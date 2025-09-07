@@ -35,7 +35,7 @@
     "@openzeppelin/hardhat-upgrades": "^3.9.0",
     "@solidstate/hardhat-bytecode-exporter": "^1.1.1",
     "dotenv": "^16.5.0",
-    "eslint": "^9.24.0",
+    "eslint": "^9.35.0",
     "hardhat": "^2.23.0",
     "hardhat-abi-exporter": "^2.11.0"
   }
