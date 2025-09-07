@@ -1,0 +1,42 @@
+{
+  "name": "tangem-yield-module-contracts",
+  "version": "0.0.1",
+  "description": "EVM smart contracts for Tangem Yield Module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tangem/tangem-yield-module-contracts.git"
+  },
+  "keywords": [
+    "Tangem",
+    "smart contracts",
+    "yield",
+    "DeFi",
+    "lending",
+    "cryptocurrency",
+    "EVM",
+    "solidity"
+  ],
+  "author": "Tangem",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/tangem/tangem-yield-module-contracts/issues"
+  },
+  "homepage": "https://github.com/tangem/tangem-yield-module-contracts#readme",
+  "devDependencies": {
+    "@0xsequence/create3": "github:0xsequence/create3",
+    "@aave/core-v3": "^1.19.3",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^5.3.0",
+    "@openzeppelin/contracts-upgradeable": "^5.3.0",
+    "@openzeppelin/hardhat-upgrades": "^3.9.0",
+    "@solidstate/hardhat-bytecode-exporter": "^1.1.1",
+    "dotenv": "^16.5.0",
+    "eslint": "^9.24.0",
+    "hardhat": "^2.23.0",
+    "hardhat-abi-exporter": "^2.11.0"
+  }
+}
