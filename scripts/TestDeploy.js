@@ -54,6 +54,9 @@ async function deployTestSetup() {
     const grantTx6 = await factory.grantRole(implementationSetterRole, msgSender);
     await grantTx6.wait();
 
+    const grantTx7 = await factory.grantRole(pauserRole, msgSender);
+    await grantTx7.wait();
+
     const setTx = await factory.setImplementation(moduleImplementation);
     await setTx.wait();
 
