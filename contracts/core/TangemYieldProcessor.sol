@@ -26,6 +26,8 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
     event FeeReceiverSet(address paymentReceiver);
     event FeeRateSet(uint feeRate);
 
+    error InvalidFeeRate();
+
     constructor(
         address feeReceiver_,
         uint serviceFeeRate_
@@ -87,7 +89,7 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
     }
 
     function _setServiceFeeRate(uint serviceFeeRate_) private {
-        require(serviceFeeRate_ <= PRECISION, "YieldProcessor: fee cannot be > 100%");
+        require(serviceFeeRate_ <= PRECISION, InvalidFeeRate());
 
         serviceFeeRate = serviceFeeRate_;
     }
