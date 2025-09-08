@@ -24,7 +24,6 @@ contract TangemYieldModuleFactory is AccessControlEnumerable, Pausable {
 
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(PAUSER_ROLE, msg.sender);
 
         _pause();
     }

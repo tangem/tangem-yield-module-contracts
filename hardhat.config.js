@@ -49,8 +49,15 @@ task("deploy-base", "Deploys contracts for testing")
     const grantTx4 = await factory.grantRole(implementationSetterRole, msgSender);
     await grantTx4.wait();
 
+    const pauserRole = ethers.id("PAUSER_ROLE")
+    const grantTx5 = await factory.grantRole(pauserRole, msgSender);
+    await grantTx5.wait();
+
     const setTx = await factory.setImplementation(moduleImplementation);
     await setTx.wait();
+
+    const unpauseTx = await factory.unpause();
+    await unpauseTx.wait();
 
     console.log("TangemYieldModuleFactory deployed to: ", await factory.getAddress());
   });
