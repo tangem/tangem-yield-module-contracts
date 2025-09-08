@@ -95,7 +95,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should fail with correct error if called not by owner or factory", async function () {
       await expect(yieldModule.initYieldToken(yieldToken, maxNetworkFee))
-        .to.be.revertedWith("YieldModule: only owner or factory can call this function");
+        .to.be.revertedWithCustomError(yieldModule, "OnlyOwnerOrFactory");
     });
 
     it("Should emit YieldTokenInitialized event", async function () {
@@ -153,7 +153,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should fail with correct error if called not by owner", async function () {
       await expect(yieldModule.enterProtocolByOwner(yieldToken))
-        .to.be.revertedWith("YieldModule: only owner can call this function");
+        .to.be.revertedWithCustomError(yieldModule, "OnlyOwner");
     });
 
     it("Should emit ProtocolEntered event with correct parameters", async function () {
@@ -301,7 +301,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should fail with correct error if network fee exceeds maximum", async function () {
       await expect(processor.enterProtocol(yieldModule, yieldToken, maxNetworkFee + 1))
-        .to.be.revertedWith("YieldModule: network fee exceeds maximum");
+        .to.be.revertedWithCustomError(yieldModule, "NetworkFeeExceedsMax");
     });
 
     it("Should fail with correct error if network fee >= enter amount", async function () {
@@ -312,12 +312,12 @@ describe("TangemBridgeProcessor", function () {
       await mintTx.wait();
 
       await expect(processor.enterProtocol(yieldModule, yieldToken, networkFee))
-        .to.be.revertedWith("YieldModule: amount to enter <= network fee");
+        .to.be.revertedWithCustomError(yieldModule, "NetworkFeeExceedsAmount");
     });
 
     it("Should fail with correct error if called not by processor", async function () {
       await expect(yieldModule.enterProtocol(yieldToken, networkFee))
-        .to.be.revertedWith("YieldModule: only processor can call this function");
+        .to.be.revertedWithCustomError(yieldModule, "OnlyProcessor");
     });
 
     it("Should emit ProtocolEntered event with correct parameters", async function () {
@@ -483,12 +483,12 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should fail with correct error if network fee exceeds maximum", async function () {
       await expect(processor.exitProtocol(yieldModule, yieldToken, maxNetworkFee + 1))
-        .to.be.revertedWith("YieldModule: network fee exceeds maximum");
+        .to.be.revertedWithCustomError(yieldModule, "NetworkFeeExceedsMax");
     });
 
     it("Should fail with correct error if called not by processor", async function () {
       await expect(yieldModule.exitProtocol(yieldToken, networkFee))
-        .to.be.revertedWith("YieldModule: only processor can call this function");
+        .to.be.revertedWithCustomError(yieldModule, "OnlyProcessor");
     });
 
     it("Should emit ProtocolExited event with correct parameters", async function () {
@@ -609,12 +609,12 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should fail with correct error if receiver is owner", async function () {
       await expect(yieldModule.connect(owner).send(yieldToken, owner, sendAmount))
-        .to.be.revertedWith("YieldModule: sending to owner");
+        .to.be.revertedWithCustomError(yieldModule, "SendingToOwner");
     });
 
     it("Should fail with correct error if called not by owner", async function () {
       await expect(yieldModule.send(yieldToken, receiver, sendAmount))
-        .to.be.revertedWith("YieldModule: only owner can call this function");
+        .to.be.revertedWithCustomError(yieldModule, "OnlyOwner");
     });
 
     it("Should emit SendProcessed event with correct parameters", async function () {
@@ -734,7 +734,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should fail with correct error if called not by owner", async function () {
       await expect(yieldModule.withdrawAndDeactivate(yieldToken))
-        .to.be.revertedWith("YieldModule: only owner can call this function");
+        .to.be.revertedWithCustomError(yieldModule, "OnlyOwner");
     });
 
     it("Should emit ProtocolExited event with correct parameters", async function () {
@@ -820,7 +820,7 @@ describe("TangemBridgeProcessor", function () {
       await initTx.wait();
 
       await expect(yieldModule.connect(owner).withdrawNonYieldToken(yieldToken))
-        .to.be.revertedWith("YieldModule: withdrawing yield token");
+        .to.be.revertedWithCustomError(yieldModule, "WithdrawingYieldToken");
     });
 
     it("Should fail with correct error if withdrawing protocol token", async function () {
@@ -829,12 +829,12 @@ describe("TangemBridgeProcessor", function () {
       await initTx.wait();
 
       await expect(yieldModule.connect(owner).withdrawNonYieldToken(protocolToken))
-        .to.be.revertedWith("YieldModule: withdrawing protocol token");
+        .to.be.revertedWithCustomError(yieldModule, "WithdrawingProtocolToken");
     });
 
     it("Should fail with correct error if called not by owner", async function () {
       await expect(yieldModule.withdrawNonYieldToken(nonYieldToken))
-        .to.be.revertedWith("YieldModule: only owner can call this function");
+        .to.be.revertedWithCustomError(yieldModule, "OnlyOwner");
     });
 
     it("Should emit WithdrawNonYieldProcessed event", async function () {
@@ -907,7 +907,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should fail with correct error if called not by processor", async function () {
       await expect(yieldModule.collectServiceFee(yieldToken))
-        .to.be.revertedWith("YieldModule: only processor can call this function");
+        .to.be.revertedWithCustomError(yieldModule, "OnlyProcessor");
     });
 
     it("Should emit FeePaymentProcessed event with correct parameters", async function () {
@@ -960,7 +960,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should fail with correct error if called not by owner", async function () {
       await expect(yieldModule.reactivateToken(yieldToken, newMaxNetworkFee))
-        .to.be.revertedWith("YieldModule: only owner can call this function");
+        .to.be.revertedWithCustomError(yieldModule, "OnlyOwner");
     });
 
     it("Should emit TokenReactivated event with correct parameters", async function () {
@@ -997,7 +997,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should fail with correct error if called not by owner", async function () {
       await expect(yieldModule.setYieldTokenMaxNetworkFee(yieldToken, newMaxNetworkFee))
-        .to.be.revertedWith("YieldModule: only owner can call this function");
+        .to.be.revertedWithCustomError(yieldModule, "OnlyOwner");
     });
 
     it("Should emit TokenMaxNetworkFeeSet event with correct parameters", async function () {
@@ -1041,7 +1041,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should fail with correct error if called not by owner", async function () {
       await expect(yieldModule.upgradeToAndCall(newImplementation, "0x"))
-        .to.be.revertedWith("YieldModule: only owner can call this function");
+        .to.be.revertedWithCustomError(yieldModule, "OnlyOwner");
     });
 
     it("Should emit Upgraded event with correct parameters", async function () {

@@ -47,21 +47,18 @@ abstract contract YieldModuleLiquidUpgradeable is
     mapping(address => bool) public isProtocolToken;
 
     modifier onlyOwner {
-        require(_msgSender() == owner, "YieldModule: only owner can call this function");
+        require(_msgSender() == owner, OnlyOwner());
         _;
     }
 
     modifier onlyOwnerOrFactory {
         address msgSender = _msgSender();
-        require(
-            msgSender == owner || msgSender == address(factory),
-            "YieldModule: only owner or factory can call this function"
-        );
+        require(msgSender == owner || msgSender == address(factory), OnlyOwnerOrFactory());
         _;
     }
 
     modifier onlyProcessor {
-        require(_msgSender() == address(processor), "YieldModule: only processor can call this function");
+        require(_msgSender() == address(processor), OnlyProcessor());
         _;
     }
 
@@ -90,7 +87,7 @@ abstract contract YieldModuleLiquidUpgradeable is
     // emergency function to save user's funds in case protocol or module is compromised
     function exitProtocol(address yieldToken, uint networkFee) external onlyProcessor {
         YieldTokenData storage yieldTokenData = yieldTokensData[yieldToken];
-        require(yieldTokenData.active, "YieldModule: yield token is not active");
+        require(yieldTokenData.active, TokenNotActive());
 
         // calculate service fee before changing funds in a protocol
         uint fee = calculateFee(yieldToken, networkFee);
@@ -108,13 +105,13 @@ abstract contract YieldModuleLiquidUpgradeable is
     function collectServiceFee(address yieldToken) external onlyProcessor {
         bool success = _tryProcessFee(yieldToken, calculateServiceFee(yieldToken), true);
 
-        require(success, "YieldModule: service fee processing failed");
+        require(success, FeeProcessingFailed());
     }
 
     /* OWNER FUNCTIONS */
 
     function initYieldToken(address yieldToken, uint240 maxNetworkFee) external onlyOwnerOrFactory {
-        require(!yieldTokensData[yieldToken].initialized, "YieldModule: yield token already initialized");
+        require(!yieldTokensData[yieldToken].initialized, TokenAlreadyInitialized());
         yieldToken.requireNotZero();
 
         yieldTokensData[yieldToken] = YieldTokenData(true, true, maxNetworkFee);
@@ -127,9 +124,8 @@ abstract contract YieldModuleLiquidUpgradeable is
     }
     
     function send(address yieldToken, address to, uint amount) external onlyOwner {
-        require(to != owner, "YieldModule: sending to owner"); // use withdrawAndDeactivate to send to owner to avoid funds being pushed back to protocol
-
-        require(yieldTokensData[yieldToken].active, "YieldModule: token is inactive");
+        require(to != owner, SendingToOwner()); // use withdrawAndDeactivate to send to owner to avoid funds being pushed back to protocol
+        require(yieldTokensData[yieldToken].active, TokenInactive());
         amount.requireNotZero();
 
         IERC20 ierc20Token = IERC20(yieldToken);
@@ -152,7 +148,7 @@ abstract contract YieldModuleLiquidUpgradeable is
 
     function withdrawAndDeactivate(address yieldToken) external onlyOwner {
         YieldTokenData storage yieldTokenData = yieldTokensData[yieldToken];
-        require(yieldTokenData.active, "YieldModule: yield token is not active");
+        require(yieldTokenData.active, TokenNotActive());
 
         // calculate service fee before changing funds in a protocol
         uint fee = calculateServiceFee(yieldToken);
@@ -168,8 +164,8 @@ abstract contract YieldModuleLiquidUpgradeable is
     }
 
     function withdrawNonYieldToken(address token) external onlyOwner {
-        require(!yieldTokensData[token].active, "YieldModule: withdrawing yield token");
-        require(!isProtocolToken[token], "YieldModule: withdrawing protocol token");
+        require(!yieldTokensData[token].active, WithdrawingYieldToken());
+        require(!isProtocolToken[token], WithdrawingProtocolToken());
         token.requireNotZero();
 
         IERC20 ierc20Token = IERC20(token);
@@ -186,8 +182,8 @@ abstract contract YieldModuleLiquidUpgradeable is
     // used to reactivate token after exitProtocol and withdrawAndDeactivate
     function reactivateToken(address yieldToken, uint240 maxNetworkFee) external onlyOwner {
         YieldTokenData storage yieldTokenData = yieldTokensData[yieldToken];
-        require(yieldTokenData.initialized, "YieldModule: yield token is not initialized");
-        require(yieldTokenData.active == false, "YieldModule: yield token is already active");
+        require(yieldTokenData.initialized, TokenNotInitialized());
+        require(yieldTokenData.active == false, TokenAlreadyActive());
 
         yieldTokenData.active = true;
         yieldTokenData.maxNetworkFee = maxNetworkFee;
@@ -197,8 +193,8 @@ abstract contract YieldModuleLiquidUpgradeable is
 
     function setYieldTokenMaxNetworkFee(address yieldToken, uint240 maxNetworkFee) external onlyOwner {
         YieldTokenData storage yieldTokenData = yieldTokensData[yieldToken];
-        require(yieldTokenData.initialized, "YieldModule: yield token is not initialized");
-        require(yieldTokenData.active == true, "YieldModule: yield token is not active");
+        require(yieldTokenData.initialized, TokenNotInitialized());
+        require(yieldTokenData.active == true, TokenNotActive());
 
         yieldTokenData.maxNetworkFee = maxNetworkFee;
 
@@ -220,7 +216,7 @@ abstract contract YieldModuleLiquidUpgradeable is
     }
 
     function calculateFee(address yieldToken, uint networkFee) public view returns (uint) {
-        require(networkFee <= yieldTokensData[yieldToken].maxNetworkFee, "YieldModule: network fee exceeds maximum");
+        require(networkFee <= yieldTokensData[yieldToken].maxNetworkFee, NetworkFeeExceedsMax());
 
         return calculateServiceFee(yieldToken) + networkFee;
     }
@@ -268,7 +264,7 @@ abstract contract YieldModuleLiquidUpgradeable is
     }
 
     function _enterProtocol(address yieldToken, uint networkFee) private {
-        require(yieldTokensData[yieldToken].active, "YieldModule: yield token is not active");
+        require(yieldTokensData[yieldToken].active, TokenNotActive());
 
         IERC20 ierc20YieldToken = IERC20(yieldToken);
         uint ownerBalance = ierc20YieldToken.balanceOf(owner);
@@ -281,7 +277,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         uint amountToEnter = ierc20YieldToken.balanceOf(address(this));
 
         amountToEnter.requireNotZero();
-        require(amountToEnter > networkFee, "YieldModule: amount to enter <= network fee");
+        require(amountToEnter > networkFee, NetworkFeeExceedsAmount());
         
         _pushToProtocol(yieldToken, amountToEnter);
         _tryProcessFee(yieldToken, fee, true);
@@ -342,9 +338,6 @@ abstract contract YieldModuleLiquidUpgradeable is
         override
         view
     {
-        require(
-            factory.isValidImplementation(newImplementation),
-            "YieldModule: unauthorized implementation"
-        );
+        require(factory.isValidImplementation(newImplementation), UnauthorizedImplementation());
     }
 }

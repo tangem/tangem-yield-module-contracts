@@ -15,6 +15,22 @@ interface IYieldModule {
     event TokenReactivated(address yieldToken, uint maxNetworkFee);
     event TokenMaxNetworkFeeSet(address yieldToken, uint240 maxNetworkFee);
 
+    error OnlyOwner();
+    error OnlyOwnerOrFactory();
+    error OnlyProcessor();
+    error TokenNotActive();
+    error FeeProcessingFailed();
+    error TokenAlreadyInitialized();
+    error SendingToOwner();
+    error TokenInactive();
+    error WithdrawingYieldToken();
+    error WithdrawingProtocolToken();
+    error TokenNotInitialized();
+    error TokenAlreadyActive();
+    error NetworkFeeExceedsMax();
+    error NetworkFeeExceedsAmount();
+    error UnauthorizedImplementation();
+
     function initialize(address owner) external;
 
     function initYieldToken(address yieldToken, uint240 maxNetworkFee) external;

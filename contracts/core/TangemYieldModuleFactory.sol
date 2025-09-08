@@ -22,6 +22,9 @@ contract TangemYieldModuleFactory is AccessControlEnumerable, Pausable {
     event ImplementationSet(address newImplementation);
     event YieldModuleDeployed(address owner, address yieldModule);
 
+    error ModuleAlreadyDeployed();
+    error OnlyOwnerInitsToken();
+
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
@@ -33,9 +36,9 @@ contract TangemYieldModuleFactory is AccessControlEnumerable, Pausable {
         address yieldToken,
         uint240 maxNetworkFee
     ) external whenNotPaused returns (address yieldModule) {
-        require(yieldModules[owner] == address(0), "YieldModuleFactory: yield module is already deployed");
+        require(yieldModules[owner] == address(0), ModuleAlreadyDeployed());
         if (yieldToken != address(0)) {
-            require(_msgSender() == owner, "YieldModuleFactory: only owner can initialize a token");
+            require(_msgSender() == owner, OnlyOwnerInitsToken());
         }
 
         bytes memory initializeData = abi.encodeCall(
