@@ -125,7 +125,7 @@ abstract contract YieldModuleLiquidUpgradeable is
     
     function send(address yieldToken, address to, uint amount) external onlyOwner {
         require(to != owner, SendingToOwner()); // use withdrawAndDeactivate to send to owner to avoid funds being pushed back to protocol
-        require(yieldTokensData[yieldToken].active, TokenInactive());
+        require(yieldTokensData[yieldToken].active, TokenNotActive());
         amount.requireNotZero();
 
         IERC20 ierc20Token = IERC20(yieldToken);
