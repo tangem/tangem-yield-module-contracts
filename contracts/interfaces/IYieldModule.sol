@@ -22,6 +22,7 @@ interface IYieldModule {
     error FeeProcessingFailed();
     error TokenAlreadyInitialized();
     error SendingToOwner();
+    error InsufficientFunds();
     error WithdrawingYieldToken();
     error WithdrawingProtocolToken();
     error TokenNotInitialized();

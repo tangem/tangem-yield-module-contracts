@@ -132,9 +132,12 @@ abstract contract YieldModuleLiquidUpgradeable is
 
         uint fee = calculateServiceFee(yieldToken);
         uint ownerBalance = ierc20Token.balanceOf(owner);
+        uint pullAmount = amount - ownerBalance;
+
+        require(pullAmount <= _protocolBalance(yieldToken) - fee, InsufficientFunds());
 
         if (ownerBalance < amount) {
-            _pullFromProtocol(yieldToken, amount - ownerBalance);
+            _pullFromProtocol(yieldToken, pullAmount);
         }
 
         ierc20Token.safeTransferFrom(owner, to, amount);
