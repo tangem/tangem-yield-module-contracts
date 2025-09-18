@@ -179,7 +179,7 @@ module.exports = {
       accounts: ACCOUNTS
     },
     polygon: {
-      url: "https://polygon-rpc.com/",
+      url: "https://rpc-mainnet.matic.quiknode.pro/",
       accounts: ACCOUNTS
     },
     sepolia: {
