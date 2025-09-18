@@ -139,7 +139,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         if (ownerBalance < amount) {
             uint pullAmount = amount - ownerBalance;
             require(pullAmount <= _protocolBalance(yieldToken) - fee, InsufficientFunds());
-            
+
             _pullFromProtocol(yieldToken, pullAmount);
         }
 
@@ -228,7 +228,7 @@ abstract contract YieldModuleLiquidUpgradeable is
     }
 
     function calculateServiceFee(address yieldToken) public view returns (uint) {
-        return _calculateServiceFee(yieldToken, _protocolBalance(yieldToken)) + feeDebts[yieldToken];
+        return _calculateServiceFee(yieldToken, _protocolBalance(yieldToken));
     }
 
     /* PRIVATE AND INTERNAL FUNCTIONS */
@@ -324,8 +324,9 @@ abstract contract YieldModuleLiquidUpgradeable is
         unchecked { // checked with last if
             revenue = protocolBalance_ - latestFeePaymentProtocolBalance;
         }
+        uint currentServiceFee = revenue * latestFeePaymentServiceFeeRate / PRECISION;
 
-        return revenue * latestFeePaymentServiceFeeRate / PRECISION;
+        return currentServiceFee + feeDebts[yieldToken];
     }
 
     function _protocolBalance(address yieldToken) internal view returns (uint) {
