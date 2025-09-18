@@ -115,8 +115,10 @@ abstract contract YieldModuleLiquidUpgradeable is
         yieldToken.requireNotZero();
 
         yieldTokensData[yieldToken] = YieldTokenData(true, true, maxNetworkFee);
-        
+
         address protocolToken = _initProtocolToken(yieldToken);
+        protocolToken.requireNotZero();
+
         protocolTokens[yieldToken] = IERC20(protocolToken);
         isProtocolToken[protocolToken] = true;
 
