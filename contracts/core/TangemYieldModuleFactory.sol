@@ -20,7 +20,7 @@ contract TangemYieldModuleFactory is AccessControlEnumerable, Pausable {
     mapping(address => address) public yieldModules;
 
     event ImplementationSet(address newImplementation);
-    event YieldModuleDeployed(address owner, address yieldModule);
+    event YieldModuleDeployed(address indexed owner, address indexed yieldModule);
 
     error ModuleAlreadyDeployed();
     error OnlyOwnerInitsToken();
