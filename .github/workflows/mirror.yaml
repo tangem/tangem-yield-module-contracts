@@ -1,0 +1,24 @@
+name: Mirror repository
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to target repo
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          git remote add mirror https://x-access-token:${{ secrets.MIRROR_TOKEN }}@github.com/tangem/tangem-yield-module-contracts.git
+          git push --mirror mirror
