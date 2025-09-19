@@ -213,6 +213,12 @@ abstract contract YieldModuleLiquidUpgradeable is
         return _protocolBalance(yieldToken);
     }
 
+    function effectiveProtocolBalance(address yieldToken) external view returns (uint) {
+        uint protocolBalance_ = _protocolBalance(yieldToken);
+
+        return protocolBalance_ - _calculateServiceFee(yieldToken, protocolBalance_);
+    }
+
     function effectiveBalance(address yieldToken) external view returns (uint) {
         uint protocolBalance_ = _protocolBalance(yieldToken);
 
