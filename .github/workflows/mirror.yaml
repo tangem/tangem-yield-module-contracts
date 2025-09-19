@@ -33,7 +33,7 @@ jobs:
           git config --global user.email "gitservice@tangem.com"
 
           remote="git@github.com:tangem/tangem-yield-module-contracts.git"
-          git push --force --mirror "$remote" 'refs/heads/*:refs/heads/*'
+          git push --mirror "$remote"
 
 
       - name: Cleanup SSH keys
