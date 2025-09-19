@@ -15,10 +15,28 @@ jobs:
         with:
           fetch-depth: 0
 
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          echo "Host github.com" >> ~/.ssh/config
+          echo "  ServerAliveInterval 30" >> ~/.ssh/config
+          echo "  ServerAliveCountMax 5" >> ~/.ssh/config
+
+
       - name: Push to target repo
         run: |
           git config --global user.name "tangem-service"
           git config --global user.email "gitservice@tangem.com"
 
-          git remote add mirror https://x-access-token:${{ secrets.MIRROR_TOKEN }}@github.com/tangem/tangem-yield-module-contracts.git
-          git push --mirror mirror
+          remote="git@github.com:tangem/tangem-yield-module-contracts.git"
+          git push --force "$remote" 'refs/heads/*:refs/heads/*'
+
+
+      - name: Cleanup SSH keys
+        if: always()
+        run: |
+          rm -rf ~/.ssh
