@@ -17,8 +17,8 @@ jobs:
 
       - name: Push to target repo
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "tangem-service"
+          git config --global user.email "gitservice@tangem.com"
 
           git remote add mirror https://x-access-token:${{ secrets.MIRROR_TOKEN }}@github.com/tangem/tangem-yield-module-contracts.git
           git push --mirror mirror
