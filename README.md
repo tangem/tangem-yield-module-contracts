@@ -3,12 +3,12 @@ EVM smart contracts for Tangem Yield Module
 
 ## Current testnet deployment (Sepolia testnet)
 
-TangemYieldProcessor - [0xf5D1B3D963836F4157d7518A35BDF1A4A6F7fB26](https://sepolia.etherscan.io/address/0xf5D1B3D963836F4157d7518A35BDF1A4A6F7fB26)
+TangemYieldProcessor - [0x54E44c70Ed257Baf81e8CfE77Ffe9c5D2Bf6C04b](https://sepolia.etherscan.io/address/0x54E44c70Ed257Baf81e8CfE77Ffe9c5D2Bf6C04b)
 
-TangemYieldModuleFactory - [0xEF9884f7D4b6EB8c3F1e7F1dD0D5E17289dFd3D0](https://sepolia.etherscan.io/address/0xEF9884f7D4b6EB8c3F1e7F1dD0D5E17289dFd3D0)
+TangemYieldModuleFactory - [0xC013c927B9471889BdECDBd8cFD145CdE8B23f1A](https://sepolia.etherscan.io/address/0xC013c927B9471889BdECDBd8cFD145CdE8B23f1A)
 
 ## Current test mainnet deployment (Polygon PoS)
 
-TangemYieldProcessor - [0x9491790712569635154e8E7540d68da9e1F83a14](https://sepolia.etherscan.io/address/0x9491790712569635154e8E7540d68da9e1F83a14)
+TangemYieldProcessor - [0xA32019c38a7EF45b87c09155600EEc457915b782](https://sepolia.etherscan.io/address/0xA32019c38a7EF45b87c09155600EEc457915b782)
 
-TangemYieldModuleFactory - [0x39DA3e346F26c784d5A3f389C27d7FdA830Eb742](https://sepolia.etherscan.io/address/0x39DA3e346F26c784d5A3f389C27d7FdA830Eb742)
+TangemYieldModuleFactory - [0x685345d16aA462FB52bDB0D73807a199d1c5Ef76](https://sepolia.etherscan.io/address/0x685345d16aA462FB52bDB0D73807a199d1c5Ef76)
