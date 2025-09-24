@@ -160,8 +160,10 @@ abstract contract YieldModuleLiquidUpgradeable is
         uint fee = calculateServiceFee(yieldToken);
         uint amountToExit = _protocolBalance(yieldToken) - fee;
         
-        _pullFromProtocol(yieldToken, amountToExit);
-        _tryProcessFee(yieldToken, _protocolBalance(yieldToken), true); // get protocol balance again to extract all funds, because the amount left can grow a bit after pull
+        if (amountToExit > 0) {
+            _pullFromProtocol(yieldToken, amountToExit);
+            _tryProcessFee(yieldToken, _protocolBalance(yieldToken), true); // get protocol balance again to extract all funds, because the amount left can grow a bit after pull
+        }
 
         // disable token to avoid abuse by processor
         yieldTokenData.active = false;
