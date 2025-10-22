@@ -174,16 +174,16 @@ module.exports = {
     flat: true
   },
   networks: {
-    mumbai: {
-      url: "https://polygon-mumbai.g.alchemy.com/v2/_1qqjXgBC_IikaXChnna8KTcV2eMMIQG",
-      accounts: ACCOUNTS
-    },
     polygon: {
       url: "https://rpc-mainnet.matic.quiknode.pro/",
       accounts: ACCOUNTS
     },
     sepolia: {
       url: "https://gateway.tenderly.co/public/sepolia",
+      accounts: ACCOUNTS
+    },
+    arbitrum_sepolia: {
+      url: "https://arbitrum-sepolia.drpc.org",
       accounts: ACCOUNTS
     },
     hardhat: {
