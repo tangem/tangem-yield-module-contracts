@@ -62,7 +62,7 @@ task("deploy-base", "Deploys contracts for testing")
     console.log("TangemYieldModuleFactory deployed to: ", await factory.getAddress());
   });
 
-task("deploy-account", "Deploys yield module")
+task("deploy-module", "Deploys yield module")
   .addParam("factory", "The address of the yield module factory")
   .addParam("token", "The address of the yield token")
   .setAction(async (taskArgs) => {
@@ -80,7 +80,7 @@ task("deploy-account", "Deploys yield module")
     const deployTx = await factory.deployYieldModule(ownerAddress, yieldTokenAddress, 100);
     await deployTx.wait();
 
-    const yieldModuleAddress = await factory.calculateYieldModuleAddress(ownerAddress);
+    const yieldModuleAddress = await factory.yieldModules(ownerAddress);
     const AaveV3YieldModule = await ethers.getContractFactory("TangemAaveV3YieldModule");
     const yieldModule = AaveV3YieldModule.attach(yieldModuleAddress);
 
@@ -97,59 +97,54 @@ task("deploy-account", "Deploys yield module")
 
 task("enter-protocol", "Enters yield protocol")
   .addParam("processor", "The address of the yield processor")
-  .addParam("account", "The address of the yield module")
+  .addParam("factory", "The address of the yield module factory")
+  .addParam("owner", "The address of the yield module's owner")
   .addParam("token", "The address of the yield token")
+  .addParam("maxFee", "The address of the yield token")
   .setAction(async (taskArgs) => {
     await hre.run('compile');
 
     const processorAddress = taskArgs.processor;
-    const yieldModuleAddress = taskArgs.account;
+    const factoryAddress = taskArgs.factory;
+    const ownerAddress = taskArgs.owner;
     const yieldTokenAddress = taskArgs.token;
+    const maxFee = taskArgs.maxFee;
+
+    const TangemYieldModuleFactory = await ethers.getContractFactory("TangemYieldModuleFactory");
+    const factory = TangemYieldModuleFactory.attach(factoryAddress);
+    
+    const yieldModuleAddress = factory.yieldModules(ownerAddress);
 
     const TangemYieldProcessor = await ethers.getContractFactory("TangemYieldProcessor");
     const processor = TangemYieldProcessor.attach(processorAddress);
     
-    const enterTx = await processor.enterProtocol(yieldModuleAddress, yieldTokenAddress, 100); // , { gasLimit: 3000000 });
+    const enterTx = await processor.enterProtocol(yieldModuleAddress, yieldTokenAddress, maxFee); // , { gasLimit: 3000000 });
     await enterTx.wait();
 
     console.log("Protocol entered");
   });
 
-task("withdraw-self", "Withdraws user funds")
-  .addParam("module", "The address of the yield module")
-  .addParam("amount", "Amount to withdraw")
-  .addParam("token", "The address of the yield token")
+task("grant-backend-roles", "Withdraws user funds")
+  .addParam("processor", "The address of the yield processor")
+  .addParam("to", "The address of the account to grant roles to")
   .setAction(async (taskArgs) => {
     await hre.run('compile');
 
-    const msgSender = (await hre.ethers.getSigners())[0].address
+    const processorAddress = taskArgs.processor;
+    const to = taskArgs.to;
 
-    const yieldModuleAddress = taskArgs.account;
-    const amount = taskArgs.amount;
-    const yieldTokenAddress = taskArgs.token;
-
-    const TangemAaveV3YieldModule = await ethers.getContractFactory("TangemAaveV3YieldModule");
-    const yieldModule = TangemAaveV3YieldModule.attach(yieldModuleAddress);
+    const TangemYieldProcessor = await ethers.getContractFactory("TangemYieldProcessor");
+    const processor = TangemYieldProcessor.attach(processorAddress);
     
-    const withdrawTx = await yieldModule.withdraw(yieldTokenAddress, msgSender, amount); // , { gasLimit: 3000000 });
-    await withdrawTx.wait();
+    const protocolEntererRole = ethers.id("PROTOCOL_ENTERER_ROLE")
+    const grantTx1 = await processor.grantRole(protocolEntererRole, to);
+    await grantTx1.wait();
 
-    console.log("Funds withdrawn");
-  });
+    const serviceFeeCollectorRole = ethers.id("SERVICE_FEE_COLLECTOR_ROLE")
+    const grantTx2 = await processor.grantRole(serviceFeeCollectorRole, to);
+    await grantTx2.wait();
 
-task("get-module-address", "Withdraws user funds")
-  .addParam("owner", "The address of the yield module's owner")
-  .addParam("factory", "The address of the yield module factory")
-  .setAction(async (taskArgs) => {
-    const factoryAddress = taskArgs.factory;
-    const ownerAddress = taskArgs.owner;
-
-    const TangemYieldModuleFactory = await ethers.getContractFactory("TangemYieldModuleFactory");
-    const factory = TangemYieldModuleFactory.attach(factoryAddress);
-
-    const moduleAddress = await factory.calculateYieldModuleAddress(ownerAddress);
-
-    console.log("Owner's yield module address - " + moduleAddress);
+    console.log("Backend roles granted");
   });
 
 module.exports = {
