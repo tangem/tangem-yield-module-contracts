@@ -142,6 +142,42 @@ task("grant-backend-roles", "Grants backend roles")
     console.log("Backend roles granted");
   });
 
+task("change-admin", "Changes the Default Admin for processor and factory")
+  .addParam("processor", "The address of the yield processor")
+  .addParam("factory", "The address of the yield module factory")
+  .addParam("to", "The address of the new admin")
+  .setAction(async (taskArgs) => {
+    await hre.run('compile');
+
+    const msgSender = (await hre.ethers.getSigners())[0].address
+
+    const processorAddress = taskArgs.processor;
+    const factoryAddress = taskArgs.factory;
+    const to = taskArgs.to;
+
+    const TangemYieldProcessor = await ethers.getContractFactory("TangemYieldProcessor");
+    const processor = TangemYieldProcessor.attach(processorAddress);
+    
+    const TangemYieldModuleFactory = await ethers.getContractFactory("TangemYieldModuleFactory");
+    const factory = TangemYieldModuleFactory.attach(factoryAddress);
+
+    const defaultAdminRole = "0x0000000000000000000000000000000000000000000000000000000000000000";
+    
+    const grantTx1 = await processor.grantRole(defaultAdminRole, to);
+    await grantTx1.wait();
+
+    const grantTx2 = await factory.grantRole(defaultAdminRole, to);
+    await grantTx2.wait();
+
+    const revokeTx1 = await processor.revokeRole(defaultAdminRole, msgSender);
+    await revokeTx1.wait();
+
+    const revokeTx2 = await factory.revokeRole(defaultAdminRole, msgSender);
+    await revokeTx2.wait();
+
+    console.log("Admin has been changed");
+  });
+
 task("upgrade-module-implementation", "Deploys new module implementation and sets it to factory")
   .addParam("pool", "The address of the Aave pool")
   .addParam("processor", "The address of the yield processor")
@@ -253,7 +289,7 @@ module.exports = {
       accounts: ACCOUNTS
     },
     gnosis: {
-      url: "https://rpc.gnosischain.com",
+      url: "https://gnosis.drpc.org",
       accounts: ACCOUNTS
     },
     bsc: {
