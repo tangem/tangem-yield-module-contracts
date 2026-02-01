@@ -4,10 +4,12 @@ pragma solidity ^0.8.29;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol"; 
 import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../interfaces/IYieldModule.sol";
 import "../interfaces/IYieldFactory.sol";
 import "../interfaces/IYieldProcessor.sol";
+import "../interfaces/ISwapExecutionRegistry.sol";
 import "../resources/Constants.sol";
 import "../common/Requires.sol";
 
@@ -15,7 +17,8 @@ abstract contract YieldModuleLiquidUpgradeable is
     Initializable,
     ERC2771ContextUpgradeable,
     IYieldModule,
-    UUPSUpgradeable
+    UUPSUpgradeable,
+    ReentrancyGuardUpgradeable
 {
     using SafeERC20 for IERC20;
     using Requires for uint;
@@ -32,8 +35,18 @@ abstract contract YieldModuleLiquidUpgradeable is
         uint serviceFeeRate;
     }
 
+    struct SwapCtx {
+        IERC20 tokenIn;
+        address tokenInAddr;
+        address spenderEffective;
+        uint256 amountIn;
+        uint256 feeIn;
+        bool protocolTouched;
+    }
+
     IYieldProcessor public immutable processor;
     IYieldFactory public immutable factory;
+    ISwapExecutionRegistry public immutable swapExecutionRegistry;
     address public owner;
 
     // yield token => yield token data
@@ -63,12 +76,15 @@ abstract contract YieldModuleLiquidUpgradeable is
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor(address processor_, address factory_, address trustedForwarder)
-        ERC2771ContextUpgradeable(trustedForwarder)
+    constructor(address processor_, address factory_, address trustedForwarder_, address swapExecutionRegistry_)
+        ERC2771ContextUpgradeable(trustedForwarder_)
     {
         processor = IYieldProcessor(processor_);
         factory = IYieldFactory(factory_);
+        swapExecutionRegistry = ISwapExecutionRegistry(swapExecutionRegistry_);
     }
+
+    receive() external payable {}
 
     function __YieldModule_init(address owner_) internal onlyInitializing {
         __YieldModule_init_unchained(owner_);
@@ -183,6 +199,21 @@ abstract contract YieldModuleLiquidUpgradeable is
         emit WithdrawNonYieldProcessed(token, balance);
     }
 
+    function withdrawNativeAll(address to) external onlyOwner {
+        to.requireNotZero();
+
+        uint256 amount = address(this).balance;
+        if (amount == 0) {
+            emit WithdrawNativeProcessed(to, 0);
+            return;
+        }
+
+        (bool success, ) = to.call{value: amount}("");
+        require(success, NativeTransferFailed());
+
+        emit WithdrawNativeProcessed(to, amount);
+    }
+
     function enterProtocolByOwner(address yieldToken) external onlyOwner {
         _enterProtocol(yieldToken, 0);
     }
@@ -207,6 +238,94 @@ abstract contract YieldModuleLiquidUpgradeable is
         yieldTokenData.maxNetworkFee = maxNetworkFee;
 
         emit TokenMaxNetworkFeeSet(yieldToken, maxNetworkFee);
+    }
+
+    function swap(
+        address tokenIn,
+        uint256 amountIn,
+        address target,
+        address spender,
+        bytes calldata data
+    )
+        external
+        payable
+        onlyOwner
+        nonReentrant
+    {
+        SwapCtx memory context = _prepareSwap(tokenIn, amountIn, target, spender, data);
+
+        _callProvider(target, data);
+
+        _finalizeSwap(context);
+
+        emit SwapInitiated(
+            tokenIn,
+            amountIn,
+            target,
+            context.spenderEffective,
+            msg.value,
+            keccak256(data)
+        );
+    }
+
+    function swapAndReceive(
+        address tokenIn,
+        address tokenOut,
+        address to,
+        uint256 amountIn,
+        address target,
+        address spender,
+        bytes calldata data
+    )
+        external
+        payable
+        onlyOwner
+        nonReentrant
+    {
+        tokenOut.requireNotZero();
+        require(tokenOut != tokenIn, TokenInEqualsTokenOut());
+        require(!isProtocolToken[tokenOut], WithdrawingProtocolToken());
+
+        uint256 outBefore = IERC20(tokenOut).balanceOf(address(this));
+
+        SwapCtx memory context = _prepareSwap(tokenIn, amountIn, target, spender, data);
+
+        _callProvider(target, data);
+
+        _finalizeSwap(context);
+
+        uint256 outAfter = IERC20(tokenOut).balanceOf(address(this));
+        uint256 received = (outAfter > outBefore) ? (outAfter - outBefore) : 0;
+        require(received > 0, SwapPayoutNotReceived());
+
+        emit SwapAndReceiveInitiated(
+            tokenIn,
+            tokenOut,
+            to,
+            amountIn,
+            target,
+            context.spenderEffective,
+            msg.value,
+            keccak256(data)
+        );
+
+        bool deposited;
+        if (yieldTokensData[tokenOut].active) {
+            uint256 feeOut = calculateServiceFee(tokenOut);
+
+            _pushToProtocol(tokenOut, received);
+            _tryProcessFee(tokenOut, feeOut, true);
+
+            deposited = true;
+        } else {
+            to.requireNotZero();
+            require(to != address(this), SendingToThis());
+
+            IERC20(tokenOut).safeTransfer(to, received);
+            deposited = false;
+        }
+
+        emit SwapAndReceiveCompleted(tokenOut, to, received, deposited);
     }
 
     /* VIEW FUNCTIONS */
@@ -346,6 +465,79 @@ abstract contract YieldModuleLiquidUpgradeable is
     function _pushToProtocol(address yieldToken, uint amount) internal virtual;
 
     function _pullFromProtocol(address yieldToken, uint amount) internal virtual returns (uint);
+
+    function _prepareSwap(
+        address tokenIn,
+        uint256 amountIn,
+        address target,
+        address spender,
+        bytes calldata data
+    )
+        internal
+        returns (SwapCtx memory context)
+    {
+        require(yieldTokensData[tokenIn].active, TokenNotActive());
+
+        amountIn.requireNotZero();
+        target.requireNotZero();
+        require(target.code.length > 0, TargetHasNoCode());
+        require(data.length >= 4, DataTooShort());
+
+        address spenderEffective = (spender == address(0)) ? target : spender;
+
+        require(swapExecutionRegistry.allowedTargets(target), TargetNotAllowed());
+        require(swapExecutionRegistry.allowedSpenders(spenderEffective), SpenderNotAllowed());
+
+        uint256 feeIn = calculateServiceFee(tokenIn);
+
+        IERC20 tokenInErc20 = IERC20(tokenIn);
+        uint256 ownerBal = tokenInErc20.balanceOf(owner);
+
+        bool protocolTouched = ownerBal < amountIn;
+        if (protocolTouched) {
+            uint256 pullAmount = amountIn - ownerBal;
+            uint256 protocolBal = _protocolBalance(tokenIn);
+
+            require(protocolBal >= feeIn, InsufficientFunds());
+            require(pullAmount <= protocolBal - feeIn, InsufficientFunds());
+
+            _pullFromProtocol(tokenIn, pullAmount);
+        }
+
+        tokenInErc20.safeTransferFrom(owner, address(this), amountIn);
+        tokenInErc20.forceApprove(spenderEffective, amountIn);
+
+        context = SwapCtx({
+            tokenIn: tokenInErc20,
+            tokenInAddr: tokenIn,
+            spenderEffective: spenderEffective,
+            amountIn: amountIn,
+            feeIn: feeIn,
+            protocolTouched: protocolTouched
+        });
+    }
+
+    function _callProvider(address target, bytes calldata data) internal {
+        (bool success, bytes memory ret) = target.call{value: msg.value}(data);
+        if (!success) {
+            if (ret.length > 0) {
+                assembly {
+                    revert(add(ret, 0x20), mload(ret))
+                }
+            }
+            revert ProviderCallFailed();
+        }
+    }
+
+    function _finalizeSwap(SwapCtx memory context) internal {
+        context.tokenIn.forceApprove(context.spenderEffective, 0);
+
+        require(context.tokenIn.balanceOf(address(this)) == 0, TokenInResidue());
+
+        if (context.protocolTouched) {
+            _tryProcessFee(context.tokenInAddr, context.feeIn, true);
+        }
+    }
 
     function _authorizeUpgrade(address newImplementation)
         internal

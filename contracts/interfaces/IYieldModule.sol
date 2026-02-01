@@ -14,6 +14,31 @@ interface IYieldModule {
     event WithdrawNonYieldProcessed(address token, uint amount);
     event TokenReactivated(address yieldToken, uint maxNetworkFee);
     event TokenMaxNetworkFeeSet(address yieldToken, uint240 maxNetworkFee);
+    event SwapInitiated(
+        address indexed tokenIn,
+        uint256 amountIn,
+        address indexed target,
+        address indexed spender,
+        uint256 msgValue,
+        bytes32 dataHash
+    );
+    event SwapAndReceiveInitiated(
+        address indexed tokenIn,
+        address indexed tokenOut,
+        address indexed to,
+        uint256 amountIn,
+        address target,
+        address spender,
+        uint256 msgValue,
+        bytes32 dataHash
+    );
+    event SwapAndReceiveCompleted(
+        address indexed tokenOut,
+        address indexed to,
+        uint256 amountOut,
+        bool depositedToProtocol
+    );
+    event WithdrawNativeProcessed(address indexed to, uint256 amount);
 
     error OnlyOwner();
     error OnlyOwnerOrFactory();
@@ -30,6 +55,16 @@ interface IYieldModule {
     error NetworkFeeExceedsMax();
     error NetworkFeeExceedsAmount();
     error UnauthorizedImplementation();
+    error TargetHasNoCode();
+    error DataTooShort();
+    error TargetNotAllowed();
+    error SpenderNotAllowed();
+    error ProviderCallFailed();
+    error TokenInResidue();
+    error SwapPayoutNotReceived();
+    error NativeTransferFailed();
+    error TokenInEqualsTokenOut();
+    error SendingToThis();
 
     function initialize(address owner) external;
 
@@ -50,6 +85,28 @@ interface IYieldModule {
     function reactivateToken(address yieldToken, uint240 maxNetworkFee) external;
 
     function setYieldTokenMaxNetworkFee(address yieldToken, uint240 maxNetworkFee) external;
+
+    function swap(
+        address tokenIn,
+        uint256 amountIn,
+        address target,
+        address spender,
+        bytes calldata data
+    )
+        external
+        payable;
+
+    function swapAndReceive(
+        address tokenIn,
+        address tokenOut,
+        address to,
+        uint256 amountIn,
+        address target,
+        address spender,
+        bytes calldata data
+    )
+        external
+        payable;
 
     function protocolBalance(address yieldToken) external view returns (uint);
     
