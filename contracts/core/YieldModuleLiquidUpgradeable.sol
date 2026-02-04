@@ -35,7 +35,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         uint serviceFeeRate;
     }
 
-    struct SwapCtx {
+    struct SwapContext {
         IERC20 tokenIn;
         address tokenInAddr;
         address spenderEffective;
@@ -252,7 +252,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         onlyOwner
         nonReentrant
     {
-        SwapCtx memory context = _prepareSwap(tokenIn, amountIn, target, spender, data);
+        SwapContext memory context = _prepareSwap(tokenIn, amountIn, target, spender, data);
 
         _callProvider(target, data);
 
@@ -288,7 +288,7 @@ abstract contract YieldModuleLiquidUpgradeable is
 
         uint256 outBefore = IERC20(tokenOut).balanceOf(address(this));
 
-        SwapCtx memory context = _prepareSwap(tokenIn, amountIn, target, spender, data);
+        SwapContext memory context = _prepareSwap(tokenIn, amountIn, target, spender, data);
 
         _callProvider(target, data);
 
@@ -474,7 +474,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         bytes calldata data
     )
         internal
-        returns (SwapCtx memory context)
+        returns (SwapContext memory context)
     {
         require(yieldTokensData[tokenIn].active, TokenNotActive());
 
@@ -507,7 +507,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         tokenInErc20.safeTransferFrom(owner, address(this), amountIn);
         tokenInErc20.forceApprove(spenderEffective, amountIn);
 
-        context = SwapCtx({
+        context = SwapContext({
             tokenIn: tokenInErc20,
             tokenInAddr: tokenIn,
             spenderEffective: spenderEffective,
@@ -529,7 +529,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         }
     }
 
-    function _finalizeSwap(SwapCtx memory context) internal {
+    function _finalizeSwap(SwapContext memory context) internal {
         context.tokenIn.forceApprove(context.spenderEffective, 0);
 
         require(context.tokenIn.balanceOf(address(this)) == 0, TokenInResidue());
