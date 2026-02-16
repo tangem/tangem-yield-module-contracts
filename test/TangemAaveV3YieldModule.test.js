@@ -4,14 +4,14 @@ const { deployTestSetup } = require("../scripts/TestDeploy");
 
 describe("TangemBridgeProcessor", function () {
   const PRECISION = 10000;
-  let yieldToken, factory, processor, pool, forwarder, protocolToken, backend, owner, otherAccount;
+  let yieldToken, factory, processor, pool, forwarder, protocolToken, swapExecutionRegistry, backend, owner, otherAccount;
 
   before(async function () {
     [ backend, owner, otherAccount ] = await ethers.getSigners();
   });
 
   beforeEach(async function () {
-    ( { yieldToken, factory, processor, pool, forwarder } = await deployTestSetup() );
+    ( { yieldToken, factory, processor, pool, forwarder, swapExecutionRegistry } = await deployTestSetup() );
 
     protocolTokenAddress = await pool.aToken();
     const TestERC20 = await ethers.getContractFactory("TestERC20");
@@ -1020,7 +1020,7 @@ describe("TangemBridgeProcessor", function () {
       const yieldModuleAddress = await factory.calculateYieldModuleAddress(owner);
       yieldModule = TangemAaveV3YieldModule.attach(yieldModuleAddress)
 
-      newImplementation = await TangemAaveV3YieldModule.deploy(pool, processor, factory, newForwarder);
+      newImplementation = await TangemAaveV3YieldModule.deploy(pool, processor, factory, newForwarder, swapExecutionRegistry);
       await newImplementation.waitForDeployment();
 
       const pauseTx = await factory.pause();
@@ -1048,6 +1048,640 @@ describe("TangemBridgeProcessor", function () {
       await expect(yieldModule.connect(owner).upgradeToAndCall(newImplementation, "0x"))
         .to.emit(yieldModule, "Upgraded")
         .withArgs(newImplementation);
+    });
+  });
+
+  describe("swap", function () {
+    const maxNetworkFee = 12345;
+    let yieldModule, yieldModuleAddress, swapProvider, swapProviderAddress;
+
+    let ownerAddress, backendAddress, otherAddress;
+    let tokenIn;
+
+    beforeEach(async function () {
+      ownerAddress = await owner.getAddress();
+      backendAddress = await backend.getAddress();
+      otherAddress = await otherAccount.getAddress();
+      tokenIn = await yieldToken.getAddress();
+
+      const deployTx = await factory.connect(owner).deployYieldModule(ownerAddress, tokenIn, maxNetworkFee);
+      await deployTx.wait();
+
+      const TangemAaveV3YieldModule = await ethers.getContractFactory("TangemAaveV3YieldModule");
+      yieldModuleAddress = await factory.calculateYieldModuleAddress(ownerAddress);
+      yieldModule = TangemAaveV3YieldModule.attach(yieldModuleAddress);
+
+      const SwapProviderMock = await ethers.getContractFactory("SwapProviderMock");
+      swapProvider = await SwapProviderMock.deploy();
+      await swapProvider.waitForDeployment();
+      swapProviderAddress = await swapProvider.getAddress();
+
+      await (await swapExecutionRegistry.connect(backend).setTargetAllowed(swapProviderAddress, true)).wait();
+      await (await swapExecutionRegistry.connect(backend).setSpenderAllowed(swapProviderAddress, true)).wait();
+
+      await (await yieldToken.connect(owner).approve(yieldModuleAddress, ethers.MaxUint256)).wait();
+    });
+
+    it("Should fail with correct error if called not by owner", async function () {
+      const data = swapProvider.interface.encodeFunctionData("revertEmpty", []);
+
+      await expect(
+        yieldModule.connect(backend).swap(tokenIn, 1, swapProviderAddress, ethers.ZeroAddress, data)
+      ).to.be.revertedWithCustomError(yieldModule, "OnlyOwner");
+    });
+
+    it("Should fail with correct error if token is not active", async function () {
+      const deactivateTx = await yieldModule.connect(owner).withdrawAndDeactivate(tokenIn);
+      await deactivateTx.wait();
+
+      const data = swapProvider.interface.encodeFunctionData("revertEmpty", []);
+
+      await expect(
+        yieldModule.connect(owner).swap(tokenIn, 1, swapProviderAddress, ethers.ZeroAddress, data)
+      ).to.be.revertedWithCustomError(yieldModule, "TokenNotActive");
+    });
+
+    it("Should fail with correct error if data is too short", async function () {
+      await expect(
+        yieldModule.connect(owner).swap(tokenIn, 1, swapProviderAddress, ethers.ZeroAddress, "0x123456")
+      ).to.be.revertedWithCustomError(yieldModule, "DataTooShort");
+    });
+
+    it("Should fail with correct error if target has no code", async function () {
+      await expect(
+        yieldModule.connect(owner).swap(tokenIn, 1, otherAddress, ethers.ZeroAddress, "0x12345678")
+      ).to.be.revertedWithCustomError(yieldModule, "TargetHasNoCode");
+    });
+
+    it("Should fail with correct error if target is not allowed", async function () {
+      const SwapProviderMock = await ethers.getContractFactory("SwapProviderMock");
+      const notAllowedProvider = await SwapProviderMock.deploy();
+      await notAllowedProvider.waitForDeployment();
+      const notAllowedProviderAddress = await notAllowedProvider.getAddress();
+
+      const data = notAllowedProvider.interface.encodeFunctionData("revertEmpty", []);
+
+      await expect(
+        yieldModule.connect(owner).swap(tokenIn, 1, notAllowedProviderAddress, ethers.ZeroAddress, data)
+      ).to.be.revertedWithCustomError(yieldModule, "TargetNotAllowed");
+    });
+
+    it("Should fail with correct error if spender is not allowed", async function () {
+      const data = swapProvider.interface.encodeFunctionData("revertEmpty", []);
+
+      await expect(
+        yieldModule.connect(owner).swap(tokenIn, 1, swapProviderAddress, otherAddress, data)
+      ).to.be.revertedWithCustomError(yieldModule, "SpenderNotAllowed");
+    });
+
+    it("Should bubble provider custom error", async function () {
+      await (await yieldToken.mint(ownerAddress, 1)).wait();
+
+      const data = swapProvider.interface.encodeFunctionData("revertWithError", []);
+
+      await expect(
+        yieldModule.connect(owner).swap(tokenIn, 1, swapProviderAddress, ethers.ZeroAddress, data)
+      ).to.be.revertedWithCustomError(swapProvider, "MockRevert");
+    });
+
+    it("Should fail with correct error if provider reverts without data", async function () {
+      await (await yieldToken.mint(ownerAddress, 1)).wait();
+
+      const data = swapProvider.interface.encodeFunctionData("revertEmpty", []);
+
+      await expect(
+        yieldModule.connect(owner).swap(tokenIn, 1, swapProviderAddress, ethers.ZeroAddress, data)
+      ).to.be.revertedWithCustomError(yieldModule, "ProviderCallFailed");
+    });
+
+    it("Should fail with correct error if tokenIn residue remains after swap", async function () {
+      const amountIn = 1000;
+
+      await (await yieldToken.mint(ownerAddress, amountIn)).wait();
+
+      const data = swapProvider.interface.encodeFunctionData("spendPartial", [
+        tokenIn,
+        amountIn,
+        backendAddress,
+      ]);
+
+      await expect(
+        yieldModule.connect(owner).swap(tokenIn, amountIn, swapProviderAddress, ethers.ZeroAddress, data)
+      ).to.be.revertedWithCustomError(yieldModule, "TokenInResidue");
+    });
+
+    it("Should execute swap, clear allowance, and emit SwapInitiated event", async function () {
+      const amountIn = 2500;
+
+      await (await yieldToken.mint(ownerAddress, amountIn)).wait();
+
+      const sinkBefore = await yieldToken.balanceOf(backendAddress);
+
+      const data = swapProvider.interface.encodeFunctionData("swapExactIn", [
+        tokenIn,
+        ethers.ZeroAddress,
+        amountIn,
+        0,
+        backendAddress,
+      ]);
+
+      const dataHash = ethers.keccak256(data);
+
+      await expect(
+        yieldModule.connect(owner).swap(tokenIn, amountIn, swapProviderAddress, ethers.ZeroAddress, data)
+      )
+        .to.emit(yieldModule, "SwapInitiated")
+        .withArgs(tokenIn, amountIn, swapProviderAddress, swapProviderAddress, 0, dataHash);
+
+      expect(await yieldToken.allowance(yieldModuleAddress, swapProviderAddress)).to.equal(0);
+      expect(await yieldToken.balanceOf(yieldModuleAddress)).to.equal(0);
+
+      const sinkAfter = await yieldToken.balanceOf(backendAddress);
+      expect(sinkAfter - sinkBefore).to.equal(amountIn);
+    });
+
+    it("Should pull from protocol when owner balance is insufficient and process service fee", async function () {
+      const depositAmount = 100000;
+      const accumulatedRevenue = 10000;
+      const ownerTopup = 1;
+      const amountIn = 2000;
+
+      await (await yieldToken.mint(ownerAddress, depositAmount)).wait();
+      await (await yieldModule.connect(owner).enterProtocolByOwner(tokenIn)).wait();
+
+      await (await pool.generateRevenue(yieldModuleAddress, accumulatedRevenue)).wait();
+
+      const feeRate = await processor.serviceFeeRate();
+      const serviceFee = Math.floor(accumulatedRevenue * Number(feeRate) / PRECISION);
+      const feeReceiver = await processor.feeReceiver();
+
+      await (await yieldToken.mint(ownerAddress, ownerTopup)).wait();
+
+      const pullAmount = amountIn - ownerTopup;
+
+      const data = swapProvider.interface.encodeFunctionData("swapExactIn", [
+        tokenIn,
+        ethers.ZeroAddress,
+        amountIn,
+        0,
+        backendAddress,
+      ]);
+
+      await expect(
+        yieldModule.connect(owner).swap(tokenIn, amountIn, swapProviderAddress, ethers.ZeroAddress, data)
+      )
+        .to.emit(pool, "Withdraw")
+        .withArgs(tokenIn, pullAmount, ownerAddress)
+        .and.to.emit(protocolToken, "Transfer")
+        .withArgs(yieldModuleAddress, feeReceiver, serviceFee)
+        .and.to.emit(yieldModule, "FeePaymentProcessed")
+        .withArgs(tokenIn, serviceFee, feeReceiver);
+    });
+
+    it("Should pull from protocol when owner balance is insufficient and process service fee", async function () {
+      const ownerAddress = await owner.getAddress();
+      const backendAddress = await backend.getAddress();
+      const yieldTokenAddress = await yieldToken.getAddress();
+
+      const depositAmount = 100000n;
+      const accumulatedRevenue = 10000n;
+      const ownerTopup = 1n;
+      const amountIn = 2000n;
+
+      await (await yieldToken.mint(ownerAddress, depositAmount)).wait();
+      await (await yieldModule.connect(owner).enterProtocolByOwner(yieldTokenAddress)).wait();
+      await (await pool.generateRevenue(yieldModuleAddress, accumulatedRevenue)).wait();
+
+      const feeRate = await processor.serviceFeeRate();
+      const serviceFee = (accumulatedRevenue * feeRate) / BigInt(PRECISION);
+      const feeReceiver = await processor.feeReceiver();
+
+      await (await yieldToken.mint(ownerAddress, ownerTopup)).wait();
+
+      const pullAmount = amountIn - ownerTopup;
+
+      const data = swapProvider.interface.encodeFunctionData("swapExactIn", [
+        yieldTokenAddress,
+        ethers.ZeroAddress,
+        amountIn,
+        0n,
+        backendAddress,
+      ]);
+
+      const tx = yieldModule
+        .connect(owner)
+        .swap(yieldTokenAddress, amountIn, swapProviderAddress, ethers.ZeroAddress, data);
+
+      await expect(tx)
+        .to.emit(pool, "Withdraw")
+        .withArgs(yieldTokenAddress, pullAmount, ownerAddress)
+        .and.to.emit(protocolToken, "Transfer")
+        .withArgs(yieldModuleAddress, feeReceiver, serviceFee)
+        .and.to.emit(yieldModule, "FeePaymentProcessed")
+        .withArgs(yieldTokenAddress, serviceFee, feeReceiver);
+    });
+
+    it("Should fail with correct error when pull amount exceeds protocol balance minus fee", async function () {
+      const ownerAddress = await owner.getAddress();
+      const yieldTokenAddress = await yieldToken.getAddress();
+
+      const depositAmount = 1000n;
+      const ownerTopup = 1n;
+      const amountIn = 2000n;
+
+      await (await yieldToken.mint(ownerAddress, depositAmount)).wait();
+      await (await yieldModule.connect(owner).enterProtocolByOwner(yieldTokenAddress)).wait();
+
+      await (await yieldToken.mint(ownerAddress, ownerTopup)).wait();
+
+      const data = swapProvider.interface.encodeFunctionData("revertEmpty", []);
+
+      await expect(
+        yieldModule
+          .connect(owner)
+          .swap(yieldTokenAddress, amountIn, swapProviderAddress, ethers.ZeroAddress, data)
+      ).to.be.revertedWithCustomError(yieldModule, "InsufficientFunds");
+    });
+  });
+
+  describe("swapAndReceive", function () {
+    const maxNetworkFee = 12345;
+
+    let yieldModule, yieldModuleAddress;
+    let swapProvider, swapProviderAddress;
+
+    let tokenIn;
+    let ownerAddress, backendAddress, otherAddress;
+
+    beforeEach(async function () {
+      ownerAddress = await owner.getAddress();
+      backendAddress = await backend.getAddress();
+      otherAddress = await otherAccount.getAddress();
+
+      tokenIn = await yieldToken.getAddress();
+
+      const deployTx = await factory.connect(owner).deployYieldModule(ownerAddress, tokenIn, maxNetworkFee);
+      await deployTx.wait();
+
+      const TangemAaveV3YieldModule = await ethers.getContractFactory("TangemAaveV3YieldModule");
+      yieldModuleAddress = await factory.calculateYieldModuleAddress(ownerAddress);
+      yieldModule = TangemAaveV3YieldModule.attach(yieldModuleAddress);
+
+      const SwapProviderMock = await ethers.getContractFactory("SwapProviderMock");
+      swapProvider = await SwapProviderMock.deploy();
+      await swapProvider.waitForDeployment();
+      swapProviderAddress = await swapProvider.getAddress();
+
+      await (await swapExecutionRegistry.connect(backend).setTargetAllowed(swapProviderAddress, true)).wait();
+      await (await swapExecutionRegistry.connect(backend).setSpenderAllowed(swapProviderAddress, true)).wait();
+
+      await (await yieldToken.connect(owner).approve(yieldModuleAddress, ethers.MaxUint256)).wait();
+    });
+
+    it("Should fail with correct error if called not by owner", async function () {
+      const TestERC20 = await ethers.getContractFactory("TestERC20");
+      const outToken = await TestERC20.deploy();
+      await outToken.waitForDeployment();
+
+      const tokenOut = await outToken.getAddress();
+      const amountIn = 1n;
+
+      const data = swapProvider.interface.encodeFunctionData("swapExactIn", [
+        tokenIn,
+        tokenOut,
+        amountIn,
+        0n,
+        backendAddress,
+      ]);
+
+      await expect(
+        yieldModule
+          .connect(backend)
+          .swapAndReceive(tokenIn, tokenOut, otherAddress, amountIn, swapProviderAddress, ethers.ZeroAddress, data)
+      ).to.be.revertedWithCustomError(yieldModule, "OnlyOwner");
+    });
+
+    it("Should revert when tokenOut is zero address", async function () {
+      const amountIn = 1n;
+
+      const data = swapProvider.interface.encodeFunctionData("swapExactIn", [
+        tokenIn,
+        ethers.ZeroAddress,
+        amountIn,
+        0n,
+        backendAddress,
+      ]);
+
+      await expect(
+        yieldModule
+          .connect(owner)
+          .swapAndReceive(tokenIn, ethers.ZeroAddress, otherAddress, amountIn, swapProviderAddress, ethers.ZeroAddress, data)
+      ).to.be.reverted;
+    });
+
+    it("Should fail with correct error if tokenIn equals tokenOut", async function () {
+      const amountIn = 1n;
+
+      const data = swapProvider.interface.encodeFunctionData("swapExactIn", [
+        tokenIn,
+        tokenIn,
+        amountIn,
+        0n,
+        backendAddress,
+      ]);
+
+      await expect(
+        yieldModule
+          .connect(owner)
+          .swapAndReceive(tokenIn, tokenIn, otherAddress, amountIn, swapProviderAddress, ethers.ZeroAddress, data)
+      ).to.be.revertedWithCustomError(yieldModule, "TokenInEqualsTokenOut");
+    });
+
+    it("Should fail with correct error if tokenOut is a protocol token", async function () {
+      const protocolTokenAddress = await protocolToken.getAddress();
+      const amountIn = 1n;
+
+      const data = swapProvider.interface.encodeFunctionData("swapExactIn", [
+        tokenIn,
+        protocolTokenAddress,
+        amountIn,
+        0n,
+        backendAddress,
+      ]);
+
+      await expect(
+        yieldModule
+          .connect(owner)
+          .swapAndReceive(tokenIn, protocolTokenAddress, otherAddress, amountIn, swapProviderAddress, ethers.ZeroAddress, data)
+      ).to.be.revertedWithCustomError(yieldModule, "WithdrawingProtocolToken");
+    });
+
+    it("Should fail with correct error if swap payout is not received", async function () {
+      const TestERC20 = await ethers.getContractFactory("TestERC20");
+      const outToken = await TestERC20.deploy();
+      await outToken.waitForDeployment();
+
+      const tokenOut = await outToken.getAddress();
+
+      const amountIn = 1000n;
+
+      await (await yieldToken.mint(ownerAddress, amountIn)).wait();
+
+      const data = swapProvider.interface.encodeFunctionData("swapExactIn", [
+        tokenIn,
+        tokenOut,
+        amountIn,
+        0n,
+        backendAddress,
+      ]);
+
+      await expect(
+        yieldModule
+          .connect(owner)
+          .swapAndReceive(tokenIn, tokenOut, otherAddress, amountIn, swapProviderAddress, ethers.ZeroAddress, data)
+      ).to.be.revertedWithCustomError(yieldModule, "SwapPayoutNotReceived");
+    });
+
+    it("Should revert when tokenOut is not active and receiver is zero address", async function () {
+      const TestERC20 = await ethers.getContractFactory("TestERC20");
+      const outToken = await TestERC20.deploy();
+      await outToken.waitForDeployment();
+
+      const tokenOut = await outToken.getAddress();
+
+      const amountIn = 1000n;
+      const amountOut = 500n;
+
+      await (await yieldToken.mint(ownerAddress, amountIn)).wait();
+      await (await outToken.mint(swapProviderAddress, amountOut)).wait();
+
+      const data = swapProvider.interface.encodeFunctionData("swapExactIn", [
+        tokenIn,
+        tokenOut,
+        amountIn,
+        amountOut,
+        backendAddress,
+      ]);
+
+      await expect(
+        yieldModule
+          .connect(owner)
+          .swapAndReceive(tokenIn, tokenOut, ethers.ZeroAddress, amountIn, swapProviderAddress, ethers.ZeroAddress, data)
+      ).to.be.reverted;
+    });
+
+    it("Should fail with correct error when tokenOut is not active and receiver is this contract", async function () {
+      const TestERC20 = await ethers.getContractFactory("TestERC20");
+      const outToken = await TestERC20.deploy();
+      await outToken.waitForDeployment();
+
+      const tokenOut = await outToken.getAddress();
+
+      const amountIn = 1000n;
+      const amountOut = 500n;
+
+      await (await yieldToken.mint(ownerAddress, amountIn)).wait();
+      await (await outToken.mint(swapProviderAddress, amountOut)).wait();
+
+      const data = swapProvider.interface.encodeFunctionData("swapExactIn", [
+        tokenIn,
+        tokenOut,
+        amountIn,
+        amountOut,
+        backendAddress,
+      ]);
+
+      await expect(
+        yieldModule
+          .connect(owner)
+          .swapAndReceive(tokenIn, tokenOut, yieldModuleAddress, amountIn, swapProviderAddress, ethers.ZeroAddress, data)
+      ).to.be.revertedWithCustomError(yieldModule, "SendingToThis");
+    });
+
+    it("Should execute swap, clear allowance, transfer tokenOut to receiver, and emit SwapAndReceive events when tokenOut is not active", async function () {
+      const TestERC20 = await ethers.getContractFactory("TestERC20");
+      const outToken = await TestERC20.deploy();
+      await outToken.waitForDeployment();
+
+      const tokenOut = await outToken.getAddress();
+
+      const amountIn = 1000n;
+      const amountOut = 500n;
+
+      await (await yieldToken.mint(ownerAddress, amountIn)).wait();
+      await (await outToken.mint(swapProviderAddress, amountOut)).wait();
+
+      const outBefore = await outToken.balanceOf(otherAddress);
+
+      const data = swapProvider.interface.encodeFunctionData("swapExactIn", [
+        tokenIn,
+        tokenOut,
+        amountIn,
+        amountOut,
+        backendAddress,
+      ]);
+      const dataHash = ethers.keccak256(data);
+
+      await expect(
+        yieldModule
+          .connect(owner)
+          .swapAndReceive(tokenIn, tokenOut, otherAddress, amountIn, swapProviderAddress, ethers.ZeroAddress, data)
+      )
+        .to.emit(yieldModule, "SwapAndReceiveInitiated")
+        .withArgs(tokenIn, tokenOut, otherAddress, amountIn, swapProviderAddress, swapProviderAddress, 0n, dataHash)
+        .and.to.emit(outToken, "Transfer")
+        .withArgs(yieldModuleAddress, otherAddress, amountOut)
+        .and.to.emit(yieldModule, "SwapAndReceiveCompleted")
+        .withArgs(tokenOut, otherAddress, amountOut, false);
+
+      expect(await yieldToken.allowance(yieldModuleAddress, swapProviderAddress)).to.equal(0n);
+      expect(await yieldToken.balanceOf(yieldModuleAddress)).to.equal(0n);
+
+      const outAfter = await outToken.balanceOf(otherAddress);
+      expect(outAfter - outBefore).to.equal(amountOut);
+    });
+
+    it("Should deposit tokenOut to protocol and emit FeePaymentFailed when tokenOut is active and fee is zero", async function () {
+      const TestERC20 = await ethers.getContractFactory("TestERC20");
+      const outToken = await TestERC20.deploy();
+      await outToken.waitForDeployment();
+
+      const tokenOut = await outToken.getAddress();
+
+      await (await yieldModule.connect(owner).initYieldToken(tokenOut, 0)).wait();
+
+      const amountIn = 1000n;
+      const amountOut = 500n;
+
+      await (await yieldToken.mint(ownerAddress, amountIn)).wait();
+      await (await outToken.mint(swapProviderAddress, amountOut)).wait();
+
+      const data = swapProvider.interface.encodeFunctionData("swapExactIn", [
+        tokenIn,
+        tokenOut,
+        amountIn,
+        amountOut,
+        backendAddress,
+      ]);
+
+      await expect(
+        yieldModule
+          .connect(owner)
+          .swapAndReceive(tokenIn, tokenOut, otherAddress, amountIn, swapProviderAddress, ethers.ZeroAddress, data)
+      )
+        .to.emit(pool, "Supply")
+        .withArgs(tokenOut, amountOut, yieldModuleAddress, 0)
+        .and.to.emit(yieldModule, "FeePaymentFailed")
+        .withArgs(tokenOut, 0n)
+        .and.to.emit(yieldModule, "SwapAndReceiveCompleted")
+        .withArgs(tokenOut, otherAddress, amountOut, true);
+    });
+
+    it("Should deposit tokenOut to protocol and process service fee when tokenOut is active and revenue exists", async function () {
+      const TestERC20 = await ethers.getContractFactory("TestERC20");
+      const outToken = await TestERC20.deploy();
+      await outToken.waitForDeployment();
+
+      const tokenOut = await outToken.getAddress();
+
+      await (await yieldModule.connect(owner).initYieldToken(tokenOut, 0)).wait();
+
+      const seed = 100000n;
+      await (await outToken.mint(ownerAddress, seed)).wait();
+      await (await outToken.connect(owner).approve(yieldModuleAddress, ethers.MaxUint256)).wait();
+      await (await yieldModule.connect(owner).enterProtocolByOwner(tokenOut)).wait();
+
+      const accumulatedRevenue = 10000n;
+      await (await pool.generateRevenue(yieldModuleAddress, accumulatedRevenue)).wait();
+
+      const feeRate = await processor.serviceFeeRate();
+      const expectedFeeOut = (accumulatedRevenue * feeRate) / BigInt(PRECISION);
+      const feeReceiver = await processor.feeReceiver();
+
+      const amountIn = 1000n;
+      const amountOut = 500n;
+
+      await (await yieldToken.mint(ownerAddress, amountIn)).wait();
+      await (await outToken.mint(swapProviderAddress, amountOut)).wait();
+
+      const data = swapProvider.interface.encodeFunctionData("swapExactIn", [
+        tokenIn,
+        tokenOut,
+        amountIn,
+        amountOut,
+        backendAddress,
+      ]);
+
+      await expect(
+        yieldModule
+          .connect(owner)
+          .swapAndReceive(tokenIn, tokenOut, otherAddress, amountIn, swapProviderAddress, ethers.ZeroAddress, data)
+      )
+        .to.emit(pool, "Supply")
+        .withArgs(tokenOut, amountOut, yieldModuleAddress, 0)
+        .and.to.emit(protocolToken, "Transfer")
+        .withArgs(yieldModuleAddress, feeReceiver, expectedFeeOut)
+        .and.to.emit(yieldModule, "FeePaymentProcessed")
+        .withArgs(tokenOut, expectedFeeOut, feeReceiver)
+        .and.to.emit(yieldModule, "SwapAndReceiveCompleted")
+        .withArgs(tokenOut, otherAddress, amountOut, true);
+    });
+  });
+
+  describe("withdrawNativeAll", function () {
+    const maxNetworkFee = 12345;
+
+    let yieldModule, yieldModuleAddress;
+    let ownerAddress, backendAddress;
+    let tokenIn;
+
+    beforeEach(async function () {
+      ownerAddress = await owner.getAddress();
+      backendAddress = await backend.getAddress();
+      tokenIn = await yieldToken.getAddress();
+
+      const deployTx = await factory.connect(owner).deployYieldModule(ownerAddress, tokenIn, maxNetworkFee);
+      await deployTx.wait();
+
+      const TangemAaveV3YieldModule = await ethers.getContractFactory("TangemAaveV3YieldModule");
+      yieldModuleAddress = await factory.calculateYieldModuleAddress(ownerAddress);
+      yieldModule = TangemAaveV3YieldModule.attach(yieldModuleAddress);
+    });
+
+    it("Should emit WithdrawNativeProcessed with zero amount when balance is zero", async function () {
+      await expect(yieldModule.connect(owner).withdrawNativeAll(backendAddress))
+        .to.emit(yieldModule, "WithdrawNativeProcessed")
+        .withArgs(backendAddress, 0n);
+    });
+
+    it("Should transfer native balance and emit WithdrawNativeProcessed when balance is non-zero", async function () {
+      const value = 1000000000000000n;
+
+      await (await owner.sendTransaction({ to: yieldModuleAddress, value })).wait();
+
+      const tx = yieldModule.connect(owner).withdrawNativeAll(backendAddress);
+
+      await expect(tx).to.changeEtherBalances([yieldModuleAddress, backendAddress], [-value, value]);
+      await expect(tx).to.emit(yieldModule, "WithdrawNativeProcessed").withArgs(backendAddress, value);
+    });
+
+    it("Should fail with correct error when native transfer fails", async function () {
+      const value = 1000000000000000n;
+      const badReceiver = await swapExecutionRegistry.getAddress();
+
+      await (await owner.sendTransaction({ to: yieldModuleAddress, value })).wait();
+
+      await expect(yieldModule.connect(owner).withdrawNativeAll(badReceiver))
+        .to.be.revertedWithCustomError(yieldModule, "NativeTransferFailed");
+    });
+
+    it("Should revert when receiver is zero address", async function () {
+      await expect(yieldModule.connect(owner).withdrawNativeAll(ethers.ZeroAddress)).to.be.reverted;
+    });
+
+    it("Should fail with correct error if called not by owner", async function () {
+      await expect(yieldModule.connect(backend).withdrawNativeAll(backendAddress))
+        .to.be.revertedWithCustomError(yieldModule, "OnlyOwner");
     });
   });
 });
