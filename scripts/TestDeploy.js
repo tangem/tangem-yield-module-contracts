@@ -46,8 +46,12 @@ async function deployTestSetup() {
     const factory = await TangemYieldModuleFactory.deploy();
     await factory.waitForDeployment();
 
+    const SwapExecutionRegistry = await ethers.getContractFactory("SwapExecutionRegistry");
+    const swapExecutionRegistry = await SwapExecutionRegistry.deploy(msgSender);
+    await swapExecutionRegistry.waitForDeployment();
+
     const AaveV3YieldModule = await ethers.getContractFactory("TangemAaveV3YieldModule");
-    const moduleImplementation = await AaveV3YieldModule.deploy(pool, processor, factory, forwarder);
+    const moduleImplementation = await AaveV3YieldModule.deploy(pool, processor, factory, forwarder, swapExecutionRegistry);
     await moduleImplementation.waitForDeployment();
 
     const implementationSetterRole = ethers.id("IMPLEMENTATION_SETTER_ROLE")
@@ -63,7 +67,7 @@ async function deployTestSetup() {
     const unpauseTx = await factory.unpause();
     await unpauseTx.wait();
 
-    return { yieldToken, factory, processor, pool, forwarder };
+    return { yieldToken, factory, processor, pool, forwarder, swapExecutionRegistry };
 }
 
 module.exports = { deployTestSetup };

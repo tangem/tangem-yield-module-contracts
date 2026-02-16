@@ -5,15 +5,25 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@aave/core-v3/contracts/interfaces/IPool.sol";
 import "../core/YieldModuleLiquidUpgradeable.sol";
 
-
 contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable {
     using SafeERC20 for IERC20;
 
     IPool public immutable pool;
     
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor(address pool_, address yieldProcessor_, address factory_, address trustedForwarder)
-        YieldModuleLiquidUpgradeable(yieldProcessor_, factory_, trustedForwarder)
+    constructor(
+        address pool_,
+        address yieldProcessor_,
+        address factory_,
+        address trustedForwarder_,
+        address swapExecutionRegistry_
+    )
+        YieldModuleLiquidUpgradeable(
+            yieldProcessor_,
+            factory_,
+            trustedForwarder_,
+            swapExecutionRegistry_
+        )
     {
         pool = IPool(pool_);
 
