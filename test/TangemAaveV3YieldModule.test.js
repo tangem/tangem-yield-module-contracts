@@ -185,12 +185,15 @@ describe("TangemBridgeProcessor", function () {
           expect(latestFeePaymentState.serviceFeeRate).to.equal(expectedFeeRate);
         });
 
-        it("Should emit FeePaymentFailed event with correct parameters", async function () {
-          const expectedAmount = 0;
+        it("Should not emit fee events when fee is zero and should sync latest fee payment state", async function () {
+          const expectedProtocolBalance = initialOwnerBalance + initialModuleBalance;
+          const expectedFeeRate = await processor.serviceFeeRate();
 
           await expect(yieldModule.connect(owner).enterProtocolByOwner(yieldToken))
-            .to.emit(yieldModule, "FeePaymentFailed")
-            .withArgs(yieldToken, expectedAmount);
+            .to.emit(yieldModule, "LatestFeePaymentStateUpdated")
+            .withArgs(yieldToken, expectedProtocolBalance, expectedFeeRate)
+            .and.to.not.emit(yieldModule, "FeePaymentFailed")
+            .and.to.not.emit(yieldModule, "FeePaymentProcessed");
         });
       });
 
@@ -1541,7 +1544,7 @@ describe("TangemBridgeProcessor", function () {
       expect(outAfter - outBefore).to.equal(amountOut);
     });
 
-    it("Should deposit tokenOut to protocol and emit FeePaymentFailed when tokenOut is active and fee is zero", async function () {
+    it("Should deposit tokenOut to protocol and sync latest fee state when tokenOut is active and fee is zero", async function () {
       const TestERC20 = await ethers.getContractFactory("TestERC20");
       const outToken = await TestERC20.deploy();
       await outToken.waitForDeployment();
@@ -1564,6 +1567,8 @@ describe("TangemBridgeProcessor", function () {
         backendAddress,
       ]);
 
+      const expectedFeeRate = await processor.serviceFeeRate();
+
       await expect(
         yieldModule
           .connect(owner)
@@ -1571,8 +1576,8 @@ describe("TangemBridgeProcessor", function () {
       )
         .to.emit(pool, "Supply")
         .withArgs(tokenOut, amountOut, yieldModuleAddress, 0)
-        .and.to.emit(yieldModule, "FeePaymentFailed")
-        .withArgs(tokenOut, 0n)
+        .and.to.emit(yieldModule, "LatestFeePaymentStateUpdated")
+        .withArgs(tokenOut, amountOut, expectedFeeRate)
         .and.to.emit(yieldModule, "SwapAndReceiveCompleted")
         .withArgs(tokenOut, otherAddress, amountOut, true);
     });
