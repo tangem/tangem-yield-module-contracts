@@ -179,7 +179,6 @@ abstract contract YieldModuleLiquidUpgradeable is
     )
         external
         onlyOwner
-        nonReentrant
     {
         require(yieldTokensData[yieldToken].active, TokenNotActive());
         amount.requireNotZero();
