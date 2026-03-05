@@ -173,13 +173,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         emit SendProcessed(yieldToken, to, amount);
     }
 
-    function withdraw(
-        address yieldToken, 
-        uint amount
-    )
-        external
-        onlyOwner
-    {
+    function withdraw(address yieldToken, uint amount) external onlyOwner {
         require(yieldTokensData[yieldToken].active, TokenNotActive());
         amount.requireNotZero();
 
@@ -188,12 +182,12 @@ abstract contract YieldModuleLiquidUpgradeable is
 
         require(protocolBal >= amount + fee, InsufficientFunds());
 
-        uint pulled = _pullFromProtocol(yieldToken, amount);
+        _pullFromProtocol(yieldToken, amount);
 
         // fee is computed from the "old" protocolBal snapshot and processed right after withdrawal.
         _tryProcessFee(yieldToken, fee, true);
 
-        emit WithdrawProcessed(yieldToken, amount, pulled);
+        emit WithdrawProcessed(yieldToken, amount);
     }
 
     function withdrawAndDeactivate(address yieldToken) external onlyOwner {
@@ -211,14 +205,7 @@ abstract contract YieldModuleLiquidUpgradeable is
             _pullFromProtocol(yieldToken, amountToExit);
         }
 
-        bool feePaid = _tryProcessFee(yieldToken, fee, true);
-
-        uint residual = _protocolBalance(yieldToken);
-        if (residual > 0 && feePaid) {
-            _pullFromProtocol(yieldToken, residual);
-            // sync baseline after final pull; no-op fee processing updates LatestFeePaymentStateUpdated.
-            _tryProcessFee(yieldToken, 0, true);
-        }
+        _tryProcessFee(yieldToken, fee, true);
 
         // disable token to avoid abuse by processor
         yieldTokenData.active = false;
@@ -383,9 +370,9 @@ abstract contract YieldModuleLiquidUpgradeable is
     function effectiveBalance(address yieldToken) external view returns (uint) {
         uint protocolBalance_ = _protocolBalance(yieldToken);
         uint fee = _calculateServiceFee(yieldToken, protocolBalance_);
-        uint effectiveProtocol = protocolBalance_ > fee ? (protocolBalance_ - fee) : 0;
+        uint effectiveProtocolBal = protocolBalance_ > fee ? (protocolBalance_ - fee) : 0;
 
-        return IERC20(yieldToken).balanceOf(owner) + effectiveProtocol;
+        return IERC20(yieldToken).balanceOf(owner) + effectiveProtocolBal;
     }
 
     function calculateFee(address yieldToken, uint networkFee) public view returns (uint) {
@@ -402,12 +389,9 @@ abstract contract YieldModuleLiquidUpgradeable is
 
     function _tryProcessFee(address yieldToken, uint amount, bool useProtocolToken) private returns (bool success) {
         if (amount == 0) {
-            // no-op success: don't touch feeDebts and don't emit FeePaymentFailed/Processed.
-            // just sync baseline so future revenue is measured from the latest state.
-            _updateLatestFeePaymentState(yieldToken);
+            _processFeePaymentSuccess(yieldToken, 0, processor.feeReceiver());
             return true;
         }
-
 
         uint balance;
         if (useProtocolToken) {

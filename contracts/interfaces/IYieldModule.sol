@@ -10,7 +10,7 @@ interface IYieldModule {
     event FeePaymentFailed(address yieldToken, uint serviceFeeDebt); // TODO: add reason?
     event LatestFeePaymentStateUpdated(address yieldToken, uint protocolBalance, uint serviceFeeRate);
     event SendProcessed(address yieldToken, address to, uint amount);
-    event WithdrawProcessed(address yieldToken, uint amount, uint pulled);
+    event WithdrawProcessed(address yieldToken, uint amount);
     event WithdrawAndDeactivateProcessed(address yieldToken, uint amount);
     event WithdrawNonYieldProcessed(address token, uint amount);
     event TokenReactivated(address yieldToken, uint maxNetworkFee);
