@@ -244,6 +244,21 @@ abstract contract YieldModuleLiquidUpgradeable is
         _enterProtocol(yieldToken, 0);
     }
 
+    function enterProtocolByOwner(address yieldToken, uint amount) external onlyOwner {
+        require(yieldTokensData[yieldToken].active, TokenNotActive());
+        amount.requireNotZero();
+
+        IERC20 ierc20YieldToken = IERC20(yieldToken);
+        ierc20YieldToken.safeTransferFrom(owner, address(this), amount);
+
+        uint fee = calculateServiceFee(yieldToken);
+
+        _pushToProtocol(yieldToken, amount);
+        _tryProcessFee(yieldToken, fee, true);
+
+        emit ProtocolEntered(yieldToken, amount, 0);
+    }
+
     // used to reactivate token after exitProtocol and withdrawAndDeactivate
     function reactivateToken(address yieldToken, uint240 maxNetworkFee) external onlyOwner {
         YieldTokenData storage yieldTokenData = yieldTokensData[yieldToken];
