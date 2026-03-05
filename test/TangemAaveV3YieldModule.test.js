@@ -201,15 +201,17 @@ describe("TangemBridgeProcessor", function () {
           expect(latestFeePaymentState.serviceFeeRate).to.equal(expectedFeeRate);
         });
 
-        it("Should not emit fee events when fee is zero and should sync latest fee payment state", async function () {
+        it("Should emit FeePaymentProcessed with zero fee and sync latest fee payment state", async function () {
           const expectedProtocolBalance = initialOwnerBalance + initialModuleBalance;
           const expectedFeeRate = await processor.serviceFeeRate();
+          const feeReceiver = await processor.feeReceiver();
 
           await expect(yieldModule.connect(owner).enterProtocolByOwner(yieldToken))
             .to.emit(yieldModule, "LatestFeePaymentStateUpdated")
             .withArgs(yieldToken, expectedProtocolBalance, expectedFeeRate)
-            .and.to.not.emit(yieldModule, "FeePaymentFailed")
-            .and.to.not.emit(yieldModule, "FeePaymentProcessed");
+            .and.to.emit(yieldModule, "FeePaymentProcessed")
+            .withArgs(yieldToken, 0n, feeReceiver)
+            .and.to.not.emit(yieldModule, "FeePaymentFailed");
         });
       });
 
@@ -839,10 +841,13 @@ describe("TangemBridgeProcessor", function () {
 
         const expectedFeeRate = await processor.serviceFeeRate();
 
+        const feeReceiver = await processor.feeReceiver();
+
         await expect(yieldModule2.connect(secondOwner).withdrawAndDeactivate(yieldToken))
           .to.emit(yieldModule2, "LatestFeePaymentStateUpdated")
           .withArgs(yieldToken, 0n, expectedFeeRate)
-          .and.to.not.emit(yieldModule2, "FeePaymentProcessed")
+          .and.to.emit(yieldModule2, "FeePaymentProcessed")
+          .withArgs(yieldToken, 0n, feeReceiver)
           .and.to.not.emit(yieldModule2, "FeePaymentFailed");
       });
 
@@ -1851,7 +1856,7 @@ describe("TangemBridgeProcessor", function () {
         .and.to.emit(yieldModule, "FeePaymentProcessed")
         .withArgs(yieldToken, serviceFee, feeReceiver)
         .and.to.emit(yieldModule, "WithdrawProcessed")
-        .withArgs(yieldToken, withdrawAmount, withdrawAmount);
+        .withArgs(yieldToken, withdrawAmount);
     });
 
     it("Should update latest fee payment state after withdraw", async function () {
@@ -1912,10 +1917,13 @@ describe("TangemBridgeProcessor", function () {
 
       const expectedFeeRate = await processor.serviceFeeRate();
 
+      const feeReceiver = await processor.feeReceiver();
+
       await expect(yieldModule2.connect(secondOwner).withdraw(yieldToken, amount))
         .to.emit(yieldModule2, "LatestFeePaymentStateUpdated")
         .withArgs(yieldToken, deposit - amount, expectedFeeRate)
-        .and.to.not.emit(yieldModule2, "FeePaymentProcessed")
+        .and.to.emit(yieldModule2, "FeePaymentProcessed")
+        .withArgs(yieldToken, 0n, feeReceiver)
         .and.to.not.emit(yieldModule2, "FeePaymentFailed");
     });
   });
