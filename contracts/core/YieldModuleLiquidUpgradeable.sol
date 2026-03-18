@@ -415,7 +415,10 @@ abstract contract YieldModuleLiquidUpgradeable is
             balance = IERC20(yieldToken).balanceOf(owner);
         }
 
-        if (amount > balance) {
+        uint transferAmount = amount > balance ? balance : amount;
+        uint debt = amount - transferAmount;
+
+        if (transferAmount == 0) {
             _processFeePaymentFailure(yieldToken, amount);
             return false;
         }
@@ -423,13 +426,16 @@ abstract contract YieldModuleLiquidUpgradeable is
         address feeReceiver = processor.feeReceiver();
         bool transferSuccess;
         if (useProtocolToken) {
-            transferSuccess = protocolTokens[yieldToken].trySafeTransfer(feeReceiver, amount);
+            transferSuccess = protocolTokens[yieldToken].trySafeTransfer(feeReceiver, transferAmount);
         } else {
-            transferSuccess = IERC20(yieldToken).trySafeTransferFrom(owner, feeReceiver, amount);
+            transferSuccess = IERC20(yieldToken).trySafeTransferFrom(owner, feeReceiver, transferAmount);
         }
 
         if (transferSuccess) {
-            _processFeePaymentSuccess(yieldToken, amount, feeReceiver);
+            _processFeePaymentSuccess(yieldToken, transferAmount, feeReceiver);
+            if (debt > 0) {
+                feeDebts[yieldToken] = debt;
+            }
         } else { // shouldn't happen with proper fee receiver
             _processFeePaymentFailure(yieldToken, amount);
         }
