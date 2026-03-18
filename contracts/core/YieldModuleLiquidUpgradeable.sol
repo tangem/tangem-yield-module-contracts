@@ -97,7 +97,7 @@ abstract contract YieldModuleLiquidUpgradeable is
     /* PROCESSOR FUNCTIONS */
 
     function enterProtocol(address yieldToken, uint networkFee) external onlyProcessor {
-        _enterProtocol(yieldToken, networkFee);
+        _enterProtocol(yieldToken, networkFee, 0);
     }
 
     // emergency function to save user's funds in case protocol or module is compromised
@@ -241,22 +241,12 @@ abstract contract YieldModuleLiquidUpgradeable is
     }
 
     function enterProtocolByOwner(address yieldToken) external onlyOwner {
-        _enterProtocol(yieldToken, 0);
+        _enterProtocol(yieldToken, 0, 0);
     }
 
     function enterProtocolByOwner(address yieldToken, uint amount) external onlyOwner {
-        require(yieldTokensData[yieldToken].active, TokenNotActive());
         amount.requireNotZero();
-
-        IERC20 ierc20YieldToken = IERC20(yieldToken);
-        ierc20YieldToken.safeTransferFrom(owner, address(this), amount);
-
-        uint fee = calculateServiceFee(yieldToken);
-
-        _pushToProtocol(yieldToken, amount);
-        _tryProcessFee(yieldToken, fee, true);
-
-        emit ProtocolEntered(yieldToken, amount, 0);
+        _enterProtocol(yieldToken, 0, amount);
     }
 
     // used to reactivate token after exitProtocol and withdrawAndDeactivate
@@ -443,26 +433,31 @@ abstract contract YieldModuleLiquidUpgradeable is
         return transferSuccess;
     }
 
-    function _enterProtocol(address yieldToken, uint networkFee) private {
+    function _enterProtocol(address yieldToken, uint networkFee, uint amount) private {
         require(yieldTokensData[yieldToken].active, TokenNotActive());
 
         IERC20 ierc20YieldToken = IERC20(yieldToken);
-        uint ownerBalance = ierc20YieldToken.balanceOf(owner);
-        if (ownerBalance > 0) {
-            ierc20YieldToken.safeTransferFrom(owner, address(this), ownerBalance);
+
+        if (amount > 0) {
+            ierc20YieldToken.safeTransferFrom(owner, address(this), amount);
+        } else {
+            uint ownerBalance = ierc20YieldToken.balanceOf(owner);
+            if (ownerBalance > 0) {
+                ierc20YieldToken.safeTransferFrom(owner, address(this), ownerBalance);
+            }
+            amount = ierc20YieldToken.balanceOf(address(this));
         }
 
         // calculate service fee before changing funds in a protocol
         uint fee = calculateFee(yieldToken, networkFee);
-        uint amountToEnter = ierc20YieldToken.balanceOf(address(this));
 
-        amountToEnter.requireNotZero();
-        require(amountToEnter > networkFee, NetworkFeeExceedsAmount());
-        
-        _pushToProtocol(yieldToken, amountToEnter);
+        amount.requireNotZero();
+        require(amount > networkFee, NetworkFeeExceedsAmount());
+
+        _pushToProtocol(yieldToken, amount);
         _tryProcessFee(yieldToken, fee, true);
 
-        emit ProtocolEntered(yieldToken, amountToEnter, networkFee);
+        emit ProtocolEntered(yieldToken, amount, networkFee);
     }
 
     function _processFeePaymentSuccess(address token, uint amount, address receiver) private {
