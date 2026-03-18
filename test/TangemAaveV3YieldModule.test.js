@@ -1049,10 +1049,11 @@ describe("TangemBridgeProcessor", function () {
         await (await yieldToken.mint(owner2, tinyDeposit)).wait();
         await (await yieldToken.connect(secondOwner).approve(moduleAddress2, ethers.MaxUint256)).wait();
 
-        // enterProtocolByOwner will try to collect old debt from protocol token and fail again (debt persists)
+        // enterProtocolByOwner will try to collect old debt from protocol token.
+        // With partial fee payment, the tiny deposit (1 wei) is paid toward the debt.
         await (await yieldModule2.connect(secondOwner).enterProtocolByOwner(yieldToken)).wait();
 
-        expect(await yieldModule2.feeDebts(yieldToken)).to.equal(expectedDebt);
+        expect(await yieldModule2.feeDebts(yieldToken)).to.equal(expectedDebt - tinyDeposit);
 
         // New behavior: _calculateServiceFee returns debt even when balance <= baseline,
         // so withdrawAndDeactivate reverts if protocolBal < fee
@@ -2136,7 +2137,8 @@ describe("TangemBridgeProcessor", function () {
     });
 
     it("Should return persisted fee debt from calculateServiceFee when protocol balance is not above baseline", async function () {
-      expect(await yieldModule.calculateServiceFee(yieldToken)).to.equal(expectedDebt);
+      // Partial fee payment during enterProtocolByOwner reduced debt by 1 wei (the tiny deposit)
+      expect(await yieldModule.calculateServiceFee(yieldToken)).to.equal(expectedDebt - 1n);
     });
 
     it("Should clamp effectiveProtocolBalance to zero when fee exceeds protocol balance", async function () {
