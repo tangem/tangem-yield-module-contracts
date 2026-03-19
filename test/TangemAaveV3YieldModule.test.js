@@ -6,6 +6,22 @@ describe("TangemBridgeProcessor", function () {
   const PRECISION = 10000;
   let yieldToken, factory, processor, pool, forwarder, protocolToken, swapExecutionRegistry, backend, owner, otherAccount;
 
+  async function deployYieldModuleFor(moduleOwnerSigner, initialYieldTokenAddress = ethers.ZeroAddress, maxNetworkFee = 0) {
+    const moduleOwnerAddress = await moduleOwnerSigner.getAddress();
+
+    await (await factory.connect(moduleOwnerSigner).deployYieldModule(
+      moduleOwnerAddress,
+      initialYieldTokenAddress,
+      maxNetworkFee
+    )).wait();
+
+    const TangemAaveV3YieldModule = await ethers.getContractFactory("TangemAaveV3YieldModule");
+    const yieldModuleAddress = await factory.calculateYieldModuleAddress(moduleOwnerAddress);
+    const yieldModule = TangemAaveV3YieldModule.attach(yieldModuleAddress);
+
+    return { yieldModule, yieldModuleAddress, moduleOwnerAddress };
+  }
+
   before(async function () {
     [ backend, owner, otherAccount ] = await ethers.getSigners();
   });
@@ -13,7 +29,7 @@ describe("TangemBridgeProcessor", function () {
   beforeEach(async function () {
     ( { yieldToken, factory, processor, pool, forwarder, swapExecutionRegistry } = await deployTestSetup() );
 
-    protocolTokenAddress = await pool.aToken();
+    const protocolTokenAddress = await pool.aToken();
     const TestERC20 = await ethers.getContractFactory("TestERC20");
     protocolToken = TestERC20.attach(protocolTokenAddress);
   });
@@ -185,12 +201,17 @@ describe("TangemBridgeProcessor", function () {
           expect(latestFeePaymentState.serviceFeeRate).to.equal(expectedFeeRate);
         });
 
-        it("Should emit FeePaymentFailed event with correct parameters", async function () {
-          const expectedAmount = 0;
+        it("Should emit FeePaymentProcessed with zero fee and sync latest fee payment state", async function () {
+          const expectedProtocolBalance = initialOwnerBalance + initialModuleBalance;
+          const expectedFeeRate = await processor.serviceFeeRate();
+          const feeReceiver = await processor.feeReceiver();
 
           await expect(yieldModule.connect(owner).enterProtocolByOwner(yieldToken))
-            .to.emit(yieldModule, "FeePaymentFailed")
-            .withArgs(yieldToken, expectedAmount);
+            .to.emit(yieldModule, "LatestFeePaymentStateUpdated")
+            .withArgs(yieldToken, expectedProtocolBalance, expectedFeeRate)
+            .and.to.emit(yieldModule, "FeePaymentProcessed")
+            .withArgs(yieldToken, 0n, feeReceiver)
+            .and.to.not.emit(yieldModule, "FeePaymentFailed");
         });
       });
 
@@ -247,6 +268,163 @@ describe("TangemBridgeProcessor", function () {
           await expect(yieldModule.connect(owner).enterProtocolByOwner(yieldToken))
             .to.emit(yieldModule, "FeePaymentProcessed")
             .withArgs(yieldToken, expectedAmount, feeReceiver);
+        });
+      });
+    });
+  });
+
+  describe("enterProtocolByOwner with amount", function () {
+    const maxNetworkFee = 12345;
+    const initialOwnerBalance = 223556;
+    const enterAmount = 150000;
+    let yieldModule, yieldModuleAddress;
+
+    beforeEach(async function () {
+      const deployTx = await factory.connect(owner).deployYieldModule(owner, yieldToken, maxNetworkFee);
+      await deployTx.wait();
+
+      const TangemAaveV3YieldModule = await ethers.getContractFactory("TangemAaveV3YieldModule");
+      yieldModuleAddress = await factory.calculateYieldModuleAddress(owner);
+      yieldModule = TangemAaveV3YieldModule.attach(yieldModuleAddress);
+
+      const mintTx = await yieldToken.mint(owner, initialOwnerBalance);
+      await mintTx.wait();
+
+      const approveTx = await yieldToken.connect(owner).approve(yieldModule, ethers.MaxUint256);
+      await approveTx.wait();
+    });
+
+    it("Should transfer only the specified amount from owner to module", async function () {
+      await expect(yieldModule.connect(owner)["enterProtocolByOwner(address,uint256)"](yieldToken, enterAmount))
+        .to.emit(yieldToken, "Transfer")
+        .withArgs(owner, yieldModule, enterAmount);
+    });
+
+    it("Should initiate AAVE pool supply with the specified amount only", async function () {
+      await expect(yieldModule.connect(owner)["enterProtocolByOwner(address,uint256)"](yieldToken, enterAmount))
+        .to.emit(pool, "Supply")
+        .withArgs(yieldToken, enterAmount, yieldModule, 0);
+    });
+
+    it("Should leave remaining balance on owner wallet", async function () {
+      const tx = await yieldModule.connect(owner)["enterProtocolByOwner(address,uint256)"](yieldToken, enterAmount);
+      await tx.wait();
+
+      const remainingBalance = await yieldToken.balanceOf(owner);
+      expect(remainingBalance).to.equal(initialOwnerBalance - enterAmount);
+    });
+
+    it("Should emit ProtocolEntered event with the specified amount", async function () {
+      await expect(yieldModule.connect(owner)["enterProtocolByOwner(address,uint256)"](yieldToken, enterAmount))
+        .to.emit(yieldModule, "ProtocolEntered")
+        .withArgs(yieldToken, enterAmount, 0);
+    });
+
+    it("Should fail with correct error if called not by owner", async function () {
+      await expect(yieldModule["enterProtocolByOwner(address,uint256)"](yieldToken, enterAmount))
+        .to.be.revertedWithCustomError(yieldModule, "OnlyOwner");
+    });
+
+    it("Should fail if amount is zero", async function () {
+      await expect(yieldModule.connect(owner)["enterProtocolByOwner(address,uint256)"](yieldToken, 0))
+        .to.be.revertedWithCustomError(yieldModule, "ZeroAmount");
+    });
+
+    it("Should fail if token is not active", async function () {
+      const inactiveToken = ethers.ZeroAddress;
+      await expect(yieldModule.connect(owner)["enterProtocolByOwner(address,uint256)"](inactiveToken, enterAmount))
+        .to.be.revertedWithCustomError(yieldModule, "TokenNotActive");
+    });
+
+    describe("Fee processing", function () {
+
+      describe("First enter", function () {
+
+        it("Should set latest fee payment state", async function () {
+          const expectedProtocolBalance = enterAmount;
+          const expectedFeeRate = await processor.serviceFeeRate();
+
+          let latestFeePaymentState = await yieldModule.latestFeePaymentStates(yieldToken);
+          expect(latestFeePaymentState.protocolBalance).to.equal(0);
+          expect(latestFeePaymentState.serviceFeeRate).to.equal(0);
+
+          const enterTx = await yieldModule.connect(owner)["enterProtocolByOwner(address,uint256)"](yieldToken, enterAmount);
+          await enterTx.wait();
+
+          latestFeePaymentState = await yieldModule.latestFeePaymentStates(yieldToken);
+          expect(latestFeePaymentState.protocolBalance).to.equal(expectedProtocolBalance);
+          expect(latestFeePaymentState.serviceFeeRate).to.equal(expectedFeeRate);
+        });
+
+        it("Should emit FeePaymentProcessed with zero fee", async function () {
+          const expectedProtocolBalance = enterAmount;
+          const expectedFeeRate = await processor.serviceFeeRate();
+          const feeReceiver = await processor.feeReceiver();
+
+          await expect(yieldModule.connect(owner)["enterProtocolByOwner(address,uint256)"](yieldToken, enterAmount))
+            .to.emit(yieldModule, "LatestFeePaymentStateUpdated")
+            .withArgs(yieldToken, expectedProtocolBalance, expectedFeeRate)
+            .and.to.emit(yieldModule, "FeePaymentProcessed")
+            .withArgs(yieldToken, 0n, feeReceiver)
+            .and.to.not.emit(yieldModule, "FeePaymentFailed");
+        });
+      });
+
+      describe("Consecutive enters", function () {
+        const freshOwnerBalance = 453456;
+        const accumulatedRevenue = 23566;
+        const newFeeRate = 2444;
+        let initialFeeRate, serviceFee, feeReceiver;
+
+        beforeEach(async function () {
+          initialFeeRate = await processor.serviceFeeRate();
+          serviceFee = Math.floor(accumulatedRevenue * Number(initialFeeRate) / PRECISION);
+          feeReceiver = await processor.feeReceiver();
+
+          const enterTx = await yieldModule.connect(owner)["enterProtocolByOwner(address,uint256)"](yieldToken, enterAmount);
+          await enterTx.wait();
+
+          const mintTx = await yieldToken.mint(owner, freshOwnerBalance);
+          await mintTx.wait();
+
+          const generateTx = await pool.generateRevenue(yieldModule, accumulatedRevenue);
+          await generateTx.wait();
+
+          const setTx = await processor.setServiceFeeRate(newFeeRate);
+          await setTx.wait();
+        });
+
+        it("Should update latest fee payment state", async function () {
+          const secondEnterAmount = 100000;
+          const expectedProtocolBalance = enterAmount + accumulatedRevenue + secondEnterAmount - serviceFee;
+          const expectedFeeRate = newFeeRate;
+
+          let latestFeePaymentState = await yieldModule.latestFeePaymentStates(yieldToken);
+          expect(latestFeePaymentState.protocolBalance).to.equal(enterAmount);
+          expect(latestFeePaymentState.serviceFeeRate).to.equal(initialFeeRate);
+
+          const enterTx = await yieldModule.connect(owner)["enterProtocolByOwner(address,uint256)"](yieldToken, secondEnterAmount);
+          await enterTx.wait();
+
+          latestFeePaymentState = await yieldModule.latestFeePaymentStates(yieldToken);
+          expect(latestFeePaymentState.protocolBalance).to.equal(expectedProtocolBalance);
+          expect(latestFeePaymentState.serviceFeeRate).to.equal(expectedFeeRate);
+        });
+
+        it("Should initiate protocol token transfer of service fee to fee receiver", async function () {
+          const secondEnterAmount = 100000;
+
+          await expect(yieldModule.connect(owner)["enterProtocolByOwner(address,uint256)"](yieldToken, secondEnterAmount))
+            .to.emit(protocolToken, "Transfer")
+            .withArgs(yieldModule, feeReceiver, serviceFee);
+        });
+
+        it("Should emit FeePaymentProcessed event with correct parameters", async function () {
+          const secondEnterAmount = 100000;
+
+          await expect(yieldModule.connect(owner)["enterProtocolByOwner(address,uint256)"](yieldToken, secondEnterAmount))
+            .to.emit(yieldModule, "FeePaymentProcessed")
+            .withArgs(yieldToken, serviceFee, feeReceiver);
         });
       });
     });
@@ -679,6 +857,24 @@ describe("TangemBridgeProcessor", function () {
           .to.emit(yieldModule, "FeePaymentProcessed")
           .withArgs(yieldToken, expectedAmount, feeReceiver);
       });
+
+      it("Should fail with correct error when pull amount fits protocol balance but exceeds protocol balance minus fee", async function () {
+        // Make owner balance very small, so send requires pulling from protocol
+        const ownerBal = await yieldToken.balanceOf(owner);
+        if (ownerBal > 0n) {
+          // optional: leave as is; current setup already gives freshOwnerBalance
+        }
+
+        const protocolBal = await yieldModule.protocolBalance(yieldToken);
+        const fee = await yieldModule.calculateServiceFee(yieldToken);
+
+        // pullAmount = protocolBal - fee + 1  => should fail due fee reservation
+        const pullAmount = protocolBal - fee + 1n;
+        const sendAmountLocal = BigInt(freshOwnerBalance) + pullAmount;
+
+        await expect(yieldModule.connect(owner).send(yieldToken, receiver, sendAmountLocal))
+          .to.be.revertedWithCustomError(yieldModule, "InsufficientFunds");
+      });
     });
   });
 
@@ -786,6 +982,82 @@ describe("TangemBridgeProcessor", function () {
         await expect(yieldModule.connect(owner).withdrawAndDeactivate(yieldToken))
           .to.emit(yieldModule, "FeePaymentProcessed")
           .withArgs(yieldToken, expectedAmount, feeReceiver);
+      });
+
+      it("Should sync latest fee payment state without fee events when fee is zero", async function () {
+        const secondOwner = otherAccount;
+        const { yieldModule: yieldModule2, yieldModuleAddress: moduleAddress2, moduleOwnerAddress: owner2 } =
+          await deployYieldModuleFor(secondOwner, yieldToken, maxNetworkFee);
+
+        const deposit = 5000n;
+        await (await yieldToken.mint(owner2, deposit)).wait();
+        await (await yieldToken.connect(secondOwner).approve(moduleAddress2, ethers.MaxUint256)).wait();
+
+        // First enter, no revenue => baseline set, fee == 0
+        await (await processor.enterProtocol(yieldModule2, yieldToken, 0)).wait();
+
+        const expectedFeeRate = await processor.serviceFeeRate();
+
+        const feeReceiver = await processor.feeReceiver();
+
+        await expect(yieldModule2.connect(secondOwner).withdrawAndDeactivate(yieldToken))
+          .to.emit(yieldModule2, "LatestFeePaymentStateUpdated")
+          .withArgs(yieldToken, 0n, expectedFeeRate)
+          .and.to.emit(yieldModule2, "FeePaymentProcessed")
+          .withArgs(yieldToken, 0n, feeReceiver)
+          .and.to.not.emit(yieldModule2, "FeePaymentFailed");
+      });
+
+      it("Should fail with correct error when persisted fee debt exceeds protocol balance", async function () {
+        const secondOwner = otherAccount;
+        const { yieldModule: yieldModule2, yieldModuleAddress: moduleAddress2, moduleOwnerAddress: owner2 } =
+          await deployYieldModuleFor(secondOwner, yieldToken, maxNetworkFee);
+
+        const deposit = 100000n;
+        const revenue = 10000n;
+
+        await (await yieldToken.mint(owner2, deposit)).wait();
+        await (await yieldToken.connect(secondOwner).approve(moduleAddress2, ethers.MaxUint256)).wait();
+
+        await (await processor.enterProtocol(yieldModule2, yieldToken, 0)).wait();
+        await (await pool.generateRevenue(moduleAddress2, revenue)).wait();
+
+        const feeRate = await processor.serviceFeeRate();
+        const expectedDebt = (revenue * feeRate) / BigInt(PRECISION);
+
+        // Make exitProtocol fee processing fail (owner transferFrom path)
+        await (await yieldToken.connect(secondOwner).approve(moduleAddress2, 0n)).wait();
+
+        await expect(processor.exitProtocol(yieldModule2, yieldToken, 0))
+          .to.emit(yieldModule2, "FeePaymentFailed")
+          .withArgs(yieldToken, expectedDebt);
+        
+        const sinkAddress = await backend.getAddress();
+        const ownerBalanceAfterExit = await yieldToken.balanceOf(owner2);
+
+        // exitProtocol withdraws protocol funds to owner even when fee payment fails.
+        // Clear owner's balance so the next enterProtocolByOwner re-enters only the tiny deposit.
+        if (ownerBalanceAfterExit > 0n) {
+          await (await yieldToken.connect(secondOwner).transfer(sinkAddress, ownerBalanceAfterExit)).wait();
+        }
+
+        // Token is now inactive, reactivate it
+        await (await yieldModule2.connect(secondOwner).reactivateToken(yieldToken, maxNetworkFee)).wait();
+
+        // Re-enter with tiny amount so protocol balance stays below existing debt
+        const tinyDeposit = 1n;
+        await (await yieldToken.mint(owner2, tinyDeposit)).wait();
+        await (await yieldToken.connect(secondOwner).approve(moduleAddress2, ethers.MaxUint256)).wait();
+
+        // enterProtocolByOwner will try to collect old debt from protocol token and fail again (debt persists)
+        await (await yieldModule2.connect(secondOwner).enterProtocolByOwner(yieldToken)).wait();
+
+        expect(await yieldModule2.feeDebts(yieldToken)).to.equal(expectedDebt);
+
+        // New behavior: _calculateServiceFee returns debt even when balance <= baseline,
+        // so withdrawAndDeactivate reverts if protocolBal < fee
+        await expect(yieldModule2.connect(secondOwner).withdrawAndDeactivate(yieldToken))
+          .to.be.revertedWithCustomError(yieldModule2, "InsufficientFunds");
       });
     });
   });
@@ -916,6 +1188,52 @@ describe("TangemBridgeProcessor", function () {
       await expect(processor.collectServiceFee(yieldModule, yieldToken))
         .to.emit(yieldModule, "FeePaymentProcessed")
         .withArgs(yieldToken, expectedAmount, feeReceiver);
+    });
+
+    it("Should fail with correct error when there is nothing to collect", async function () {
+      const secondOwner = otherAccount;
+      const { yieldModule, yieldModuleAddress, moduleOwnerAddress } =
+        await deployYieldModuleFor(secondOwner, yieldToken, 12345);
+
+      await (await yieldToken.mint(moduleOwnerAddress, 10000n)).wait();
+      await (await yieldToken.connect(secondOwner).approve(yieldModuleAddress, ethers.MaxUint256)).wait();
+
+      // First enter with zero network fee and no revenue => baseline sync only, no collectible fee
+      await (await processor.enterProtocol(yieldModule, yieldToken, 0)).wait();
+
+      await expect(processor.collectServiceFee(yieldModule, yieldToken))
+        .to.be.revertedWithCustomError(yieldModule, "NothingToCollect");
+    });
+
+    it("Should fail with FeeProcessingFailed when fee debt exists but protocol balance is zero", async function () {
+      const secondOwner = otherAccount;
+      const { yieldModule, yieldModuleAddress, moduleOwnerAddress } =
+        await deployYieldModuleFor(secondOwner, yieldToken, 12345);
+
+      const deposit = 100000n;
+      const revenue = 10000n;
+
+      await (await yieldToken.mint(moduleOwnerAddress, deposit)).wait();
+      await (await yieldToken.connect(secondOwner).approve(yieldModuleAddress, ethers.MaxUint256)).wait();
+
+      await (await processor.enterProtocol(yieldModule, yieldToken, 0)).wait();
+      await (await pool.generateRevenue(yieldModuleAddress, revenue)).wait();
+
+      const feeRate = await processor.serviceFeeRate();
+      const expectedFee = (revenue * feeRate) / BigInt(PRECISION);
+
+      // Force fee collection from owner to fail in exitProtocol (uses yield token transferFrom(owner,...))
+      await (await yieldToken.connect(secondOwner).approve(yieldModuleAddress, 0n)).wait();
+
+      await expect(processor.exitProtocol(yieldModule, yieldToken, 0))
+        .to.emit(yieldModule, "FeePaymentFailed")
+        .withArgs(yieldToken, expectedFee);
+
+      // New collectServiceFee flow:
+      // fee > 0 => passes NothingToCollect check
+      // but protocol balance = 0 => _tryProcessFee returns false => FeeProcessingFailed
+      await expect(processor.collectServiceFee(yieldModule, yieldToken))
+        .to.be.revertedWithCustomError(yieldModule, "FeeProcessingFailed");
     });
   });
 
@@ -1198,44 +1516,6 @@ describe("TangemBridgeProcessor", function () {
 
       const sinkAfter = await yieldToken.balanceOf(backendAddress);
       expect(sinkAfter - sinkBefore).to.equal(amountIn);
-    });
-
-    it("Should pull from protocol when owner balance is insufficient and process service fee", async function () {
-      const depositAmount = 100000;
-      const accumulatedRevenue = 10000;
-      const ownerTopup = 1;
-      const amountIn = 2000;
-
-      await (await yieldToken.mint(ownerAddress, depositAmount)).wait();
-      await (await yieldModule.connect(owner).enterProtocolByOwner(tokenIn)).wait();
-
-      await (await pool.generateRevenue(yieldModuleAddress, accumulatedRevenue)).wait();
-
-      const feeRate = await processor.serviceFeeRate();
-      const serviceFee = Math.floor(accumulatedRevenue * Number(feeRate) / PRECISION);
-      const feeReceiver = await processor.feeReceiver();
-
-      await (await yieldToken.mint(ownerAddress, ownerTopup)).wait();
-
-      const pullAmount = amountIn - ownerTopup;
-
-      const data = swapProvider.interface.encodeFunctionData("swapExactIn", [
-        tokenIn,
-        ethers.ZeroAddress,
-        amountIn,
-        0,
-        backendAddress,
-      ]);
-
-      await expect(
-        yieldModule.connect(owner).swap(tokenIn, amountIn, swapProviderAddress, ethers.ZeroAddress, data)
-      )
-        .to.emit(pool, "Withdraw")
-        .withArgs(tokenIn, pullAmount, ownerAddress)
-        .and.to.emit(protocolToken, "Transfer")
-        .withArgs(yieldModuleAddress, feeReceiver, serviceFee)
-        .and.to.emit(yieldModule, "FeePaymentProcessed")
-        .withArgs(tokenIn, serviceFee, feeReceiver);
     });
 
     it("Should pull from protocol when owner balance is insufficient and process service fee", async function () {
@@ -1541,7 +1821,7 @@ describe("TangemBridgeProcessor", function () {
       expect(outAfter - outBefore).to.equal(amountOut);
     });
 
-    it("Should deposit tokenOut to protocol and emit FeePaymentFailed when tokenOut is active and fee is zero", async function () {
+    it("Should deposit tokenOut to protocol and sync latest fee state when tokenOut is active and fee is zero", async function () {
       const TestERC20 = await ethers.getContractFactory("TestERC20");
       const outToken = await TestERC20.deploy();
       await outToken.waitForDeployment();
@@ -1564,6 +1844,8 @@ describe("TangemBridgeProcessor", function () {
         backendAddress,
       ]);
 
+      const expectedFeeRate = await processor.serviceFeeRate();
+
       await expect(
         yieldModule
           .connect(owner)
@@ -1571,8 +1853,8 @@ describe("TangemBridgeProcessor", function () {
       )
         .to.emit(pool, "Supply")
         .withArgs(tokenOut, amountOut, yieldModuleAddress, 0)
-        .and.to.emit(yieldModule, "FeePaymentFailed")
-        .withArgs(tokenOut, 0n)
+        .and.to.emit(yieldModule, "LatestFeePaymentStateUpdated")
+        .withArgs(tokenOut, amountOut, expectedFeeRate)
         .and.to.emit(yieldModule, "SwapAndReceiveCompleted")
         .withArgs(tokenOut, otherAddress, amountOut, true);
     });
@@ -1682,6 +1964,194 @@ describe("TangemBridgeProcessor", function () {
     it("Should fail with correct error if called not by owner", async function () {
       await expect(yieldModule.connect(backend).withdrawNativeAll(backendAddress))
         .to.be.revertedWithCustomError(yieldModule, "OnlyOwner");
+    });
+  });
+
+  describe("withdraw", function () {
+    const maxNetworkFee = 12345;
+    const initialOwnerBalance = 100000n;
+    const accumulatedRevenue = 10000n;
+    const withdrawAmount = 2000n;
+
+    let yieldModule, yieldModuleAddress;
+    let ownerAddress;
+    let feeReceiver;
+    let feeRate;
+    let serviceFee;
+
+    beforeEach(async function () {
+      ownerAddress = await owner.getAddress();
+
+      const deployTx = await factory.connect(owner).deployYieldModule(ownerAddress, yieldToken, maxNetworkFee);
+      await deployTx.wait();
+
+      const TangemAaveV3YieldModule = await ethers.getContractFactory("TangemAaveV3YieldModule");
+      yieldModuleAddress = await factory.calculateYieldModuleAddress(ownerAddress);
+      yieldModule = TangemAaveV3YieldModule.attach(yieldModuleAddress);
+
+      await (await yieldToken.mint(ownerAddress, initialOwnerBalance)).wait();
+      await (await yieldToken.connect(owner).approve(yieldModuleAddress, ethers.MaxUint256)).wait();
+
+      await (await processor.enterProtocol(yieldModule, yieldToken, 0)).wait();
+      await (await pool.generateRevenue(yieldModuleAddress, accumulatedRevenue)).wait();
+
+      feeRate = await processor.serviceFeeRate();
+      serviceFee = (accumulatedRevenue * feeRate) / BigInt(PRECISION);
+      feeReceiver = await processor.feeReceiver();
+    });
+
+    it("Should initiate AAVE pool withdrawal of specified amount to owner", async function () {
+      await expect(yieldModule.connect(owner).withdraw(yieldToken, withdrawAmount))
+        .to.emit(pool, "Withdraw")
+        .withArgs(yieldToken, withdrawAmount, ownerAddress);
+    });
+
+    it("Should process service fee from protocol token and emit WithdrawProcessed", async function () {
+      await expect(yieldModule.connect(owner).withdraw(yieldToken, withdrawAmount))
+        .to.emit(protocolToken, "Transfer")
+        .withArgs(yieldModuleAddress, feeReceiver, serviceFee)
+        .and.to.emit(yieldModule, "FeePaymentProcessed")
+        .withArgs(yieldToken, serviceFee, feeReceiver)
+        .and.to.emit(yieldModule, "WithdrawProcessed")
+        .withArgs(yieldToken, withdrawAmount);
+    });
+
+    it("Should update latest fee payment state after withdraw", async function () {
+      const newFeeRate = 777n;
+      await (await processor.setServiceFeeRate(newFeeRate)).wait();
+
+      const expectedProtocolBalance = initialOwnerBalance + accumulatedRevenue - withdrawAmount - serviceFee;
+
+      let latest = await yieldModule.latestFeePaymentStates(yieldToken);
+      expect(latest.protocolBalance).to.equal(initialOwnerBalance);
+      expect(latest.serviceFeeRate).to.equal(feeRate);
+
+      await (await yieldModule.connect(owner).withdraw(yieldToken, withdrawAmount)).wait();
+
+      latest = await yieldModule.latestFeePaymentStates(yieldToken);
+      expect(latest.protocolBalance).to.equal(expectedProtocolBalance);
+      expect(latest.serviceFeeRate).to.equal(newFeeRate);
+    });
+
+    it("Should fail with correct error when amount plus fee exceeds protocol balance", async function () {
+      const protocolBal = initialOwnerBalance + accumulatedRevenue;
+      const tooMuch = protocolBal - serviceFee + 1n;
+
+      await expect(yieldModule.connect(owner).withdraw(yieldToken, tooMuch))
+        .to.be.revertedWithCustomError(yieldModule, "InsufficientFunds");
+    });
+
+    it("Should fail with correct error if token is not active", async function () {
+      await (await yieldModule.connect(owner).withdrawAndDeactivate(yieldToken)).wait();
+
+      await expect(yieldModule.connect(owner).withdraw(yieldToken, 1n))
+        .to.be.revertedWithCustomError(yieldModule, "TokenNotActive");
+    });
+
+    it("Should revert when amount is zero", async function () {
+      await expect(yieldModule.connect(owner).withdraw(yieldToken, 0n))
+        .to.be.reverted;
+    });
+
+    it("Should fail with correct error if called not by owner", async function () {
+      await expect(yieldModule.withdraw(yieldToken, 1n))
+        .to.be.revertedWithCustomError(yieldModule, "OnlyOwner");
+    });
+
+    it("Should sync latest fee payment state without fee events when fee is zero", async function () {
+      const secondOwner = otherAccount;
+      const { yieldModule: yieldModule2, yieldModuleAddress: moduleAddress2, moduleOwnerAddress: owner2 } =
+        await deployYieldModuleFor(secondOwner, yieldToken, maxNetworkFee);
+
+      const deposit = 5000n;
+      const amount = 1000n;
+
+      await (await yieldToken.mint(owner2, deposit)).wait();
+      await (await yieldToken.connect(secondOwner).approve(moduleAddress2, ethers.MaxUint256)).wait();
+
+      // No revenue => service fee is zero
+      await (await processor.enterProtocol(yieldModule2, yieldToken, 0)).wait();
+
+      const expectedFeeRate = await processor.serviceFeeRate();
+
+      const feeReceiver = await processor.feeReceiver();
+
+      await expect(yieldModule2.connect(secondOwner).withdraw(yieldToken, amount))
+        .to.emit(yieldModule2, "LatestFeePaymentStateUpdated")
+        .withArgs(yieldToken, deposit - amount, expectedFeeRate)
+        .and.to.emit(yieldModule2, "FeePaymentProcessed")
+        .withArgs(yieldToken, 0n, feeReceiver)
+        .and.to.not.emit(yieldModule2, "FeePaymentFailed");
+    });
+  });
+
+  describe("Fee debt persistence and effective balances", function () {
+    const maxNetworkFee = 12345;
+    const deposit = 100000n;
+    const revenue = 10000n;
+
+    let yieldModule;
+    let moduleAddress;
+    let moduleOwner;
+    let ownerAddress;
+    let feeRate;
+    let expectedDebt;
+
+    beforeEach(async function () {
+      moduleOwner = otherAccount;
+      ownerAddress = await moduleOwner.getAddress();
+
+      const deployed = await deployYieldModuleFor(moduleOwner, yieldToken, maxNetworkFee);
+      yieldModule = deployed.yieldModule;
+      moduleAddress = deployed.yieldModuleAddress;
+
+      await (await yieldToken.mint(ownerAddress, deposit)).wait();
+      await (await yieldToken.connect(moduleOwner).approve(moduleAddress, ethers.MaxUint256)).wait();
+
+      await (await processor.enterProtocol(yieldModule, yieldToken, 0)).wait();
+      await (await pool.generateRevenue(moduleAddress, revenue)).wait();
+
+      feeRate = await processor.serviceFeeRate();
+      expectedDebt = (revenue * feeRate) / BigInt(PRECISION);
+
+      // Force fee failure on exitProtocol => creates feeDebt
+      await (await yieldToken.connect(moduleOwner).approve(moduleAddress, 0n)).wait();
+      await (await processor.exitProtocol(yieldModule, yieldToken, 0)).wait();
+
+      const sinkAddress = await backend.getAddress();
+      const ownerBalanceAfterExit = await yieldToken.balanceOf(ownerAddress);
+
+      // exitProtocol sends withdrawn funds to owner. Remove them so the re-enter below
+      // creates protocolBalance < feeDebt instead of re-entering the full withdrawn amount.
+      if (ownerBalanceAfterExit > 0n) {
+        await (await yieldToken.connect(moduleOwner).transfer(sinkAddress, ownerBalanceAfterExit)).wait();
+      }
+
+      // Reactivate and re-enter with tiny balance to create state: protocolBal < feeDebt
+      await (await yieldModule.connect(moduleOwner).reactivateToken(yieldToken, maxNetworkFee)).wait();
+
+      await (await yieldToken.mint(ownerAddress, 1n)).wait();
+      await (await yieldToken.connect(moduleOwner).approve(moduleAddress, ethers.MaxUint256)).wait();
+      await (await yieldModule.connect(moduleOwner).enterProtocolByOwner(yieldToken)).wait();
+    });
+
+    it("Should return persisted fee debt from calculateServiceFee when protocol balance is not above baseline", async function () {
+      expect(await yieldModule.calculateServiceFee(yieldToken)).to.equal(expectedDebt);
+    });
+
+    it("Should clamp effectiveProtocolBalance to zero when fee exceeds protocol balance", async function () {
+      const protocolBal = await yieldModule.protocolBalance(yieldToken);
+      const fee = await yieldModule.calculateServiceFee(yieldToken);
+
+      expect(fee).to.be.gt(protocolBal);
+      expect(await yieldModule.effectiveProtocolBalance(yieldToken)).to.equal(0n);
+    });
+
+    it("Should not underflow effectiveBalance when fee exceeds protocol balance", async function () {
+      const ownerBal = await yieldToken.balanceOf(ownerAddress);
+
+      // Protocol component should be clamped to zero
+      expect(await yieldModule.effectiveBalance(yieldToken)).to.equal(ownerBal);
     });
   });
 });

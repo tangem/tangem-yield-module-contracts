@@ -10,41 +10,43 @@ interface IYieldModule {
     event FeePaymentFailed(address yieldToken, uint serviceFeeDebt); // TODO: add reason?
     event LatestFeePaymentStateUpdated(address yieldToken, uint protocolBalance, uint serviceFeeRate);
     event SendProcessed(address yieldToken, address to, uint amount);
+    event WithdrawProcessed(address yieldToken, uint amount);
     event WithdrawAndDeactivateProcessed(address yieldToken, uint amount);
     event WithdrawNonYieldProcessed(address token, uint amount);
     event TokenReactivated(address yieldToken, uint maxNetworkFee);
     event TokenMaxNetworkFeeSet(address yieldToken, uint240 maxNetworkFee);
     event SwapInitiated(
         address indexed tokenIn,
-        uint256 amountIn,
+        uint amountIn,
         address indexed target,
         address indexed spender,
-        uint256 msgValue,
+        uint msgValue,
         bytes32 dataHash
     );
     event SwapAndReceiveInitiated(
         address indexed tokenIn,
         address indexed tokenOut,
         address indexed to,
-        uint256 amountIn,
+        uint amountIn,
         address target,
         address spender,
-        uint256 msgValue,
+        uint msgValue,
         bytes32 dataHash
     );
     event SwapAndReceiveCompleted(
         address indexed tokenOut,
         address indexed to,
-        uint256 amountOut,
+        uint amountOut,
         bool depositedToProtocol
     );
-    event WithdrawNativeProcessed(address indexed to, uint256 amount);
+    event WithdrawNativeProcessed(address indexed to, uint amount);
 
     error OnlyOwner();
     error OnlyOwnerOrFactory();
     error OnlyProcessor();
     error TokenNotActive();
     error FeeProcessingFailed();
+    error NothingToCollect();
     error TokenAlreadyInitialized();
     error SendingToOwner();
     error InsufficientFunds();
@@ -78,6 +80,8 @@ interface IYieldModule {
 
     function send(address yieldToken, address to, uint amount) external;
 
+    function withdraw(address yieldToken, uint amount) external;
+
     function withdrawAndDeactivate(address yieldToken) external;
 
     function withdrawNonYieldToken(address token) external;
@@ -88,7 +92,7 @@ interface IYieldModule {
 
     function swap(
         address tokenIn,
-        uint256 amountIn,
+        uint amountIn,
         address target,
         address spender,
         bytes calldata data
@@ -100,7 +104,7 @@ interface IYieldModule {
         address tokenIn,
         address tokenOut,
         address to,
-        uint256 amountIn,
+        uint amountIn,
         address target,
         address spender,
         bytes calldata data
