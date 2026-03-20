@@ -97,7 +97,7 @@ abstract contract YieldModuleLiquidUpgradeable is
     /* PROCESSOR FUNCTIONS */
 
     function enterProtocol(address yieldToken, uint networkFee) external onlyProcessor {
-        _enterProtocol(yieldToken, networkFee, 0);
+        _enterProtocol(yieldToken, type(uint).max, networkFee); // enter with all funds available
     }
 
     // emergency function to save user's funds in case protocol or module is compromised
@@ -105,8 +105,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         YieldTokenData storage yieldTokenData = yieldTokensData[yieldToken];
         require(yieldTokenData.active, TokenNotActive());
 
-        // calculate service fee before changing funds in a protocol
-        uint fee = calculateFee(yieldToken, networkFee);
+        uint fee = calculateFee(yieldToken, networkFee); // calculate service fee before changing funds in a protocol
         uint amountToExit = type(uint).max; // withdraw all
         
         uint exitAmount = _pullFromProtocol(yieldToken, amountToExit);
@@ -151,14 +150,14 @@ abstract contract YieldModuleLiquidUpgradeable is
 
         IERC20 ierc20Token = IERC20(yieldToken);
 
-        uint fee = calculateServiceFee(yieldToken);
+        uint fee = calculateServiceFee(yieldToken); // calculate service fee before changing funds in a protocol
         uint ownerBalance = ierc20Token.balanceOf(owner);
         
-
+        uint protocolBal;
         if (ownerBalance < amount) {
             uint pullAmount = amount - ownerBalance;
 
-            uint protocolBal = _protocolBalance(yieldToken);
+            protocolBal = _protocolBalance(yieldToken);
             require(protocolBal >= pullAmount + fee, InsufficientFunds());
 
             _pullFromProtocol(yieldToken, pullAmount);
@@ -167,6 +166,9 @@ abstract contract YieldModuleLiquidUpgradeable is
         ierc20Token.safeTransferFrom(owner, to, amount);
 
         if (ownerBalance < amount) { // no need to process fee if the protocol balance hasn't changed
+            if (protocolBal == amount + fee) { // avoid protocol rounding errors on sending all available funds
+                fee = _protocolBalance(yieldToken);
+            } 
             _tryProcessFee(yieldToken, fee, true);
         }
 
@@ -178,13 +180,15 @@ abstract contract YieldModuleLiquidUpgradeable is
         amount.requireNotZero();
 
         uint protocolBal = _protocolBalance(yieldToken);
-        uint fee = _calculateServiceFee(yieldToken, protocolBal);
+        uint fee = _calculateServiceFee(yieldToken, protocolBal); // calculate service fee before changing funds in a protocol
 
         require(protocolBal >= amount + fee, InsufficientFunds());
 
         _pullFromProtocol(yieldToken, amount);
 
-        // fee is computed from the "old" protocolBal snapshot and processed right after withdrawal.
+        if (protocolBal == amount + fee) { // avoid protocol rounding errors on withdrawing all available funds
+            fee = _protocolBalance(yieldToken);
+        } 
         _tryProcessFee(yieldToken, fee, true);
 
         emit WithdrawProcessed(yieldToken, amount);
@@ -199,13 +203,16 @@ abstract contract YieldModuleLiquidUpgradeable is
         uint fee = _calculateServiceFee(yieldToken, protocolBal);
 
         require(protocolBal >= fee, InsufficientFunds());
-        uint amountToExit = protocolBal - fee;
+        uint amountToExit = protocolBal >= fee ? protocolBal - fee : 0; // we should still allow to deactivate token even if there is some error
         
         if (amountToExit > 0) {
             _pullFromProtocol(yieldToken, amountToExit);
         }
 
-        _tryProcessFee(yieldToken, fee, true);
+        // get protocol balance again to avoid protocol rounding errors
+        // we can lose debt if the balance were less than the debt due to some error, but we have no means to get it anyway,
+        // since not enough funds left, but we'll catch this behaviour with data collection
+        _tryProcessFee(yieldToken, _protocolBalance(yieldToken), true); 
 
         // disable token to avoid abuse by processor
         yieldTokenData.active = false;
@@ -241,12 +248,11 @@ abstract contract YieldModuleLiquidUpgradeable is
     }
 
     function enterProtocolByOwner(address yieldToken) external onlyOwner {
-        _enterProtocol(yieldToken, 0, 0);
+        _enterProtocol(yieldToken, type(uint).max, 0); // enter with all funds available
     }
 
     function enterProtocolByOwner(address yieldToken, uint amount) external onlyOwner {
-        amount.requireNotZero();
-        _enterProtocol(yieldToken, 0, amount);
+        _enterProtocol(yieldToken, amount, 0);
     }
 
     // used to reactivate token after exitProtocol and withdrawAndDeactivate
@@ -344,7 +350,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         if (yieldTokensData[tokenOut].active) {
             uint feeOut = calculateServiceFee(tokenOut);
 
-            _pushToProtocol(tokenOut, received);
+            _pushToProtocol(tokenOut, outAfter);
             _tryProcessFee(tokenOut, feeOut, true);
 
             deposited = true;
@@ -433,23 +439,20 @@ abstract contract YieldModuleLiquidUpgradeable is
         return transferSuccess;
     }
 
-    function _enterProtocol(address yieldToken, uint networkFee, uint amount) private {
+    function _enterProtocol(address yieldToken, uint amount, uint networkFee) private {
         require(yieldTokensData[yieldToken].active, TokenNotActive());
 
         IERC20 ierc20YieldToken = IERC20(yieldToken);
 
-        if (amount > 0) {
-            ierc20YieldToken.safeTransferFrom(owner, address(this), amount);
-        } else {
-            uint ownerBalance = ierc20YieldToken.balanceOf(owner);
-            if (ownerBalance > 0) {
-                ierc20YieldToken.safeTransferFrom(owner, address(this), ownerBalance);
-            }
-            amount = ierc20YieldToken.balanceOf(address(this));
+        if (amount == type(uint).max) {
+            amount = ierc20YieldToken.balanceOf(owner);
         }
+
+        ierc20YieldToken.safeTransferFrom(owner, address(this), amount);
 
         // calculate service fee before changing funds in a protocol
         uint fee = calculateFee(yieldToken, networkFee);
+        uint amountToEnter = ierc20YieldToken.balanceOf(address(this)); // in case some yield token is stuck in module
 
         amount.requireNotZero();
         require(amount > networkFee, NetworkFeeExceedsAmount());
@@ -542,6 +545,9 @@ abstract contract YieldModuleLiquidUpgradeable is
             uint protocolBal = _protocolBalance(tokenIn);
 
             require(protocolBal >= pullAmount + feeIn, InsufficientFunds());
+            if (protocolBal == pullAmount + feeIn) { // avoid protocol rounding errors on withdrawing all available funds
+                feeIn = type(uint).max; // use whole balance left as fee
+            } 
 
             _pullFromProtocol(tokenIn, pullAmount);
         }
@@ -577,7 +583,10 @@ abstract contract YieldModuleLiquidUpgradeable is
         require(context.tokenIn.balanceOf(address(this)) == 0, TokenInResidue());
 
         if (context.protocolTouched) {
-            _tryProcessFee(context.tokenInAddr, context.feeIn, true);
+            address tokenIn = context.tokenInAddr;
+            uint feeIn = context.feeIn == type(uint).max ? _protocolBalance(tokenIn) : context.feeIn;
+
+            _tryProcessFee(tokenIn, feeIn, true);
         }
     }
 
