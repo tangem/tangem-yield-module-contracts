@@ -452,14 +452,15 @@ abstract contract YieldModuleLiquidUpgradeable is
 
         // calculate service fee before changing funds in a protocol
         uint fee = calculateFee(yieldToken, networkFee);
+        uint amountToEnter = ierc20YieldToken.balanceOf(address(this)); // in case some yield token is stuck in module
 
-        amount.requireNotZero();
-        require(amount > networkFee, NetworkFeeExceedsAmount());
+        amountToEnter.requireNotZero();
+        require(amountToEnter > networkFee, NetworkFeeExceedsAmount());
 
-        _pushToProtocol(yieldToken, amount);
+        _pushToProtocol(yieldToken, amountToEnter);
         _tryProcessFee(yieldToken, fee, true);
 
-        emit ProtocolEntered(yieldToken, amount, networkFee);
+        emit ProtocolEntered(yieldToken, amountToEnter, networkFee);
     }
 
     function _processFeePaymentSuccess(address token, uint amount, address receiver) private {

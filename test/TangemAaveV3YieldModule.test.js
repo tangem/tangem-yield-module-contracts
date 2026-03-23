@@ -125,6 +125,7 @@ describe("TangemBridgeProcessor", function () {
     const maxNetworkFee = 12345;
     const initialOwnerBalance = 223556;
     const initialModuleBalance = 1235;
+    const totalEnterAmount = initialOwnerBalance + initialModuleBalance;
     let yieldModule;
 
     beforeEach(async function () {
@@ -154,13 +155,13 @@ describe("TangemBridgeProcessor", function () {
     it("Should initiate yield token approval of owner balance to the AAVE pool", async function () {
       await expect(yieldModule.connect(owner).enterProtocolByOwner(yieldToken))
         .to.emit(yieldToken, "Approval")
-        .withArgs(yieldModule, pool, initialOwnerBalance);
+        .withArgs(yieldModule, pool, totalEnterAmount);
     });
 
     it("Should initiate AAVE pool supply of yield token with owner balance on behalf of itself", async function () {
       await expect(yieldModule.connect(owner).enterProtocolByOwner(yieldToken))
         .to.emit(pool, "Supply")
-        .withArgs(yieldToken, initialOwnerBalance, yieldModule, 0);
+        .withArgs(yieldToken, totalEnterAmount, yieldModule, 0);
     });
 
     it("Should fail with correct error if called not by owner", async function () {
@@ -173,7 +174,7 @@ describe("TangemBridgeProcessor", function () {
 
       await expect(yieldModule.connect(owner).enterProtocolByOwner(yieldToken))
         .to.emit(yieldModule, "ProtocolEntered")
-        .withArgs(yieldToken, initialOwnerBalance, expectedNetworkFee);
+        .withArgs(yieldToken, totalEnterAmount, expectedNetworkFee);
     });
 
     describe("Fee processing", function () {
@@ -181,7 +182,7 @@ describe("TangemBridgeProcessor", function () {
       describe("First enter", function () {
 
         it("Should set latest fee payment state", async function () {
-          const expectedProtocolBalance = initialOwnerBalance;
+          const expectedProtocolBalance = totalEnterAmount;
           const expectedFeeRate = await processor.serviceFeeRate();
 
           let latestFeePaymentState = await yieldModule.latestFeePaymentStates(yieldToken);
@@ -197,7 +198,7 @@ describe("TangemBridgeProcessor", function () {
         });
 
         it("Should emit FeePaymentProcessed with zero fee and sync latest fee payment state", async function () {
-          const expectedProtocolBalance = initialOwnerBalance;
+          const expectedProtocolBalance = totalEnterAmount;
           const expectedFeeRate = await processor.serviceFeeRate();
           const feeReceiver = await processor.feeReceiver();
 
@@ -214,7 +215,7 @@ describe("TangemBridgeProcessor", function () {
         const freshOwnerBalance = 453456;
         const accumulatedRevenue = 23566;
         const newFeeRate = 2444;
-        const initialProtocolBalance = initialOwnerBalance;
+        const initialProtocolBalance = totalEnterAmount;
         let initialFeeRate, serviceFee, feeReceiver;
 
         beforeEach(async function () {
@@ -430,6 +431,7 @@ describe("TangemBridgeProcessor", function () {
     const networkFee = 1234;
     const initialOwnerBalance = 464263;
     const initialModuleBalance = 53245;
+    const totalEnterAmount = initialOwnerBalance + initialModuleBalance;
     let yieldModule;
 
     beforeEach(async function () {
@@ -459,13 +461,13 @@ describe("TangemBridgeProcessor", function () {
     it("Should initiate yield token approval of owner balance to the AAVE pool", async function () {
       await expect(processor.enterProtocol(yieldModule, yieldToken, networkFee))
         .to.emit(yieldToken, "Approval")
-        .withArgs(yieldModule, pool, initialOwnerBalance);
+        .withArgs(yieldModule, pool, totalEnterAmount);
     });
 
     it("Should initiate AAVE pool supply of yield token with owner balance on behalf of itself", async function () {
       await expect(processor.enterProtocol(yieldModule, yieldToken, networkFee))
         .to.emit(pool, "Supply")
-        .withArgs(yieldToken, initialOwnerBalance, yieldModule, 0);
+        .withArgs(yieldToken, totalEnterAmount, yieldModule, 0);
     });
 
     it("Should fail with correct error if network fee exceeds maximum", async function () {
@@ -492,7 +494,7 @@ describe("TangemBridgeProcessor", function () {
     it("Should emit ProtocolEntered event with correct parameters", async function () {
       await expect(processor.enterProtocol(yieldModule, yieldToken, networkFee))
         .to.emit(yieldModule, "ProtocolEntered")
-        .withArgs(yieldToken, initialOwnerBalance, networkFee);
+        .withArgs(yieldToken, totalEnterAmount, networkFee);
     });
 
     describe("Fee processing", function () {
@@ -505,7 +507,7 @@ describe("TangemBridgeProcessor", function () {
       describe("First enter", function () {
 
         it("Should set latest fee payment state", async function () {
-          const expectedProtocolBalance = initialOwnerBalance - networkFee;
+          const expectedProtocolBalance = totalEnterAmount - networkFee;
           const expectedFeeRate = await processor.serviceFeeRate();
 
           let latestFeePaymentState = await yieldModule.latestFeePaymentStates(yieldToken);
@@ -539,7 +541,7 @@ describe("TangemBridgeProcessor", function () {
         const freshOwnerBalance = 46436;
         const accumulatedRevenue = 11435;
         const newFeeRate = 1234;
-        const initialProtocolBalance = initialOwnerBalance;
+        const initialProtocolBalance = totalEnterAmount;
         let initialFeeRate, serviceFee, feeReceiver;
 
         beforeEach(async function () {
