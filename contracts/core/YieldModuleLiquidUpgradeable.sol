@@ -429,9 +429,12 @@ abstract contract YieldModuleLiquidUpgradeable is
         }
 
         if (transferSuccess) {
-            _processFeePaymentSuccess(yieldToken, transferAmount, feeReceiver);
             if (debt > 0) {
                 feeDebts[yieldToken] = debt;
+                _updateLatestFeePaymentState(yieldToken);
+                emit FeePaymentPartial(yieldToken, transferAmount, debt, feeReceiver);
+            } else {
+                _processFeePaymentSuccess(yieldToken, transferAmount, feeReceiver);
             }
         } else { // shouldn't happen with proper fee receiver
             _processFeePaymentFailure(yieldToken, amount);
