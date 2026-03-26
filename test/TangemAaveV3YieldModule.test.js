@@ -1462,7 +1462,7 @@ describe("TangemBridgeProcessor", function () {
       ).to.be.revertedWithCustomError(yieldModule, "ProviderCallFailed");
     });
 
-    it("Should send tokenIn residue to owner after partial swap", async function () {
+    it("Should leave tokenIn residue on module after partial swap", async function () {
       const amountIn = 1000;
 
       await (await yieldToken.mint(ownerAddress, amountIn)).wait();
@@ -1478,9 +1478,9 @@ describe("TangemBridgeProcessor", function () {
       const ownerBalAfter = await yieldToken.balanceOf(ownerAddress);
       const moduleBalAfter = await yieldToken.balanceOf(yieldModuleAddress);
 
-      // spendPartial leaves 1 wei residue, which should be sent back to owner
-      expect(moduleBalAfter).to.equal(0);
-      expect(ownerBalAfter).to.equal(1);
+      // spendPartial leaves 1 wei residue, which stays on module for next operation
+      expect(moduleBalAfter).to.equal(1);
+      expect(ownerBalAfter).to.equal(0);
     });
 
     it("Should execute swap, clear allowance, and emit SwapInitiated event", async function () {
