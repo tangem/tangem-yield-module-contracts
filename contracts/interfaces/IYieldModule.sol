@@ -62,7 +62,6 @@ interface IYieldModule {
     error TargetNotAllowed();
     error SpenderNotAllowed();
     error ProviderCallFailed();
-    error TokenInResidue();
     error SwapPayoutNotReceived();
     error NativeTransferFailed();
     error TokenInEqualsTokenOut();

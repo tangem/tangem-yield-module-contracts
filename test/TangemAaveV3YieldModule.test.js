@@ -1462,7 +1462,7 @@ describe("TangemBridgeProcessor", function () {
       ).to.be.revertedWithCustomError(yieldModule, "ProviderCallFailed");
     });
 
-    it("Should fail with correct error if tokenIn residue remains after swap", async function () {
+    it("Should send tokenIn residue to owner after partial swap", async function () {
       const amountIn = 1000;
 
       await (await yieldToken.mint(ownerAddress, amountIn)).wait();
@@ -1473,9 +1473,14 @@ describe("TangemBridgeProcessor", function () {
         backendAddress,
       ]);
 
-      await expect(
-        yieldModule.connect(owner).swap(tokenIn, amountIn, swapProviderAddress, ethers.ZeroAddress, data)
-      ).to.be.revertedWithCustomError(yieldModule, "TokenInResidue");
+      await yieldModule.connect(owner).swap(tokenIn, amountIn, swapProviderAddress, ethers.ZeroAddress, data);
+
+      const ownerBalAfter = await yieldToken.balanceOf(ownerAddress);
+      const moduleBalAfter = await yieldToken.balanceOf(yieldModuleAddress);
+
+      // spendPartial leaves 1 wei residue, which should be sent back to owner
+      expect(moduleBalAfter).to.equal(0);
+      expect(ownerBalAfter).to.equal(1);
     });
 
     it("Should execute swap, clear allowance, and emit SwapInitiated event", async function () {
@@ -1544,7 +1549,7 @@ describe("TangemBridgeProcessor", function () {
 
       await expect(tx)
         .to.emit(pool, "Withdraw")
-        .withArgs(yieldTokenAddress, pullAmount, ownerAddress)
+        .withArgs(yieldTokenAddress, pullAmount, yieldModuleAddress)
         .and.to.emit(protocolToken, "Transfer")
         .withArgs(yieldModuleAddress, feeReceiver, serviceFee)
         .and.to.emit(yieldModule, "FeePaymentProcessed")
