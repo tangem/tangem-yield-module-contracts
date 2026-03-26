@@ -87,6 +87,7 @@ abstract contract YieldModuleLiquidUpgradeable is
     receive() external payable {}
 
     function __YieldModule_init(address owner_) internal onlyInitializing {
+        __ReentrancyGuard_init();
         __YieldModule_init_unchained(owner_);
     }
 
