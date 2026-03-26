@@ -7,6 +7,7 @@ interface IYieldModule {
     event ProtocolEntered(address yieldToken, uint amount, uint networkFee);
     event ProtocolExited(address yieldToken, uint amount, uint networkFee);
     event FeePaymentProcessed(address yieldToken, uint amount, address receiver);
+    event FeePaymentPartial(address yieldToken, uint paid, uint debt, address receiver);
     event FeePaymentFailed(address yieldToken, uint serviceFeeDebt); // TODO: add reason?
     event LatestFeePaymentStateUpdated(address yieldToken, uint protocolBalance, uint serviceFeeRate);
     event SendProcessed(address yieldToken, address to, uint amount);
@@ -62,7 +63,6 @@ interface IYieldModule {
     error TargetNotAllowed();
     error SpenderNotAllowed();
     error ProviderCallFailed();
-    error TokenInResidue();
     error SwapPayoutNotReceived();
     error NativeTransferFailed();
     error TokenInEqualsTokenOut();
