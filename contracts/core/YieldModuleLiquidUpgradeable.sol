@@ -607,12 +607,6 @@ abstract contract YieldModuleLiquidUpgradeable is
 
             _tryProcessFee(tokenIn, feeIn, true);
         }
-
-        // send any remaining tokenIn (swap dust, stuck funds, or attacker donations) to owner
-        uint residue = context.tokenIn.balanceOf(address(this));
-        if (residue > 0) {
-            context.tokenIn.safeTransfer(owner, residue);
-        }
     }
 
     function _authorizeUpgrade(address newImplementation)
