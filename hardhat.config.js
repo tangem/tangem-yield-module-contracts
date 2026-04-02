@@ -30,8 +30,14 @@ task("deploy-base", "Deploys contracts for testing")
     const factory = await TangemYieldModuleFactory.deploy();
     await factory.waitForDeployment();
 
+    const SwapExecutionRegistry = await ethers.getContractFactory("SwapExecutionRegistry");
+    const swapExecutionRegistry = await SwapExecutionRegistry.deploy(msgSender);
+    await swapExecutionRegistry.waitForDeployment();
+
+    console.log("SwapExecutionRegistry deployed to: ", await swapExecutionRegistry.getAddress());
+
     const AaveV3YieldModule = await ethers.getContractFactory("TangemAaveV3YieldModule");
-    const moduleImplementation = await AaveV3YieldModule.deploy(pool, processor, factory, forwarder);
+    const moduleImplementation = await AaveV3YieldModule.deploy(pool, processor, factory, forwarder, swapExecutionRegistry);
     await moduleImplementation.waitForDeployment();
 
     const implementationSetterRole = ethers.id("IMPLEMENTATION_SETTER_ROLE")
@@ -95,7 +101,7 @@ task("enter-protocol", "Enters yield protocol")
   .addParam("factory", "The address of the yield module factory")
   .addParam("owner", "The address of the yield module's owner")
   .addParam("token", "The address of the yield token")
-  .addParam("maxFee", "The address of the yield token")
+  .addParam("maxFee", "The maximum network fee")
   .setAction(async (taskArgs) => {
     await hre.run('compile');
 
@@ -108,7 +114,7 @@ task("enter-protocol", "Enters yield protocol")
     const TangemYieldModuleFactory = await ethers.getContractFactory("TangemYieldModuleFactory");
     const factory = TangemYieldModuleFactory.attach(factoryAddress);
     
-    const yieldModuleAddress = factory.yieldModules(ownerAddress);
+    const yieldModuleAddress = await factory.yieldModules(ownerAddress);
 
     const TangemYieldProcessor = await ethers.getContractFactory("TangemYieldProcessor");
     const processor = TangemYieldProcessor.attach(processorAddress);
@@ -183,6 +189,7 @@ task("upgrade-module-implementation", "Deploys new module implementation and set
   .addParam("processor", "The address of the yield processor")
   .addParam("factory", "The address of the yield module factory")
   .addParam("forwarder", "The address of the Tangem forwarder")
+  .addParam("registry", "The address of the swap execution registry")
   .setAction(async (taskArgs) => {
     await hre.run('compile');
 
@@ -192,10 +199,11 @@ task("upgrade-module-implementation", "Deploys new module implementation and set
     const processorAddress = taskArgs.processor;
     const factoryAddress = taskArgs.factory;
     const forwarderAddress = taskArgs.forwarder;
+    const registryAddress = taskArgs.registry;
 
     const AaveV3YieldModule = await ethers.getContractFactory("TangemAaveV3YieldModule");
     const moduleImplementation =
-      await AaveV3YieldModule.deploy(poolAddress, processorAddress, factoryAddress, forwarderAddress);
+      await AaveV3YieldModule.deploy(poolAddress, processorAddress, factoryAddress, forwarderAddress, registryAddress);
     await moduleImplementation.waitForDeployment();
 
     console.log("New implementation deployed to: ", await moduleImplementation.getAddress());
