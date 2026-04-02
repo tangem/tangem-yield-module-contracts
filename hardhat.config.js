@@ -184,6 +184,19 @@ task("change-admin", "Changes the Default Admin for processor and factory")
     console.log("Admin has been changed");
   });
 
+task("deploy-registry", "Deploys a new SwapExecutionRegistry")
+  .setAction(async () => {
+    await hre.run('compile');
+
+    const msgSender = (await hre.ethers.getSigners())[0].address;
+
+    const SwapExecutionRegistry = await ethers.getContractFactory("SwapExecutionRegistry");
+    const swapExecutionRegistry = await SwapExecutionRegistry.deploy(msgSender);
+    await swapExecutionRegistry.waitForDeployment();
+
+    console.log("SwapExecutionRegistry deployed to: ", await swapExecutionRegistry.getAddress());
+  });
+
 task("upgrade-module-implementation", "Deploys new module implementation and sets it to factory")
   .addParam("pool", "The address of the Aave pool")
   .addParam("processor", "The address of the yield processor")
