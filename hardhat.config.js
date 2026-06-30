@@ -145,6 +145,10 @@ task("grant-backend-roles", "Grants backend roles")
     const grantTx2 = await processor.grantRole(serviceFeeCollectorRole, to);
     await grantTx2.wait();
 
+    const riskServiceRole = ethers.id("RISK_SERVICE_ROLE")
+    const grantTx3 = await processor.grantRole(riskServiceRole, to);
+    await grantTx3.wait();
+
     console.log("Backend roles granted");
   });
 

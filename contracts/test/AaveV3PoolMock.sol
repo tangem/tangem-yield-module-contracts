@@ -11,9 +11,14 @@ contract AaveV3PoolMock {
     event GenerateRevenue(address account, uint amount);
 
     TestERC20 public aToken;
+    bool public failSupply; // test toggle to simulate a reverting pool.supply
 
     constructor() {
         aToken = new TestERC20();
+    }
+
+    function setFailSupply(bool value) external {
+        failSupply = value;
     }
 
     function getReserveData(address) external view returns (DataTypes.ReserveData memory) {
@@ -37,6 +42,7 @@ contract AaveV3PoolMock {
     }
 
     function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external {
+        require(!failSupply, "MOCK_SUPPLY_FAIL");
         IERC20(asset).transferFrom(msg.sender, address(this), amount);
         aToken.mint(msg.sender, amount);
 

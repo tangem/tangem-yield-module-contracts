@@ -41,6 +41,15 @@ interface IYieldModule {
         bool depositedToProtocol
     );
     event WithdrawNativeProcessed(address indexed to, uint amount);
+    // reason and poolUtilization are informational values supplied by the caller
+    event SoftExitTriggered(
+        address indexed yieldToken,
+        uint16 reason,
+        uint poolUtilization,
+        uint moduleBalance,
+        uint amount
+    );
+    event RiskSuspensionSet(address indexed yieldToken, bool suspended, uint16 reason);
 
     error OnlyOwner();
     error OnlyOwnerOrFactory();
@@ -67,6 +76,9 @@ interface IYieldModule {
     error NativeTransferFailed();
     error TokenInEqualsTokenOut();
     error SendingToThis();
+    error TokenRiskSuspended();
+    error RiskActionRateLimited();
+    error NotSuspended();
 
     function initialize(address owner) external;
 
@@ -74,7 +86,13 @@ interface IYieldModule {
 
     function enterProtocol(address yieldToken, uint networkFee) external;
 
-    function exitProtocol(address yieldToken, uint networkFee) external;
+    function exitProtocol(address yieldToken, uint networkFee, uint16 reason, uint poolUtilization) external;
+
+    function softExit(address yieldToken, uint amount, uint16 reason, uint poolUtilization) external;
+
+    function suspendToken(address yieldToken, uint16 reason) external;
+
+    function resumeAndEnterProtocol(address yieldToken, uint16 reason) external;
 
     function collectServiceFee(address yieldToken) external;
 
@@ -113,8 +131,12 @@ interface IYieldModule {
         payable;
 
     function protocolBalance(address yieldToken) external view returns (uint);
-    
+
     function effectiveBalance(address yieldToken) external view returns (uint);
 
     function calculateServiceFee(address yieldToken) external view returns (uint);
+
+    function riskSuspended(address yieldToken) external view returns (bool);
+
+    function lastRiskActionAt(address yieldToken) external view returns (uint);
 }

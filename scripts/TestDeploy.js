@@ -42,6 +42,10 @@ async function deployTestSetup() {
     const grantTx5 = await processor.grantRole(pauserRole, msgSender);
     await grantTx5.wait();
 
+    const riskServiceRole = ethers.id("RISK_SERVICE_ROLE")
+    const grantTx5a = await processor.grantRole(riskServiceRole, msgSender);
+    await grantTx5a.wait();
+
     const TangemYieldModuleFactory = await ethers.getContractFactory("TangemYieldModuleFactory");
     const factory = await TangemYieldModuleFactory.deploy();
     await factory.waitForDeployment();

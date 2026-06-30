@@ -16,6 +16,7 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
     bytes32 public constant SERVICE_FEE_COLLECTOR_ROLE = keccak256("SERVICE_FEE_COLLECTOR_ROLE");
     bytes32 public constant PROPERTY_SETTER_ROLE = keccak256("PROPERTY_SETTER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 public constant RISK_SERVICE_ROLE = keccak256("RISK_SERVICE_ROLE");
 
     address public feeReceiver;
     uint public serviceFeeRate; // rate is specified in basis points (0.01 %)
@@ -25,6 +26,9 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
     event ServiceFeeCollected(address yieldModule);
     event FeeReceiverSet(address paymentReceiver);
     event FeeRateSet(uint feeRate);
+    event SoftExited(address yieldModule);
+    event TokenSuspended(address yieldModule);
+    event ProtocolResumed(address yieldModule);
 
     error InvalidFeeRate();
 
@@ -51,11 +55,45 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
     function exitProtocol(
         address yieldModule,
         address yieldToken,
-        uint networkFee
+        uint networkFee,
+        uint16 reason,
+        uint poolUtilization
     ) external whenNotPaused onlyRole(PROTOCOL_EXITER_ROLE) {
-        IYieldModule(yieldModule).exitProtocol(yieldToken, networkFee);
+        IYieldModule(yieldModule).exitProtocol(yieldToken, networkFee, reason, poolUtilization);
 
         emit ProtocolExited(yieldModule);
+    }
+
+    function softExit(
+        address yieldModule,
+        address yieldToken,
+        uint amount,
+        uint16 reason,
+        uint poolUtilization
+    ) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
+        IYieldModule(yieldModule).softExit(yieldToken, amount, reason, poolUtilization);
+
+        emit SoftExited(yieldModule);
+    }
+
+    function suspendToken(
+        address yieldModule,
+        address yieldToken,
+        uint16 reason
+    ) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
+        IYieldModule(yieldModule).suspendToken(yieldToken, reason);
+
+        emit TokenSuspended(yieldModule);
+    }
+
+    function resumeAndEnterProtocol(
+        address yieldModule,
+        address yieldToken,
+        uint16 reason
+    ) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
+        IYieldModule(yieldModule).resumeAndEnterProtocol(yieldToken, reason);
+
+        emit ProtocolResumed(yieldModule);
     }
 
     function collectServiceFee(address yieldModule, address yieldToken)
