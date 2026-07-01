@@ -41,15 +41,8 @@ interface IYieldModule {
         bool depositedToProtocol
     );
     event WithdrawNativeProcessed(address indexed to, uint amount);
-    // reason and poolUtilization are informational values supplied by the caller
-    event SoftExitTriggered(
-        address indexed yieldToken,
-        uint16 reason,
-        uint poolUtilization,
-        uint moduleBalance,
-        uint amount
-    );
-    event RiskSuspensionSet(address indexed yieldToken, bool suspended, uint16 reason);
+    event SoftExitTriggered(address indexed yieldToken, uint moduleBalance, uint amount);
+    event RiskSuspensionSet(address indexed yieldToken, bool suspended);
 
     error OnlyOwner();
     error OnlyOwnerOrFactory();
@@ -86,13 +79,13 @@ interface IYieldModule {
 
     function enterProtocol(address yieldToken, uint networkFee) external;
 
-    function exitProtocol(address yieldToken, uint networkFee, uint16 reason, uint poolUtilization) external;
+    function exitProtocol(address yieldToken, uint networkFee) external;
 
-    function softExit(address yieldToken, uint amount, uint16 reason, uint poolUtilization) external;
+    function softExit(address yieldToken, uint amount) external;
 
-    function suspendToken(address yieldToken, uint16 reason) external;
+    function suspendToken(address yieldToken) external;
 
-    function resumeAndEnterProtocol(address yieldToken, uint16 reason) external;
+    function resumeAndEnterProtocol(address yieldToken) external;
 
     function collectServiceFee(address yieldToken) external;
 

@@ -55,11 +55,9 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
     function exitProtocol(
         address yieldModule,
         address yieldToken,
-        uint networkFee,
-        uint16 reason,
-        uint poolUtilization
+        uint networkFee
     ) external whenNotPaused onlyRole(PROTOCOL_EXITER_ROLE) {
-        IYieldModule(yieldModule).exitProtocol(yieldToken, networkFee, reason, poolUtilization);
+        IYieldModule(yieldModule).exitProtocol(yieldToken, networkFee);
 
         emit ProtocolExited(yieldModule);
     }
@@ -67,31 +65,27 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
     function softExit(
         address yieldModule,
         address yieldToken,
-        uint amount,
-        uint16 reason,
-        uint poolUtilization
+        uint amount
     ) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
-        IYieldModule(yieldModule).softExit(yieldToken, amount, reason, poolUtilization);
+        IYieldModule(yieldModule).softExit(yieldToken, amount);
 
         emit SoftExited(yieldModule);
     }
 
     function suspendToken(
         address yieldModule,
-        address yieldToken,
-        uint16 reason
+        address yieldToken
     ) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
-        IYieldModule(yieldModule).suspendToken(yieldToken, reason);
+        IYieldModule(yieldModule).suspendToken(yieldToken);
 
         emit TokenSuspended(yieldModule);
     }
 
     function resumeAndEnterProtocol(
         address yieldModule,
-        address yieldToken,
-        uint16 reason
+        address yieldToken
     ) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
-        IYieldModule(yieldModule).resumeAndEnterProtocol(yieldToken, reason);
+        IYieldModule(yieldModule).resumeAndEnterProtocol(yieldToken);
 
         emit ProtocolResumed(yieldModule);
     }
