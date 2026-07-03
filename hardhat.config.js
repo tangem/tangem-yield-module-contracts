@@ -197,7 +197,7 @@ task("deploy-registry", "Deploys a new SwapExecutionRegistry")
     console.log("SwapExecutionRegistry deployed to: ", await swapExecutionRegistry.getAddress());
   });
 
-task("upgrade-module-implementation", "Deploys new module implementation and sets it to factory")
+task("deploy-module-implementation", "Deploys new module implementation and sets it to factory")
   .addParam("pool", "The address of the Aave pool")
   .addParam("processor", "The address of the yield processor")
   .addParam("factory", "The address of the yield module factory")
@@ -220,6 +220,18 @@ task("upgrade-module-implementation", "Deploys new module implementation and set
     await moduleImplementation.waitForDeployment();
 
     console.log("New implementation deployed to: ", await moduleImplementation.getAddress());
+  });
+
+task("upgrade-module-implementation", "Deploys new module implementation and sets it to factory")
+  .addParam("factory", "The address of the yield module factory")
+  .addParam("implementation", "The address of the new module implementation")
+  .setAction(async (taskArgs) => {
+    await hre.run('compile');
+
+    const msgSender = (await hre.ethers.getSigners())[0].address;
+
+    const factoryAddress = taskArgs.factory;
+    const implementationAddress = taskArgs.implementation;
 
     const TangemYieldModuleFactory = await ethers.getContractFactory("TangemYieldModuleFactory");
     const factory = TangemYieldModuleFactory.attach(factoryAddress);
@@ -235,7 +247,7 @@ task("upgrade-module-implementation", "Deploys new module implementation and set
     const pauseTx = await factory.pause();
     await pauseTx.wait();
 
-    const setTx = await factory.setImplementation(moduleImplementation);
+    const setTx = await factory.setImplementation(implementationAddress);
     await setTx.wait();
 
     const unpauseTx = await factory.unpause();
@@ -314,7 +326,7 @@ module.exports = {
       accounts: ACCOUNTS
     },
     bsc: {
-      url: "https://bsc.drpc.org",
+      url: "https://bsc.meowrpc.com",
       accounts: ACCOUNTS
     },
     zksync: {
