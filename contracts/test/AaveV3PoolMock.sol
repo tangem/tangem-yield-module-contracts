@@ -12,6 +12,7 @@ contract AaveV3PoolMock {
 
     TestERC20 public aToken;
     bool public failSupply; // test toggle to simulate a reverting pool.supply
+    bool public failWithdraw; // test toggle to simulate a reverting pool.withdraw
 
     constructor() {
         aToken = new TestERC20();
@@ -19,6 +20,10 @@ contract AaveV3PoolMock {
 
     function setFailSupply(bool value) external {
         failSupply = value;
+    }
+
+    function setFailWithdraw(bool value) external {
+        failWithdraw = value;
     }
 
     function getReserveData(address) external view returns (DataTypes.ReserveData memory) {
@@ -50,6 +55,7 @@ contract AaveV3PoolMock {
     }
 
     function withdraw(address asset, uint256 amount, address to) external returns (uint) {
+        require(!failWithdraw, "MOCK_WITHDRAW_FAIL");
         if (amount == type(uint256).max) {
             amount = aToken.balanceOf(msg.sender);
         }
