@@ -2157,7 +2157,6 @@ describe("TangemBridgeProcessor", function () {
     const RISK_COOLDOWN = 24 * 60 * 60;
     const initialOwnerBalance = 100000;
     const accumulatedRevenue = 10000;
-    const exitAmount = 40000;
     let yieldModule, yieldModuleAddress;
 
     beforeEach(async function () {
@@ -2173,14 +2172,14 @@ describe("TangemBridgeProcessor", function () {
       await (await processor.enterProtocol(yieldModule, yieldToken, 0)).wait();
     });
 
-    it("Should withdraw the specified amount to the owner EOA", async function () {
-      await expect(processor.softExit(yieldModule, yieldToken, exitAmount))
+    it("Should withdraw the whole protocol balance minus fee to the owner EOA", async function () {
+      await expect(processor.softExit(yieldModule, yieldToken))
         .to.emit(pool, "Withdraw")
-        .withArgs(yieldToken, exitAmount, owner);
+        .withArgs(yieldToken, initialOwnerBalance, owner);
     });
 
     it("Should keep the token active", async function () {
-      await (await processor.softExit(yieldModule, yieldToken, exitAmount)).wait();
+      await (await processor.softExit(yieldModule, yieldToken)).wait();
 
       const yieldTokenData = await yieldModule.yieldTokensData(yieldToken);
       expect(yieldTokenData.active).to.be.true;
@@ -2189,7 +2188,7 @@ describe("TangemBridgeProcessor", function () {
     it("Should set riskSuspended for the token", async function () {
       expect(await yieldModule.riskSuspended(yieldToken)).to.be.false;
 
-      await (await processor.softExit(yieldModule, yieldToken, exitAmount)).wait();
+      await (await processor.softExit(yieldModule, yieldToken)).wait();
 
       expect(await yieldModule.riskSuspended(yieldToken)).to.be.true;
     });
@@ -2201,62 +2200,55 @@ describe("TangemBridgeProcessor", function () {
       const expectedFee = (BigInt(accumulatedRevenue) * feeRate) / BigInt(PRECISION);
       const feeReceiver = await processor.feeReceiver();
 
-      await expect(processor.softExit(yieldModule, yieldToken, exitAmount))
+      await expect(processor.softExit(yieldModule, yieldToken))
         .to.emit(yieldModule, "FeePaymentProcessed")
         .withArgs(yieldToken, expectedFee, feeReceiver);
     });
 
-    it("Should update the fee watermark after collecting the fee", async function () {
+    it("Should send everything except the fee to the owner when revenue exists", async function () {
       await (await pool.generateRevenue(yieldModule, accumulatedRevenue)).wait();
 
-      await (await processor.softExit(yieldModule, yieldToken, exitAmount)).wait();
+      const feeRate = await processor.serviceFeeRate();
+      const expectedFee = (BigInt(accumulatedRevenue) * feeRate) / BigInt(PRECISION);
+      const expectedExit = BigInt(initialOwnerBalance + accumulatedRevenue) - expectedFee;
 
-      // watermark is synced to the post-withdraw, post-fee protocol balance (not left stale)
-      const after = await yieldModule.latestFeePaymentStates(yieldToken);
-      expect(after.protocolBalance).to.equal(await yieldModule.protocolBalance(yieldToken));
+      await expect(processor.softExit(yieldModule, yieldToken))
+        .to.emit(pool, "Withdraw")
+        .withArgs(yieldToken, expectedExit, owner);
+
+      expect(await yieldToken.balanceOf(owner)).to.equal(expectedExit);
+      expect(await yieldModule.protocolBalance(yieldToken)).to.equal(0);
     });
 
     it("Should emit SoftExitTriggered and RiskSuspensionSet with correct parameters", async function () {
       const moduleBalanceBefore = await yieldModule.protocolBalance(yieldToken);
 
-      await expect(processor.softExit(yieldModule, yieldToken, exitAmount))
+      await expect(processor.softExit(yieldModule, yieldToken))
         .to.emit(yieldModule, "SoftExitTriggered")
-        .withArgs(yieldToken, moduleBalanceBefore, exitAmount)
+        .withArgs(yieldToken, moduleBalanceBefore, moduleBalanceBefore) // fee is 0 without revenue
         .and.to.emit(yieldModule, "RiskSuspensionSet")
         .withArgs(yieldToken, true);
     });
 
     it("Should fail with correct error if called not by processor", async function () {
-      await expect(yieldModule.softExit(yieldToken, exitAmount))
+      await expect(yieldModule.softExit(yieldToken))
         .to.be.revertedWithCustomError(yieldModule, "OnlyProcessor");
     });
 
     it("Should fail with correct error if caller lacks RISK_SERVICE_ROLE", async function () {
-      await expect(processor.connect(otherAccount).softExit(yieldModule, yieldToken, exitAmount))
+      await expect(processor.connect(otherAccount).softExit(yieldModule, yieldToken))
         .to.be.revertedWithCustomError(processor, "AccessControlUnauthorizedAccount");
-    });
-
-    it("Should revert when amount is zero", async function () {
-      await expect(processor.softExit(yieldModule, yieldToken, 0))
-        .to.be.revertedWithCustomError(yieldModule, "ZeroAmount");
-    });
-
-    it("Should revert with InsufficientFunds when amount plus fee exceeds the protocol balance", async function () {
-      const protocolBal = await yieldModule.protocolBalance(yieldToken);
-
-      await expect(processor.softExit(yieldModule, yieldToken, protocolBal + 1n))
-        .to.be.revertedWithCustomError(yieldModule, "InsufficientFunds");
     });
 
     it("Should fail with correct error if token is not active", async function () {
       await (await yieldModule.connect(owner).withdrawAndDeactivate(yieldToken)).wait();
 
-      await expect(processor.softExit(yieldModule, yieldToken, exitAmount))
+      await expect(processor.softExit(yieldModule, yieldToken))
         .to.be.revertedWithCustomError(yieldModule, "TokenNotActive");
     });
 
     it("Should block normal processor enterProtocol after softExit", async function () {
-      await (await processor.softExit(yieldModule, yieldToken, exitAmount)).wait();
+      await (await processor.softExit(yieldModule, yieldToken)).wait();
 
       await (await yieldToken.mint(owner, 1000)).wait();
       await expect(processor.enterProtocol(yieldModule, yieldToken, 0))
@@ -2264,14 +2256,17 @@ describe("TangemBridgeProcessor", function () {
     });
 
     it("Should NOT block owner withdraw after softExit", async function () {
-      await (await processor.softExit(yieldModule, yieldToken, exitAmount)).wait();
+      await (await processor.softExit(yieldModule, yieldToken)).wait();
+
+      // owner re-enters manually (bypass), then withdraws while still suspended
+      await (await yieldModule.connect(owner).enterProtocolByOwner(yieldToken)).wait();
 
       await expect(yieldModule.connect(owner).withdraw(yieldToken, 1000))
         .to.not.be.reverted;
     });
 
     it("Should NOT block owner enterProtocolByOwner after softExit (owner bypass)", async function () {
-      await (await processor.softExit(yieldModule, yieldToken, exitAmount)).wait();
+      await (await processor.softExit(yieldModule, yieldToken)).wait();
 
       // owner now holds the withdrawn funds and may re-enter manually despite the suspension
       await expect(yieldModule.connect(owner).enterProtocolByOwner(yieldToken))
@@ -2279,27 +2274,25 @@ describe("TangemBridgeProcessor", function () {
     });
 
     it("Should enforce the 24h rate limit between two softExits", async function () {
-      await (await processor.softExit(yieldModule, yieldToken, 10000)).wait();
+      await (await processor.softExit(yieldModule, yieldToken)).wait();
 
-      await expect(processor.softExit(yieldModule, yieldToken, 10000))
+      await expect(processor.softExit(yieldModule, yieldToken))
         .to.be.revertedWithCustomError(yieldModule, "RiskActionRateLimited");
 
       await time.increase(RISK_COOLDOWN);
 
-      await expect(processor.softExit(yieldModule, yieldToken, 10000))
+      await expect(processor.softExit(yieldModule, yieldToken))
         .to.not.be.reverted;
     });
 
     it("Should NOT consume the rate-limit budget when the withdraw reverts", async function () {
-      const moduleBalance = await yieldModule.protocolBalance(yieldToken);
-
-      // request more than the module owns => pool withdraw reverts => whole tx reverts
-      await expect(processor.softExit(yieldModule, yieldToken, moduleBalance + 1n))
-        .to.be.reverted;
+      // simulate an illiquid pool: withdraw reverts => whole tx reverts
+      await (await pool.setFailWithdraw(true)).wait();
+      await expect(processor.softExit(yieldModule, yieldToken)).to.be.reverted;
 
       // a valid softExit immediately afterwards must still be allowed (budget not consumed)
-      await expect(processor.softExit(yieldModule, yieldToken, exitAmount))
-        .to.not.be.reverted;
+      await (await pool.setFailWithdraw(false)).wait();
+      await expect(processor.softExit(yieldModule, yieldToken)).to.not.be.reverted;
     });
   });
 
@@ -2394,8 +2387,6 @@ describe("TangemBridgeProcessor", function () {
     const maxNetworkFee = 12345;
     const RISK_COOLDOWN = 24 * 60 * 60;
     const initialOwnerBalance = 100000;
-    const accumulatedRevenue = 10000;
-    const exitAmount = 50000;
     let yieldModule, yieldModuleAddress;
 
     beforeEach(async function () {
@@ -2412,12 +2403,12 @@ describe("TangemBridgeProcessor", function () {
     });
 
     it("Should clear riskSuspended and re-enter owner funds after a softExit", async function () {
-      await (await processor.softExit(yieldModule, yieldToken, exitAmount)).wait();
+      await (await processor.softExit(yieldModule, yieldToken)).wait();
       await time.increase(RISK_COOLDOWN);
 
       await expect(processor.resumeAndEnterProtocol(yieldModule, yieldToken))
         .to.emit(pool, "Supply")
-        .withArgs(yieldToken, exitAmount, yieldModule, 0)
+        .withArgs(yieldToken, initialOwnerBalance, yieldModule, 0) // fee was 0, owner got the full balance
         .and.to.emit(yieldModule, "RiskSuspensionSet")
         .withArgs(yieldToken, false);
 
@@ -2425,9 +2416,9 @@ describe("TangemBridgeProcessor", function () {
     });
 
     it("Should charge the service fee on revenue accrued during suspension", async function () {
-      await (await processor.softExit(yieldModule, yieldToken, exitAmount)).wait(); // no revenue yet, fee 0
+      await (await processor.softExit(yieldModule, yieldToken)).wait(); // no revenue yet, fee 0
       const revenue = 5000n;
-      await (await pool.generateRevenue(yieldModule, revenue)).wait(); // yield on the remaining stake
+      await (await pool.generateRevenue(yieldModule, revenue)).wait(); // revenue appears while suspended
       await time.increase(RISK_COOLDOWN);
 
       const feeRate = await processor.serviceFeeRate();
@@ -2440,7 +2431,7 @@ describe("TangemBridgeProcessor", function () {
     });
 
     it("Should stay suspended if the re-entry reverts", async function () {
-      await (await processor.softExit(yieldModule, yieldToken, exitAmount)).wait();
+      await (await processor.softExit(yieldModule, yieldToken)).wait();
       const timerAfterSoftExit = await yieldModule.lastRiskActionAt(yieldToken);
       await time.increase(RISK_COOLDOWN);
 
@@ -2455,7 +2446,7 @@ describe("TangemBridgeProcessor", function () {
     });
 
     it("Should re-enable normal processor enterProtocol after resume", async function () {
-      await (await processor.softExit(yieldModule, yieldToken, exitAmount)).wait();
+      await (await processor.softExit(yieldModule, yieldToken)).wait();
       await time.increase(RISK_COOLDOWN);
       await (await processor.resumeAndEnterProtocol(yieldModule, yieldToken)).wait();
 
@@ -2490,7 +2481,7 @@ describe("TangemBridgeProcessor", function () {
     });
 
     it("Should NOT rate-limit resume (allowed immediately after softExit)", async function () {
-      await (await processor.softExit(yieldModule, yieldToken, exitAmount)).wait();
+      await (await processor.softExit(yieldModule, yieldToken)).wait();
 
       // resume is not gated by the softExit cooldown; the backend enforces the re-entry cooldown
       await expect(processor.resumeAndEnterProtocol(yieldModule, yieldToken)).to.not.be.reverted;
@@ -2592,7 +2583,7 @@ describe("TangemBridgeProcessor", function () {
     it("Should revert softExit while the processor is paused", async function () {
       await (await processor.pause()).wait();
 
-      await expect(processor.softExit(yieldModule, yieldToken, 1000))
+      await expect(processor.softExit(yieldModule, yieldToken))
         .to.be.revertedWithCustomError(processor, "EnforcedPause");
     });
 

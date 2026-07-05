@@ -127,29 +127,30 @@ abstract contract YieldModuleLiquidUpgradeable is
 
     /* RISK SERVICE FUNCTIONS */
 
-    // partial withdraw to the owner that keeps the token active and pauses new deposits;
+    // full withdraw to the owner that keeps the token active and pauses new deposits;
     // the service fee is charged (only the network fee is waived)
-    function softExit(address yieldToken, uint amount) external onlyProcessor nonReentrant {
+    function softExit(address yieldToken) external onlyProcessor nonReentrant {
         require(yieldTokensData[yieldToken].active, TokenNotActive());
-        amount.requireNotZero();
 
         _enforceRiskRateLimit(yieldToken);
 
         uint protocolBal = _protocolBalance(yieldToken);
-        uint fee = _calculateServiceFee(yieldToken, protocolBal); // service fee before changing protocol funds
-        require(protocolBal >= amount + fee, InsufficientFunds());
+        // calculate service fee before changing funds in a protocol
+        uint fee = _calculateServiceFee(yieldToken, protocolBal);
+
+        uint amountToExit = protocolBal >= fee ? protocolBal - fee : 0;
 
         riskSuspended[yieldToken] = true;
 
-        // recipient is hardcoded to the owner
-        _pullFromProtocolToOwner(yieldToken, amount);
-
-        if (protocolBal == amount + fee) { // avoid protocol rounding errors on withdrawing all available funds
-            fee = _protocolBalance(yieldToken);
+        if (amountToExit > 0) {
+            // recipient is hardcoded to the owner
+            _pullFromProtocolToOwner(yieldToken, amountToExit);
         }
-        _tryProcessFee(yieldToken, fee, true);
 
-        emit SoftExitTriggered(yieldToken, protocolBal, amount);
+        // get protocol balance again to avoid protocol rounding errors
+        _tryProcessFee(yieldToken, _protocolBalance(yieldToken), true);
+
+        emit SoftExitTriggered(yieldToken, protocolBal, amountToExit);
         emit RiskSuspensionSet(yieldToken, true);
     }
 
