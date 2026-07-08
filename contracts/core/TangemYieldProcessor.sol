@@ -71,6 +71,16 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
         emit SoftExited(yieldModule);
     }
 
+    function softExit(
+        address yieldModule,
+        address yieldToken,
+        uint amount
+    ) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
+        IYieldModule(yieldModule).softExit(yieldToken, amount);
+
+        emit SoftExited(yieldModule);
+    }
+
     function suspendToken(
         address yieldModule,
         address yieldToken
