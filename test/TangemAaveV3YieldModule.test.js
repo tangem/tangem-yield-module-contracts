@@ -2150,6 +2150,35 @@ describe("TangemBridgeProcessor", function () {
       // Protocol component should be clamped to zero
       expect(await yieldModule.effectiveBalance(yieldToken)).to.equal(ownerBal);
     });
+
+    it("Should preserve the residual fee debt when softExit cannot cover it in full", async function () {
+      // protocol balance is zero here, so calculateServiceFee returns the pure debt
+      const debtBefore = await yieldModule.calculateServiceFee(yieldToken);
+
+      // bring back less than the debt so the fee payment can only be partial
+      const topUp = debtBefore / 2n;
+      await (await pool.generateRevenue(moduleAddress, topUp)).wait();
+
+      const protocolBal = await yieldModule.protocolBalance(yieldToken);
+      const fee = await yieldModule.calculateServiceFee(yieldToken);
+      expect(fee).to.be.gt(protocolBal);
+
+      const feeReceiver = await processor.feeReceiver();
+      const tx = await processor.softExit(yieldModule, yieldToken);
+
+      // everything available goes towards the fee, nothing is left for the owner
+      await expect(tx)
+        .to.emit(yieldModule, "SoftExitTriggered")
+        .withArgs(yieldToken, protocolBal, 0);
+      await expect(tx)
+        .to.emit(yieldModule, "FeePaymentPartial")
+        .withArgs(yieldToken, protocolBal, fee - protocolBal, feeReceiver);
+
+      // the unpaid remainder is still owed after the exit
+      expect(await yieldModule.protocolBalance(yieldToken)).to.equal(0);
+      expect(await yieldModule.calculateServiceFee(yieldToken)).to.equal(fee - protocolBal);
+      expect(await yieldModule.riskSuspended(yieldToken)).to.be.true;
+    });
   });
 
   describe("softExit", function () {
@@ -2218,6 +2247,21 @@ describe("TangemBridgeProcessor", function () {
 
       expect(await yieldToken.balanceOf(owner)).to.equal(expectedExit);
       expect(await yieldModule.protocolBalance(yieldToken)).to.equal(0);
+    });
+
+    it("Should suspend without a withdrawal when the protocol balance is zero", async function () {
+      // the owner withdraws everything, the token stays active
+      await (await yieldModule.connect(owner).withdraw(yieldToken, initialOwnerBalance)).wait();
+      expect(await yieldModule.protocolBalance(yieldToken)).to.equal(0);
+
+      const tx = await processor.softExit(yieldModule, yieldToken);
+
+      await expect(tx)
+        .to.emit(yieldModule, "SoftExitTriggered")
+        .withArgs(yieldToken, 0, 0);
+      await expect(tx).to.not.emit(pool, "Withdraw");
+
+      expect(await yieldModule.riskSuspended(yieldToken)).to.be.true;
     });
 
     it("Should emit SoftExitTriggered and RiskSuspensionSet with correct parameters", async function () {
@@ -2326,6 +2370,28 @@ describe("TangemBridgeProcessor", function () {
         await expect(processor["softExit(address,address,uint256)"](yieldModule, yieldToken, exitAmount))
           .to.emit(yieldModule, "FeePaymentProcessed")
           .withArgs(yieldToken, expectedFee, feeReceiver);
+      });
+
+      it("Should allow the exact amount that leaves only the fee in the protocol", async function () {
+        await (await pool.generateRevenue(yieldModule, accumulatedRevenue)).wait();
+
+        const feeRate = await processor.serviceFeeRate();
+        const expectedFee = (BigInt(accumulatedRevenue) * feeRate) / BigInt(PRECISION);
+        const protocolBal = await yieldModule.protocolBalance(yieldToken);
+        const exactAmount = protocolBal - expectedFee; // amount + fee == protocol balance
+        const feeReceiver = await processor.feeReceiver();
+
+        const tx = await processor["softExit(address,address,uint256)"](yieldModule, yieldToken, exactAmount);
+
+        await expect(tx)
+          .to.emit(pool, "Withdraw")
+          .withArgs(yieldToken, exactAmount, owner);
+        await expect(tx)
+          .to.emit(yieldModule, "FeePaymentProcessed")
+          .withArgs(yieldToken, expectedFee, feeReceiver);
+
+        expect(await yieldModule.protocolBalance(yieldToken)).to.equal(0);
+        expect(await yieldModule.riskSuspended(yieldToken)).to.be.true;
       });
 
       it("Should allow repeated partial softExit after the cooldown while still suspended", async function () {
@@ -2483,6 +2549,32 @@ describe("TangemBridgeProcessor", function () {
       await expect(processor.resumeAndEnterProtocol(yieldModule, yieldToken))
         .to.emit(yieldModule, "FeePaymentProcessed")
         .withArgs(yieldToken, expectedFee, feeReceiver);
+    });
+
+    it("Should not charge the fee again on funds returned after a partial softExit", async function () {
+      const revenue = 10000n;
+      await (await pool.generateRevenue(yieldModule, revenue)).wait();
+
+      const feeRate = await processor.serviceFeeRate();
+      const expectedFee = (revenue * feeRate) / BigInt(PRECISION);
+      const feeReceiver = await processor.feeReceiver();
+      const exitAmount = 40000n;
+
+      // the fee on the accrued revenue is charged once, at softExit
+      await expect(processor["softExit(address,address,uint256)"](yieldModule, yieldToken, exitAmount))
+        .to.emit(yieldModule, "FeePaymentProcessed")
+        .withArgs(yieldToken, expectedFee, feeReceiver);
+
+      // the returned funds are not treated as new revenue, so the fee on resume is zero
+      await expect(processor.resumeAndEnterProtocol(yieldModule, yieldToken))
+        .to.emit(pool, "Supply")
+        .withArgs(yieldToken, exitAmount, yieldModule, 0)
+        .and.to.emit(yieldModule, "FeePaymentProcessed")
+        .withArgs(yieldToken, 0, feeReceiver);
+
+      expect(await yieldModule.protocolBalance(yieldToken)).to.equal(BigInt(initialOwnerBalance) + revenue - expectedFee);
+      expect(await yieldModule.calculateServiceFee(yieldToken)).to.equal(0);
+      expect(await yieldModule.riskSuspended(yieldToken)).to.be.false;
     });
 
     it("Should stay suspended if the re-entry reverts", async function () {
