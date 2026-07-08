@@ -103,8 +103,6 @@ abstract contract YieldModuleLiquidUpgradeable is
     /* PROCESSOR FUNCTIONS */
 
     function enterProtocol(address yieldToken, uint networkFee) external onlyProcessor {
-        // block normal deposits while risk-suspended; owner entry and recovery bypass this
-        require(!riskSuspended[yieldToken], TokenRiskSuspended());
         _enterProtocol(yieldToken, type(uint).max, networkFee); // enter with all funds available
     }
 
@@ -129,29 +127,15 @@ abstract contract YieldModuleLiquidUpgradeable is
 
     // full withdraw to the owner that keeps the token active and pauses new deposits;
     // the service fee is charged (only the network fee is waived)
-    function softExit(address yieldToken) external onlyProcessor nonReentrant {
-        require(yieldTokensData[yieldToken].active, TokenNotActive());
+    function softExit(address yieldToken) external onlyProcessor {
+        _softExit(yieldToken, type(uint).max); // exit with everything except the fee
+    }
 
-        _enforceRiskRateLimit(yieldToken);
+    // partial withdraw for positions too large to exit in one go
+    function softExit(address yieldToken, uint amount) external onlyProcessor {
+        amount.requireNotZero();
 
-        uint protocolBal = _protocolBalance(yieldToken);
-        // calculate service fee before changing funds in a protocol
-        uint fee = _calculateServiceFee(yieldToken, protocolBal);
-
-        uint amountToExit = protocolBal >= fee ? protocolBal - fee : 0;
-
-        riskSuspended[yieldToken] = true;
-
-        if (amountToExit > 0) {
-            // recipient is hardcoded to the owner
-            _pullFromProtocolToOwner(yieldToken, amountToExit);
-        }
-
-        // get protocol balance again to avoid protocol rounding errors
-        _tryProcessFee(yieldToken, _protocolBalance(yieldToken), true);
-
-        emit SoftExitTriggered(yieldToken, protocolBal, amountToExit);
-        emit RiskSuspensionSet(yieldToken, true);
+        _softExit(yieldToken, amount);
     }
 
     // pause new deposits without withdrawing any funds
@@ -167,16 +151,18 @@ abstract contract YieldModuleLiquidUpgradeable is
 
     // clear the suspension and re-enter the owner's funds (service fee charged, network fee waived);
     // a revert during re-entry keeps the token suspended
-    function resumeAndEnterProtocol(address yieldToken) external onlyProcessor nonReentrant {
+    function resumeAndEnterProtocol(address yieldToken) external onlyProcessor {
         require(yieldTokensData[yieldToken].active, TokenNotActive());
         require(riskSuspended[yieldToken], NotSuspended());
 
+        // clear before re-entering so the deposit check in _enterProtocol passes
         riskSuspended[yieldToken] = false;
-        emit RiskSuspensionSet(yieldToken, false);
 
         if (IERC20(yieldToken).balanceOf(owner) > 0) {
             _enterProtocol(yieldToken, type(uint).max, 0);
         }
+
+        emit RiskSuspensionSet(yieldToken, false);
     }
 
     function collectServiceFee(address yieldToken) external onlyProcessor {
@@ -507,6 +493,8 @@ abstract contract YieldModuleLiquidUpgradeable is
 
     function _enterProtocol(address yieldToken, uint amount, uint networkFee) private {
         require(yieldTokensData[yieldToken].active, TokenNotActive());
+        // deposits stay blocked while risk-suspended; resume clears the flag before entering
+        require(!riskSuspended[yieldToken], TokenRiskSuspended());
 
         IERC20 ierc20YieldToken = IERC20(yieldToken);
 
@@ -527,6 +515,37 @@ abstract contract YieldModuleLiquidUpgradeable is
         _tryProcessFee(yieldToken, fee, true);
 
         emit ProtocolEntered(yieldToken, amountToEnter, networkFee);
+    }
+
+    function _softExit(address yieldToken, uint amount) private {
+        require(yieldTokensData[yieldToken].active, TokenNotActive());
+
+        _enforceRiskRateLimit(yieldToken);
+
+        uint protocolBal = _protocolBalance(yieldToken);
+        // calculate service fee before changing funds in a protocol
+        uint fee = _calculateServiceFee(yieldToken, protocolBal);
+
+        if (amount == type(uint).max) { // exit with everything except the fee
+            amount = protocolBal >= fee ? protocolBal - fee : 0;
+        } else {
+            require(protocolBal >= amount + fee, InsufficientFunds());
+        }
+
+        riskSuspended[yieldToken] = true;
+
+        if (amount > 0) {
+            // recipient is hardcoded to the owner
+            _pullFromProtocolToOwner(yieldToken, amount);
+        }
+
+        if (protocolBal == amount + fee) { // avoid protocol rounding errors on withdrawing all available funds
+            fee = _protocolBalance(yieldToken);
+        }
+        _tryProcessFee(yieldToken, fee, true);
+
+        emit SoftExitTriggered(yieldToken, protocolBal, amount);
+        emit RiskSuspensionSet(yieldToken, true);
     }
 
     // true when the token accepts new deposits (active and not risk-suspended)

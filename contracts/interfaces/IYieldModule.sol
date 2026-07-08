@@ -83,6 +83,8 @@ interface IYieldModule {
 
     function softExit(address yieldToken) external;
 
+    function softExit(address yieldToken, uint amount) external;
+
     function suspendToken(address yieldToken) external;
 
     function resumeAndEnterProtocol(address yieldToken) external;

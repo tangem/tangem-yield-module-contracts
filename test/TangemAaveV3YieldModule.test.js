@@ -2256,21 +2256,18 @@ describe("TangemBridgeProcessor", function () {
     });
 
     it("Should NOT block owner withdraw after softExit", async function () {
-      await (await processor.softExit(yieldModule, yieldToken)).wait();
-
-      // owner re-enters manually (bypass), then withdraws while still suspended
-      await (await yieldModule.connect(owner).enterProtocolByOwner(yieldToken)).wait();
+      // partial exit leaves funds in the protocol to withdraw from
+      await (await processor["softExit(address,address,uint256)"](yieldModule, yieldToken, 40000)).wait();
 
       await expect(yieldModule.connect(owner).withdraw(yieldToken, 1000))
         .to.not.be.reverted;
     });
 
-    it("Should NOT block owner enterProtocolByOwner after softExit (owner bypass)", async function () {
+    it("Should block owner enterProtocolByOwner while suspended", async function () {
       await (await processor.softExit(yieldModule, yieldToken)).wait();
 
-      // owner now holds the withdrawn funds and may re-enter manually despite the suspension
       await expect(yieldModule.connect(owner).enterProtocolByOwner(yieldToken))
-        .to.not.be.reverted;
+        .to.be.revertedWithCustomError(yieldModule, "TokenRiskSuspended");
     });
 
     it("Should enforce the 24h rate limit between two softExits", async function () {
@@ -2293,6 +2290,56 @@ describe("TangemBridgeProcessor", function () {
       // a valid softExit immediately afterwards must still be allowed (budget not consumed)
       await (await pool.setFailWithdraw(false)).wait();
       await expect(processor.softExit(yieldModule, yieldToken)).to.not.be.reverted;
+    });
+
+    describe("softExit with amount", function () {
+      const exitAmount = 40000;
+
+      it("Should withdraw exactly the specified amount to the owner and suspend", async function () {
+        await expect(processor["softExit(address,address,uint256)"](yieldModule, yieldToken, exitAmount))
+          .to.emit(pool, "Withdraw")
+          .withArgs(yieldToken, exitAmount, owner);
+
+        expect(await yieldModule.protocolBalance(yieldToken)).to.equal(initialOwnerBalance - exitAmount);
+        expect(await yieldModule.riskSuspended(yieldToken)).to.be.true;
+      });
+
+      it("Should revert when amount is zero", async function () {
+        await expect(processor["softExit(address,address,uint256)"](yieldModule, yieldToken, 0))
+          .to.be.revertedWithCustomError(yieldModule, "ZeroAmount");
+      });
+
+      it("Should revert with InsufficientFunds when amount plus fee exceeds the protocol balance", async function () {
+        const protocolBal = await yieldModule.protocolBalance(yieldToken);
+
+        await expect(processor["softExit(address,address,uint256)"](yieldModule, yieldToken, protocolBal + 1n))
+          .to.be.revertedWithCustomError(yieldModule, "InsufficientFunds");
+      });
+
+      it("Should charge the service fee on accrued revenue", async function () {
+        await (await pool.generateRevenue(yieldModule, accumulatedRevenue)).wait();
+
+        const feeRate = await processor.serviceFeeRate();
+        const expectedFee = (BigInt(accumulatedRevenue) * feeRate) / BigInt(PRECISION);
+        const feeReceiver = await processor.feeReceiver();
+
+        await expect(processor["softExit(address,address,uint256)"](yieldModule, yieldToken, exitAmount))
+          .to.emit(yieldModule, "FeePaymentProcessed")
+          .withArgs(yieldToken, expectedFee, feeReceiver);
+      });
+
+      it("Should allow repeated partial softExit after the cooldown while still suspended", async function () {
+        await (await processor["softExit(address,address,uint256)"](yieldModule, yieldToken, exitAmount)).wait();
+        expect(await yieldModule.riskSuspended(yieldToken)).to.be.true;
+
+        await time.increase(RISK_COOLDOWN);
+
+        await expect(processor["softExit(address,address,uint256)"](yieldModule, yieldToken, exitAmount))
+          .to.emit(pool, "Withdraw")
+          .withArgs(yieldToken, exitAmount, owner);
+
+        expect(await yieldModule.protocolBalance(yieldToken)).to.equal(initialOwnerBalance - 2 * exitAmount);
+      });
     });
   });
 
@@ -2332,6 +2379,14 @@ describe("TangemBridgeProcessor", function () {
 
       await (await yieldToken.mint(owner, 1000)).wait();
       await expect(processor.enterProtocol(yieldModule, yieldToken, 0))
+        .to.be.revertedWithCustomError(yieldModule, "TokenRiskSuspended");
+    });
+
+    it("Should block owner enterProtocolByOwner while suspended", async function () {
+      await (await processor.suspendToken(yieldModule, yieldToken)).wait();
+
+      await (await yieldToken.mint(owner, 1000)).wait();
+      await expect(yieldModule.connect(owner).enterProtocolByOwner(yieldToken))
         .to.be.revertedWithCustomError(yieldModule, "TokenRiskSuspended");
     });
 
