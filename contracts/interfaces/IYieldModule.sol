@@ -41,14 +41,13 @@ interface IYieldModule {
         bool depositedToProtocol
     );
     event WithdrawNativeProcessed(address indexed to, uint amount);
-    // TODO: think about this event
     event MerklClaimed(
         address indexed distributor,
         address indexed rewardToken,
         uint256 received,
-        address finalRecipient, // address(this) | owner | pool
+        address finalRecipient,
         uint256 finalAmount,
-        address indexed caller // owner | processor
+        address indexed caller
     );
 
     error OnlyOwner();
@@ -76,6 +75,10 @@ interface IYieldModule {
     error NativeTransferFailed();
     error TokenInEqualsTokenOut();
     error SendingToThis();
+
+    error DistributorNotAllowed();
+    error RewardTokensEmpty();
+    error RewardTokensLengthsMismatch();
 
     function initialize(address owner) external;
 

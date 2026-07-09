@@ -13,6 +13,8 @@ import "../interfaces/ISwapExecutionRegistry.sol";
 import "../resources/Constants.sol";
 import "../common/Requires.sol";
 
+import {IMerklDistributor} from "../interfaces/IMerklDistributor.sol";
+
 abstract contract YieldModuleLiquidUpgradeable is
     Initializable,
     ERC2771ContextUpgradeable,
@@ -132,14 +134,6 @@ abstract contract YieldModuleLiquidUpgradeable is
         bool success = _tryProcessFee(yieldToken, fee, true);
         require(success, FeeProcessingFailed());
     }
-
-    // TODO: implement
-    function claimMerklRewardsBE(
-        address distributor,
-        address[] calldata rewardTokens,
-        uint256[] calldata cumulativeAmounts,
-        bytes32[][] calldata proofs
-    ) external onlyProcessor nonReentrant {}
 
     /* OWNER FUNCTIONS */
 
@@ -382,24 +376,104 @@ abstract contract YieldModuleLiquidUpgradeable is
         emit SwapAndReceiveCompleted(tokenOut, to, received, deposited);
     }
 
-    // TODO: implement
     function claimMerklRewardsOwner(
         address distributor,
         address[] calldata rewardTokens,
         uint256[] calldata cumulativeAmounts,
         bytes32[][] calldata proofs
-    ) external onlyOwner nonReentrant {}
+    ) external onlyOwner nonReentrant {
+        _claimMerklRewards(distributor, rewardTokens, cumulativeAmounts, proofs, owner);
+    }
 
-    function _claimMerklRewardsOwner(
+    function claimMerklRewardsBE(
         address distributor,
         address[] calldata rewardTokens,
         uint256[] calldata cumulativeAmounts,
         bytes32[][] calldata proofs
-    ) internal {}
+    ) external onlyProcessor nonReentrant {
+        _claimMerklRewards(distributor, rewardTokens, cumulativeAmounts, proofs, address(processor));
+    }
 
-    function setAllowedMerklDistributor(address distributor, bool allowed) external onlyOwner {}
+    function _claimMerklRewards(
+        address distributor,
+        address[] calldata rewardTokens,
+        uint256[] calldata cumulativeAmounts,
+        bytes32[][] calldata proofs,
+        address caller
+    ) internal {
+        require(allowedMerklDistributors[distributor], DistributorNotAllowed());
+        require(rewardTokens.length > 0, RewardTokensEmpty());
+        require(rewardTokens.length == cumulativeAmounts.length && cumulativeAmounts.length == proofs.length, RewardTokensLengthsMismatch());
 
-    function setAllowedMerklDistributors(address[] calldata distributors, bool[] calldata allowances) external onlyOwner {}
+        uint256[] memory balancesBefore = new uint256[](rewardTokens.length);
+        address[] memory users = new address[](rewardTokens.length);
+
+        for (uint256 i; i < rewardTokens.length; ++i) {
+            rewardTokens[i].requireNotZero();
+            cumulativeAmounts[i].requireNotZero();
+
+            balancesBefore[i] = IERC20(rewardTokens[i]).balanceOf(address(this));
+            users[i] = address(this);
+        }
+
+        IMerklDistributor(distributor).claim(users, rewardTokens, cumulativeAmounts, proofs);
+
+        for (uint256 i; i < rewardTokens.length; ++i) {
+            _routeMerklReward(distributor, rewardTokens[i], balancesBefore[i], caller);
+        }
+    }
+
+    function _routeMerklReward(
+        address distributor,
+        address rewardToken,
+        uint256 balanceBefore,
+        address caller
+    ) internal {
+        uint256 balanceAfter = IERC20(rewardToken).balanceOf(address(this));
+        uint256 received = balanceAfter > balanceBefore ? (balanceAfter - balanceBefore) : 0;
+
+        // TODO: think about SE11 requirement
+        if (received == 0) {
+            emit MerklClaimed(distributor, rewardToken, 0, address(0), 0, caller);
+            return;
+        }
+
+        address finalRecipient;
+        uint256 finalAmount;
+
+        if (isProtocolToken[rewardToken]) {
+            address yieldToken = yieldTokenByProtocolToken[rewardToken];
+
+            if (yieldTokensData[yieldToken].active) {
+                finalRecipient = address(this);
+                finalAmount = received;
+            } else {
+                finalAmount = _pullFromProtocolToOwner(yieldToken, type(uint).max);
+                finalRecipient = owner;
+            }
+        } else if (yieldTokensData[rewardToken].active) {
+            _pushToProtocol(rewardToken, received);
+            finalRecipient = address(this);
+            finalAmount = received; // TODO: what if it's not aave and 1 rewardToken != 1 yieldToken?
+        } else {
+            IERC20(rewardToken).safeTransfer(owner, received);
+            finalRecipient = owner;
+            finalAmount = received;
+        }
+
+        emit MerklClaimed(distributor, rewardToken, received, finalRecipient, finalAmount, caller);
+    }
+
+    function setAllowedMerklDistributor(address distributor, bool allowed) external onlyOwner {
+        allowedMerklDistributors[distributor] = allowed;
+    }
+
+    function setAllowedMerklDistributors(address[] calldata distributors, bool[] calldata allowances) external onlyOwner {
+        require(distributors.length == allowances.length, RewardTokensLengthsMismatch());
+        for (uint256 i; i < distributors.length; ++i) {
+            allowedMerklDistributors[distributors[i]] = allowances[i];
+        }
+    }
 
     /* VIEW FUNCTIONS */
 
