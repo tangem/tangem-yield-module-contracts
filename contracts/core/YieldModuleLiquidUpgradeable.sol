@@ -59,6 +59,13 @@ abstract contract YieldModuleLiquidUpgradeable is
     mapping(address => uint) public feeDebts;
     mapping(address => bool) public isProtocolToken;
 
+    // TODO: new state, mb move to separate contract and storage
+    // set yieldTokenByProtocolToken during initialization?
+    // yield token => protocol token
+    mapping(address => address) public yieldTokenByProtocolToken;
+    // distributor => is allowed
+    mapping(address => bool) public allowedMerklDistributors;
+
     modifier onlyOwner {
         require(_msgSender() == owner, OnlyOwner());
         _;
@@ -125,6 +132,14 @@ abstract contract YieldModuleLiquidUpgradeable is
         bool success = _tryProcessFee(yieldToken, fee, true);
         require(success, FeeProcessingFailed());
     }
+
+    // TODO: implement
+    function claimMerklRewardsBE(
+        address distributor,
+        address[] calldata rewardTokens,
+        uint256[] calldata cumulativeAmounts,
+        bytes32[][] calldata proofs
+    ) external onlyProcessor nonReentrant {}
 
     /* OWNER FUNCTIONS */
 
@@ -365,6 +380,25 @@ abstract contract YieldModuleLiquidUpgradeable is
 
         emit SwapAndReceiveCompleted(tokenOut, to, received, deposited);
     }
+
+    // TODO: implement
+    function claimMerklRewardsOwner(
+        address distributor,
+        address[] calldata rewardTokens,
+        uint256[] calldata cumulativeAmounts,
+        bytes32[][] calldata proofs
+    ) external onlyOwner nonReentrant {}
+
+    function _claimMerklRewardsOwner(
+        address distributor,
+        address[] calldata rewardTokens,
+        uint256[] calldata cumulativeAmounts,
+        bytes32[][] calldata proofs
+    ) internal {}
+
+    function setAllowedMerklDistributor(address distributor, bool allowed) external onlyOwner {}
+
+    function setAllowedMerklDistributors(address[] calldata distributors, bool[] calldata allowances) external onlyOwner {}
 
     /* VIEW FUNCTIONS */
 
