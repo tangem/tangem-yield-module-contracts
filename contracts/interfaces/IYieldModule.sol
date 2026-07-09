@@ -41,6 +41,15 @@ interface IYieldModule {
         bool depositedToProtocol
     );
     event WithdrawNativeProcessed(address indexed to, uint amount);
+    // TODO: think about this event
+    event MerklClaimed(
+        address indexed distributor,
+        address indexed rewardToken,
+        uint256 received,
+        address finalRecipient, // address(this) | owner | pool
+        uint256 finalAmount,
+        address indexed caller // owner | processor
+    );
 
     error OnlyOwner();
     error OnlyOwnerOrFactory();
@@ -117,4 +126,22 @@ interface IYieldModule {
     function effectiveBalance(address yieldToken) external view returns (uint);
 
     function calculateServiceFee(address yieldToken) external view returns (uint);
+
+    function claimMerklRewardsOwner(
+        address distributor,
+        address[] calldata rewardTokens,
+        uint256[] calldata cumulativeAmounts,
+        bytes32[][] calldata proofs
+    ) external;
+
+    function claimMerklRewardsBE(
+        address distributor,
+        address[] calldata rewardTokens,
+        uint256[] calldata cumulativeAmounts,
+        bytes32[][] calldata proofs
+    ) external;
+
+    function setAllowedMerklDistributor(address distributor, bool allowed) external;
+
+    function setAllowedMerklDistributors(address[] calldata distributors, bool[] calldata allowances) external;
 }
