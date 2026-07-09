@@ -466,6 +466,9 @@ abstract contract YieldModuleLiquidUpgradeable is
 
     function setAllowedMerklDistributor(address distributor, bool allowed) external onlyOwner {
         allowedMerklDistributors[distributor] = allowed;
+
+        // TODO: do we need this func, mb just use setAllowedMerklDistributors for single distributor?
+        // TODO: do we need event?
     }
 
     function setAllowedMerklDistributors(address[] calldata distributors, bool[] calldata allowances) external onlyOwner {
@@ -473,6 +476,8 @@ abstract contract YieldModuleLiquidUpgradeable is
         for (uint256 i; i < distributors.length; ++i) {
             allowedMerklDistributors[distributors[i]] = allowances[i];
         }
+
+        // TODO: do we need event?
     }
 
     /* VIEW FUNCTIONS */
