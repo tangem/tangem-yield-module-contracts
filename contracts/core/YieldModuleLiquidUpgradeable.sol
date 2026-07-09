@@ -154,6 +154,7 @@ abstract contract YieldModuleLiquidUpgradeable is
 
         protocolTokens[yieldToken] = IERC20(protocolToken);
         isProtocolToken[protocolToken] = true;
+        yieldTokenByProtocolToken[protocolToken] = yieldToken;
 
         emit YieldTokenInitialized(yieldToken, protocolToken, maxNetworkFee);
     }
