@@ -498,20 +498,14 @@ abstract contract YieldModuleLiquidUpgradeable is
         }
     }
 
-    function setAllowedMerklDistributor(address distributor, bool allowed) external onlyOwner {
-        allowedMerklDistributors[distributor] = allowed;
-
-        // TODO: do we need this func, mb just use setAllowedMerklDistributors for single distributor?
-        // TODO: do we need event?
-    }
-
     function setAllowedMerklDistributors(address[] calldata distributors, bool[] calldata allowances) external onlyOwner {
         require(distributors.length == allowances.length, RewardTokensLengthsMismatch());
+
         for (uint256 i; i < distributors.length; ++i) {
             allowedMerklDistributors[distributors[i]] = allowances[i];
         }
 
-        // TODO: do we need event?
+        emit MerklDistributorsSet(distributors, allowances);
     }
 
     function setYieldTokenByProtocolToken(address[] calldata yieldTokens) external onlyOwner {
@@ -525,9 +519,9 @@ abstract contract YieldModuleLiquidUpgradeable is
             require(isProtocolToken[protocolToken], ProtocolTokenNotSet(protocolToken));
 
             yieldTokenByProtocolToken[protocolToken] = yieldToken;
-
-            emit YieldTokenByProtocolTokenSet(yieldToken, protocolToken);
         }
+
+        emit YieldTokensByProtocolTokensSet(yieldTokens);
     }
 
     /* VIEW FUNCTIONS */
