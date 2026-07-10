@@ -415,6 +415,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         address[] memory users = new address[](rewardTokens.length);
         address[] memory recipients = new address[](rewardTokens.length);
         TokenAction[] memory actions = new TokenAction[](rewardTokens.length);
+        bytes[] memory emptyDatas = new bytes[](rewardTokens.length);
 
         for (uint256 i; i < rewardTokens.length; ++i) {
             rewardTokens[i].requireNotZero();
@@ -428,15 +429,26 @@ abstract contract YieldModuleLiquidUpgradeable is
             actions[i] = action;
         }
 
-        IMerklDistributor(distributor).claimWithRecipient(users, rewardTokens, cumulativeAmounts, proofs, recipients, new bytes[](rewardTokens.length));
+        IMerklDistributor(distributor).claimWithRecipient(users, rewardTokens, cumulativeAmounts, proofs, recipients, emptyDatas);
 
+        _processClaimedRewards(distributor, rewardTokens, recipients, actions, balancesBefore, caller);
+    }
+
+    function _processClaimedRewards(
+        address distributor,
+        address[] calldata rewardTokens,
+        address[] memory recipients,
+        TokenAction[] memory actions,
+        uint256[] memory balancesBefore,
+        address caller
+    ) internal {
         for (uint256 i; i < rewardTokens.length; ++i) {
             uint256 balanceAfter = IERC20(rewardTokens[i]).balanceOf(recipients[i]);
             uint256 received = balanceAfter > balancesBefore[i] ? (balanceAfter - balancesBefore[i]) : 0;
             require(received > 0, MerklClaimedNoReward(rewardTokens[i], recipients[i]));
 
             uint256 finalAmount = received;
-            
+
             if (actions[i] == TokenAction.PUSH_TO_PROTOCOL) {
                 // TODO: mb _pushToProtocol should return final amount after supply (if other protocols used)?
                 uint256 protocolBalanceBefore = _protocolBalance(rewardTokens[i]);
