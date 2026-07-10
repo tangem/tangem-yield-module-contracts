@@ -46,6 +46,12 @@ abstract contract YieldModuleLiquidUpgradeable is
         bool protocolTouched;
     }
 
+    enum ProtocolAction {
+        PUSH_TO_PROTOCOL,
+        PULL_TO_OWNER,
+        SKIP
+    }
+
     IYieldProcessor public immutable processor;
     IYieldFactory public immutable factory;
     ISwapExecutionRegistry public immutable swapExecutionRegistry;
@@ -407,61 +413,58 @@ abstract contract YieldModuleLiquidUpgradeable is
 
         uint256[] memory balancesBefore = new uint256[](rewardTokens.length);
         address[] memory users = new address[](rewardTokens.length);
+        address[] memory recipients = new address[](rewardTokens.length);
+        ProtocolAction[] memory actions = new ProtocolAction[](rewardTokens.length);
 
         for (uint256 i; i < rewardTokens.length; ++i) {
             rewardTokens[i].requireNotZero();
             cumulativeAmounts[i].requireNotZero();
 
-            balancesBefore[i] = IERC20(rewardTokens[i]).balanceOf(address(this));
+            (address finalRecipient, ProtocolAction action) = _routeMerklReward(rewardTokens[i]);
+
+            balancesBefore[i] = IERC20(rewardTokens[i]).balanceOf(finalRecipient);
             users[i] = address(this);
+            recipients[i] = finalRecipient;
+            actions[i] = action;
         }
 
-        IMerklDistributor(distributor).claim(users, rewardTokens, cumulativeAmounts, proofs);
+        IMerklDistributor(distributor).claimWithRecipient(users, rewardTokens, cumulativeAmounts, proofs, recipients, new bytes[](rewardTokens.length));
 
         for (uint256 i; i < rewardTokens.length; ++i) {
-            _routeMerklReward(distributor, rewardTokens[i], balancesBefore[i], caller);
+            uint256 balanceAfter = IERC20(rewardTokens[i]).balanceOf(recipients[i]);
+            uint256 received = balanceAfter > balancesBefore[i] ? (balanceAfter - balancesBefore[i]) : 0;
+            require(received > 0, MerklClaimedNoReward(rewardTokens[i], recipients[i]));
+
+            uint256 finalAmount = received;
+            if (actions[i] == ProtocolAction.PUSH_TO_PROTOCOL) {
+                // TODO: _pushToProtocol should return final amount after supply (if other protocols used)
+                _pushToProtocol(rewardTokens[i], received);
+            } else if (actions[i] == ProtocolAction.PULL_TO_OWNER) {
+                finalAmount = _pullFromProtocolToOwner(rewardTokens[i], type(uint256).max);
+            }
+
+            emit MerklClaimed(distributor, rewardTokens[i], received, recipients[i], finalAmount, caller);
         }
     }
 
     function _routeMerklReward(
-        address distributor,
-        address rewardToken,
-        uint256 balanceBefore,
-        address caller
-    ) internal {
-        uint256 balanceAfter = IERC20(rewardToken).balanceOf(address(this));
-        uint256 received = balanceAfter > balanceBefore ? (balanceAfter - balanceBefore) : 0;
+        address rewardToken
+    ) internal view returns (address finalRecipient, ProtocolAction action) {
+        if (isProtocolToken[rewardToken]) { // i.e aUSDC
+            address yieldToken = yieldTokenByProtocolToken[rewardToken]; // i.e. USDC
 
-        // TODO: think about SE11 requirement
-        if (received == 0) {
-            emit MerklClaimed(distributor, rewardToken, 0, address(0), 0, caller);
-            return;
-        }
-
-        address finalRecipient;
-        uint256 finalAmount;
-
-        if (isProtocolToken[rewardToken]) {
-            address yieldToken = yieldTokenByProtocolToken[rewardToken];
-
-            if (yieldTokensData[yieldToken].active) {
+            if (yieldTokensData[yieldToken].active) { // USDC
                 finalRecipient = address(this);
-                finalAmount = received;
+                return (address(this), ProtocolAction.SKIP);
             } else {
-                finalAmount = _pullFromProtocolToOwner(yieldToken, type(uint).max);
                 finalRecipient = owner;
+                return (owner, ProtocolAction.PULL_TO_OWNER);
             }
-        } else if (yieldTokensData[rewardToken].active) {
-            _pushToProtocol(rewardToken, received);
-            finalRecipient = address(this);
-            finalAmount = received; // TODO: what if it's not aave and 1 rewardToken != 1 yieldToken?
+        } else if (yieldTokensData[rewardToken].active) { // i.e. USDC
+            return (address(this), ProtocolAction.PUSH_TO_PROTOCOL);
         } else {
-            IERC20(rewardToken).safeTransfer(owner, received);
-            finalRecipient = owner;
-            finalAmount = received;
+            return (owner, ProtocolAction.SKIP); // i.e. inactive USDC or other tokens (never initialized in module)
         }
-
-        emit MerklClaimed(distributor, rewardToken, received, finalRecipient, finalAmount, caller);
     }
 
     function setAllowedMerklDistributor(address distributor, bool allowed) external onlyOwner {
