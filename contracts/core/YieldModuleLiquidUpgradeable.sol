@@ -71,6 +71,7 @@ abstract contract YieldModuleLiquidUpgradeable is
     // set yieldTokenByProtocolToken during initialization?
     // yield token => protocol token
     mapping(address => address) public yieldTokenByProtocolToken;
+    // TODO: mb move to separate contract?
     // distributor => is allowed
     mapping(address => bool) public allowedMerklDistributors;
 
