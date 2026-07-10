@@ -46,7 +46,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         bool protocolTouched;
     }
 
-    enum ProtocolAction {
+    enum TokenAction {
         PUSH_TO_PROTOCOL,
         PULL_TO_OWNER,
         SKIP
@@ -414,13 +414,13 @@ abstract contract YieldModuleLiquidUpgradeable is
         uint256[] memory balancesBefore = new uint256[](rewardTokens.length);
         address[] memory users = new address[](rewardTokens.length);
         address[] memory recipients = new address[](rewardTokens.length);
-        ProtocolAction[] memory actions = new ProtocolAction[](rewardTokens.length);
+        TokenAction[] memory actions = new TokenAction[](rewardTokens.length);
 
         for (uint256 i; i < rewardTokens.length; ++i) {
             rewardTokens[i].requireNotZero();
             cumulativeAmounts[i].requireNotZero();
 
-            (address finalRecipient, ProtocolAction action) = _routeMerklReward(rewardTokens[i]);
+            (address finalRecipient, TokenAction action) = _routeRewardsByTokenPolicy(rewardTokens[i]);
 
             balancesBefore[i] = IERC20(rewardTokens[i]).balanceOf(finalRecipient);
             users[i] = address(this);
@@ -436,34 +436,52 @@ abstract contract YieldModuleLiquidUpgradeable is
             require(received > 0, MerklClaimedNoReward(rewardTokens[i], recipients[i]));
 
             uint256 finalAmount = received;
-            if (actions[i] == ProtocolAction.PUSH_TO_PROTOCOL) {
-                // TODO: _pushToProtocol should return final amount after supply (if other protocols used)
+            
+            if (actions[i] == TokenAction.PUSH_TO_PROTOCOL) {
+                // TODO: mb _pushToProtocol should return final amount after supply (if other protocols used)?
+                uint256 protocolBalanceBefore = _protocolBalance(rewardTokens[i]);
                 _pushToProtocol(rewardTokens[i], received);
-            } else if (actions[i] == ProtocolAction.PULL_TO_OWNER) {
-                finalAmount = _pullFromProtocolToOwner(rewardTokens[i], type(uint256).max);
+
+                uint256 protocolBalanceAfter = _protocolBalance(rewardTokens[i]);
+                require(protocolBalanceAfter > protocolBalanceBefore, MerklClaimedNoReward(rewardTokens[i], address(this)));
+
+                // TODO: not sure about this decision
+                finalAmount = protocolBalanceAfter - protocolBalanceBefore;
+            } else if (actions[i] == TokenAction.PULL_TO_OWNER) {
+                finalAmount = _pullFromProtocolToOwner(yieldTokenByProtocolToken[rewardTokens[i]], type(uint256).max);
             }
 
+            // TODO: mb add separate event when finalAmount and finalRecipient don't match with reward token (_pushToProtocol, _pullFromProtocolToOwner)
+            // _pushToProtocol:             recipient == address(this)
+            //                              rewardToken == underlying
+            //
+            //                            v  finalRecipient == address(this)
+            //                            x  finalToken == protocolToken
+            //
+            // _pullFromProtocolToOwner:    recipient == address(this)
+            //                              rewardToken == protocolToken
+            //
+            //                            x  finalRecipient == owner
+            //                            x  finalToken == underlying
             emit MerklClaimed(distributor, rewardTokens[i], received, recipients[i], finalAmount, caller);
         }
     }
 
-    function _routeMerklReward(
+    function _routeRewardsByTokenPolicy(
         address rewardToken
-    ) internal view returns (address finalRecipient, ProtocolAction action) {
+    ) internal view returns (address finalRecipient, TokenAction action) {
         if (isProtocolToken[rewardToken]) { // i.e aUSDC
-            address yieldToken = yieldTokenByProtocolToken[rewardToken]; // i.e. USDC
+            address yieldToken = yieldTokenByProtocolToken[rewardToken]; // i.e. USDC (underlying)
 
-            if (yieldTokensData[yieldToken].active) { // USDC
-                finalRecipient = address(this);
-                return (address(this), ProtocolAction.SKIP);
-            } else {
-                finalRecipient = owner;
-                return (owner, ProtocolAction.PULL_TO_OWNER);
+            if (yieldTokensData[yieldToken].active) { // active USDC (underlying)
+                return (address(this), TokenAction.SKIP);
+            } else { // i.e. inactive USDC (underlying)
+                return (address(this), TokenAction.PULL_TO_OWNER);
             }
-        } else if (yieldTokensData[rewardToken].active) { // i.e. USDC
-            return (address(this), ProtocolAction.PUSH_TO_PROTOCOL);
+        } else if (yieldTokensData[rewardToken].active) { // i.e. active USDC (underlying)
+            return (address(this), TokenAction.PUSH_TO_PROTOCOL);
         } else {
-            return (owner, ProtocolAction.SKIP); // i.e. inactive USDC or other tokens (never initialized in module)
+            return (owner, TokenAction.SKIP); // i.e. inactive USDC or other tokens (never initialized in module)
         }
     }
 
