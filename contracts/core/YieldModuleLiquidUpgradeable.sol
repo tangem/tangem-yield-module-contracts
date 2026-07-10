@@ -69,7 +69,7 @@ abstract contract YieldModuleLiquidUpgradeable is
 
     // TODO: new state, mb move to separate contract and storage
     // set yieldTokenByProtocolToken during initialization?
-    // yield token => protocol token
+    // protocol token => yield token
     mapping(address => address) public yieldTokenByProtocolToken;
     // TODO: mb move to separate contract?
     // distributor => is allowed
