@@ -49,6 +49,7 @@ interface IYieldModule {
         uint256 finalAmount,
         address indexed caller
     );
+    event YieldTokenByProtocolTokenSet(address indexed yieldToken, address indexed protocolToken);
 
     error OnlyOwner();
     error OnlyOwnerOrFactory();
@@ -80,6 +81,9 @@ interface IYieldModule {
     error RewardTokensEmpty();
     error RewardTokensLengthsMismatch();
     error MerklClaimedNoReward(address rewardToken, address finalRecipient);
+    error YieldTokenNotSet(address yieldToken);
+    error ProtocolTokenNotSet(address protocolToken);
+    error YieldTokenNotInitialized(address yieldToken);
 
     function initialize(address owner) external;
 
