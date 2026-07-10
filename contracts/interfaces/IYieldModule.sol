@@ -79,6 +79,7 @@ interface IYieldModule {
     error DistributorNotAllowed();
     error RewardTokensEmpty();
     error RewardTokensLengthsMismatch();
+    error MerklClaimedNoReward(address rewardToken, address finalRecipient);
 
     function initialize(address owner) external;
 
