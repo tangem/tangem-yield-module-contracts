@@ -484,6 +484,7 @@ abstract contract YieldModuleLiquidUpgradeable is
     ) internal view returns (address finalRecipient, TokenAction action) {
         if (isProtocolToken[rewardToken]) { // i.e aUSDC
             address yieldToken = yieldTokenByProtocolToken[rewardToken]; // i.e. USDC (underlying)
+            require(yieldToken != address(0), YieldTokenNotSet(yieldToken));
 
             if (yieldTokensData[yieldToken].active) { // active USDC (underlying)
                 return (address(this), TokenAction.SKIP);
@@ -511,6 +512,22 @@ abstract contract YieldModuleLiquidUpgradeable is
         }
 
         // TODO: do we need event?
+    }
+
+    function setYieldTokenByProtocolToken(address[] calldata yieldTokens) external onlyOwner {
+        for (uint256 i; i < yieldTokens.length; ++i) {
+            address yieldToken = yieldTokens[i];
+            require(
+                yieldTokensData[yieldToken].initialized, YieldTokenNotInitialized(yieldToken)
+            );
+
+            address protocolToken = address(protocolTokens[yieldToken]);
+            require(isProtocolToken[protocolToken], ProtocolTokenNotSet(protocolToken));
+
+            yieldTokenByProtocolToken[protocolToken] = yieldToken;
+
+            emit YieldTokenByProtocolTokenSet(yieldToken, protocolToken);
+        }
     }
 
     /* VIEW FUNCTIONS */
