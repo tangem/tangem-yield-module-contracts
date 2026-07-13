@@ -50,7 +50,7 @@ interface IYieldModule {
         uint256 finalAmount,
         address indexed caller
     );
-    event YieldTokensByProtocolTokensSet(address[] yieldTokens);
+    event YieldTokensByProtocolTokensSet(address yieldToken);
     event MerklDistributorsSet(address[] distributors, bool[] allowances);
 
     error OnlyOwner();
@@ -152,6 +152,4 @@ interface IYieldModule {
     ) external;
 
     function setAllowedMerklDistributors(address[] calldata distributors, bool[] calldata allowances) external;
-
-    function setYieldTokenByProtocolToken(address[] calldata yieldTokens) external;
 }

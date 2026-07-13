@@ -4,6 +4,7 @@ pragma solidity ^0.8.29;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@aave/core-v3/contracts/interfaces/IPool.sol";
 import "../core/YieldModuleLiquidUpgradeable.sol";
+import "../interfaces/IAToken.sol";
 
 contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable {
     using SafeERC20 for IERC20;
@@ -48,6 +49,14 @@ contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable {
     }
 
     function _initProtocolToken(address yieldToken) internal virtual override returns (address) {
+        return _getProtocolToken(yieldToken);
+    }
+
+    function _getYieldTokenByProtocolToken(address protocolToken) internal virtual override view returns (address) {
+        return IAToken(protocolToken).UNDERLYING_ASSET_ADDRESS();
+    }
+
+    function _getProtocolToken(address yieldToken) internal virtual override view returns (address) {
         return IPool(pool).getReserveData(yieldToken).aTokenAddress;
     }
 }
