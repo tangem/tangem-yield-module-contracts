@@ -448,7 +448,9 @@ abstract contract YieldModuleLiquidUpgradeable is
             uint256 received = balanceAfter > balancesBefore[i] ? (balanceAfter - balancesBefore[i]) : 0;
             require(received > 0, MerklClaimedNoReward(rewardTokens[i], recipients[i]));
 
+            address finalToken = rewardTokens[i];
             uint256 finalAmount = received;
+            address finalRecipient = recipients[i];
 
             if (actions[i] == TokenAction.PUSH_TO_PROTOCOL) {
                 // TODO: mb _pushToProtocol should return final amount after supply (if other protocols used)?
@@ -458,10 +460,12 @@ abstract contract YieldModuleLiquidUpgradeable is
                 uint256 protocolBalanceAfter = _protocolBalance(rewardTokens[i]);
                 require(protocolBalanceAfter > protocolBalanceBefore, MerklClaimedNoReward(rewardTokens[i], address(this)));
 
-                // TODO: not sure about this decision
+                finalToken = address(protocolTokens[rewardTokens[i]]);
                 finalAmount = protocolBalanceAfter - protocolBalanceBefore;
             } else if (actions[i] == TokenAction.PULL_TO_OWNER) {
-                finalAmount = _pullFromProtocolToOwner(yieldTokenByProtocolToken[rewardTokens[i]], type(uint256).max);
+                finalToken = yieldTokenByProtocolToken[rewardTokens[i]];
+                finalAmount = _pullFromProtocolToOwner(finalToken, type(uint256).max);
+                finalRecipient = owner;
             }
 
             // TODO: mb add separate event when finalAmount and finalRecipient don't match with reward token (_pushToProtocol, _pullFromProtocolToOwner)
@@ -476,7 +480,7 @@ abstract contract YieldModuleLiquidUpgradeable is
             //
             //                            x  finalRecipient == owner
             //                            x  finalToken == underlying
-            emit MerklClaimed(distributor, rewardTokens[i], received, recipients[i], finalAmount, caller);
+            emit MerklClaimed(distributor, rewardTokens[i], received, finalRecipient, finalToken, finalAmount, caller);
         }
     }
 
