@@ -513,21 +513,30 @@ abstract contract YieldModuleLiquidUpgradeable is
         emit MerklDistributorsSet(distributors, allowances);
     }
 
-    function setYieldTokenByProtocolToken(address[] calldata yieldTokens) external onlyOwner {
-        for (uint256 i; i < yieldTokens.length; ++i) {
-            address yieldToken = yieldTokens[i];
-            require(
-                yieldTokensData[yieldToken].initialized, YieldTokenNotInitialized(yieldToken)
-            );
+    function _getYieldToken(address protocolToken) internal returns (address) {
+        address yieldToken = yieldTokenByProtocolToken[protocolToken];
 
-            address protocolToken = address(protocolTokens[yieldToken]);
-            require(isProtocolToken[protocolToken], ProtocolTokenNotSet(protocolToken));
-
-            yieldTokenByProtocolToken[protocolToken] = yieldToken;
+        if (yieldToken != address(0)) {
+            return yieldToken;
         }
-
-        emit YieldTokensByProtocolTokensSet(yieldTokens);
+        
+        return _updateYieldTokenByProtocolToken(protocolToken);
     }
+
+    function _updateYieldTokenByProtocolToken(address protocolToken) internal returns (address yieldToken) {
+        yieldToken = _getYieldTokenByProtocolToken(protocolToken);
+    
+        require(yieldTokensData[yieldToken].initialized, YieldTokenNotInitialized(yieldToken));
+        require(isProtocolToken[protocolToken], ProtocolTokenNotSet(protocolToken));
+        require(_getProtocolToken(yieldToken) == protocolToken, ProtocolTokenNotSet(protocolToken)); // TODO: new event?
+
+        yieldTokenByProtocolToken[protocolToken] = yieldToken;
+        emit YieldTokensByProtocolTokensSet(yieldToken);
+    }
+
+    function _getYieldTokenByProtocolToken(address protocolToken) internal virtual view returns (address);
+
+    function _getProtocolToken(address yieldToken) internal virtual view returns (address);
 
     /* VIEW FUNCTIONS */
 
