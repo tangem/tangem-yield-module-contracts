@@ -46,6 +46,7 @@ interface IYieldModule {
         address indexed rewardToken,
         uint256 received,
         address finalRecipient,
+        address finalToken,
         uint256 finalAmount,
         address indexed caller
     );
