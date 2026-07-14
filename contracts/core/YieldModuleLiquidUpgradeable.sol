@@ -13,8 +13,6 @@ import "../interfaces/ISwapExecutionRegistry.sol";
 import "../resources/Constants.sol";
 import "../common/Requires.sol";
 
-import {IMerklDistributor} from "../interfaces/IMerklDistributor.sol";
-
 abstract contract YieldModuleLiquidUpgradeable is
     Initializable,
     ERC2771ContextUpgradeable,
@@ -46,13 +44,6 @@ abstract contract YieldModuleLiquidUpgradeable is
         bool protocolTouched;
     }
 
-    enum TokenAction {
-        PUSH_TO_PROTOCOL,
-        PULL_TO_OWNER,
-        SEND_TO_OWNER,
-        LEAVE_IN_POOL
-    }
-
     IYieldProcessor public immutable processor;
     IYieldFactory public immutable factory;
     ISwapExecutionRegistry public immutable swapExecutionRegistry;
@@ -70,8 +61,6 @@ abstract contract YieldModuleLiquidUpgradeable is
 
     // protocol token => yield token
     mapping(address => address) public yieldTokenByProtocolToken;
-    // distributor => is allowed
-    mapping(address => bool) public allowedMerklDistributors;
 
     modifier onlyOwner {
         require(_msgSender() == owner, OnlyOwner());
@@ -381,165 +370,6 @@ abstract contract YieldModuleLiquidUpgradeable is
         emit SwapAndReceiveCompleted(tokenOut, to, received, deposited);
     }
 
-    function claimMerklRewardsOwner(
-        address distributor,
-        address[] calldata rewardTokens,
-        uint256[] calldata cumulativeAmounts,
-        bytes32[][] calldata proofs
-    ) external onlyOwner nonReentrant {
-        _claimMerklRewards(distributor, rewardTokens, cumulativeAmounts, proofs, owner);
-    }
-
-    function claimMerklRewardsBE(
-        address distributor,
-        address[] calldata rewardTokens,
-        uint256[] calldata cumulativeAmounts,
-        bytes32[][] calldata proofs
-    ) external onlyProcessor nonReentrant {
-        _claimMerklRewards(distributor, rewardTokens, cumulativeAmounts, proofs, address(processor));
-    }
-
-    function _claimMerklRewards(
-        address distributor,
-        address[] calldata rewardTokens,
-        uint256[] calldata cumulativeAmounts,
-        bytes32[][] calldata proofs,
-        address caller
-    ) internal {
-        require(allowedMerklDistributors[distributor], DistributorNotAllowed());
-        require(rewardTokens.length > 0, RewardTokensEmpty());
-        require(rewardTokens.length == cumulativeAmounts.length && cumulativeAmounts.length == proofs.length, RewardTokensLengthsMismatch());
-
-        _validateRewardTokens(rewardTokens);
-
-        uint256[] memory balancesBefore = new uint256[](rewardTokens.length);
-        address[] memory users = new address[](rewardTokens.length);
-        address[] memory recipients = new address[](rewardTokens.length);
-        TokenAction[] memory actions = new TokenAction[](rewardTokens.length);
-        bytes[] memory emptyDatas = new bytes[](rewardTokens.length);
-
-        for (uint256 i; i < rewardTokens.length; ++i) {
-            rewardTokens[i].requireNotZero();
-            cumulativeAmounts[i].requireNotZero();
-
-            (address finalRecipient, TokenAction action) = _routeRewardsByTokenPolicy(rewardTokens[i]);
-
-            balancesBefore[i] = IERC20(rewardTokens[i]).balanceOf(finalRecipient);
-            users[i] = address(this);
-            recipients[i] = finalRecipient;
-            actions[i] = action;
-        }
-
-        IMerklDistributor(distributor).claimWithRecipient(users, rewardTokens, cumulativeAmounts, proofs, recipients, emptyDatas);
-
-        _processClaimedRewards(distributor, rewardTokens, recipients, actions, balancesBefore, caller);
-    }
-
-    function _processClaimedRewards(
-        address distributor,
-        address[] calldata rewardTokens,
-        address[] memory recipients,
-        TokenAction[] memory actions,
-        uint256[] memory balancesBefore,
-        address caller
-    ) internal {
-        for (uint256 i; i < rewardTokens.length; ++i) {
-            uint256 balanceAfter = IERC20(rewardTokens[i]).balanceOf(recipients[i]);
-            uint256 received = balanceAfter > balancesBefore[i] ? (balanceAfter - balancesBefore[i]) : 0;
-            require(received > 0, MerklClaimedNoReward(rewardTokens[i], recipients[i]));
-
-            address finalToken = rewardTokens[i];
-            uint256 finalAmount = received;
-            address finalRecipient = recipients[i];
-
-            if (actions[i] == TokenAction.PUSH_TO_PROTOCOL) {
-                uint256 protocolBalanceBefore = _protocolBalance(rewardTokens[i]);
-                _pushToProtocol(rewardTokens[i], received);
-
-                uint256 protocolBalanceAfter = _protocolBalance(rewardTokens[i]);
-                require(protocolBalanceAfter > protocolBalanceBefore, MerklClaimedNoReward(rewardTokens[i], address(this)));
-
-                finalToken = address(protocolTokens[rewardTokens[i]]);
-                finalAmount = protocolBalanceAfter - protocolBalanceBefore;
-
-                _increaseProtocolBalanceWithoutFee(rewardTokens[i], finalAmount);
-            } else if (actions[i] == TokenAction.PULL_TO_OWNER) {
-                finalToken = yieldTokenByProtocolToken[rewardTokens[i]];
-                finalAmount = _pullFromProtocolToOwner(finalToken, type(uint256).max);
-                finalRecipient = owner;
-            } else if (actions[i] == TokenAction.LEAVE_IN_POOL) {
-                address yieldToken = yieldTokenByProtocolToken[rewardTokens[i]];
-                _increaseProtocolBalanceWithoutFee(yieldToken, received);
-            }
-
-            emit MerklClaimed(distributor, rewardTokens[i], received, finalRecipient, finalToken, finalAmount, caller);
-        }
-    }
-
-    function _routeRewardsByTokenPolicy(
-        address rewardToken
-    ) internal view returns (address finalRecipient, TokenAction action) {
-        if (isProtocolToken[rewardToken]) { // i.e aUSDC
-            address yieldToken = yieldTokenByProtocolToken[rewardToken]; // i.e. USDC (underlying)
-            require(yieldToken != address(0), YieldTokenNotSet(yieldToken));
-
-            if (yieldTokensData[yieldToken].active) { // active USDC (underlying)
-                return (address(this), TokenAction.LEAVE_IN_POOL);
-            } else { // i.e. inactive USDC (underlying)
-                return (address(this), TokenAction.PULL_TO_OWNER);
-            }
-        } else if (yieldTokensData[rewardToken].active) { // i.e. active USDC (underlying)
-            return (address(this), TokenAction.PUSH_TO_PROTOCOL);
-        } else {
-            return (owner, TokenAction.SEND_TO_OWNER); // i.e. inactive USDC or other tokens (never initialized in module)
-        }
-    }
-
-    function _validateRewardTokens(address[] calldata rewardTokens) internal pure {
-        for (uint256 i; i < rewardTokens.length; ++i) {
-            for (uint256 k = i + 1; k < rewardTokens.length; ++k) {
-                require(
-                    rewardTokens[i] != rewardTokens[k],
-                    DuplicateRewardToken(rewardTokens[i])
-                );
-            }
-        }
-    }
-
-    function setAllowedMerklDistributors(address[] calldata distributors, bool[] calldata allowances) external onlyOwner {
-        require(distributors.length == allowances.length, RewardTokensLengthsMismatch());
-
-        for (uint256 i; i < distributors.length; ++i) {
-            allowedMerklDistributors[distributors[i]] = allowances[i];
-        }
-
-        emit MerklDistributorsSet(distributors, allowances);
-    }
-
-    function _getYieldToken(address protocolToken) internal returns (address) {
-        address yieldToken = yieldTokenByProtocolToken[protocolToken];
-
-        if (yieldToken != address(0)) {
-            return yieldToken;
-        }
-        
-        return _updateYieldTokenByProtocolToken(protocolToken);
-    }
-
-    function _updateYieldTokenByProtocolToken(address protocolToken) internal returns (address yieldToken) {
-        yieldToken = _getYieldTokenByProtocolToken(protocolToken);
-    
-        require(yieldTokensData[yieldToken].initialized, YieldTokenNotInitialized(yieldToken));
-        require(isProtocolToken[protocolToken] && _getProtocolToken(yieldToken) == protocolToken, ProtocolTokenNotSet(protocolToken));
-
-        yieldTokenByProtocolToken[protocolToken] = yieldToken;
-        emit YieldTokensByProtocolTokensSet(yieldToken);
-    }
-
-    function _getYieldTokenByProtocolToken(address protocolToken) internal virtual view returns (address);
-
-    function _getProtocolToken(address yieldToken) internal virtual view returns (address);
-
     /* VIEW FUNCTIONS */
 
     function protocolBalance(address yieldToken) external view returns (uint) {
@@ -663,7 +493,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         emit LatestFeePaymentStateUpdated(token, protocolBalance_, serviceFeeRate);
     }
 
-    function _increaseProtocolBalanceWithoutFee(address token, uint amount) private {
+    function _increaseProtocolBalanceWithoutFee(address token, uint amount) internal {
         LatestFeePaymentState storage latestFeePaymentState = latestFeePaymentStates[token];
         uint newProtocolBalance = latestFeePaymentState.protocolBalance + amount;
 
@@ -702,6 +532,10 @@ abstract contract YieldModuleLiquidUpgradeable is
     function _pullFromProtocolToOwner(address yieldToken, uint amount) internal virtual returns (uint);
 
     function _pullFromProtocolToModule(address yieldToken, uint amount) internal virtual returns (uint);
+
+    function _getYieldTokenByProtocolToken(address protocolToken) internal virtual view returns (address);
+
+    function _getProtocolToken(address yieldToken) internal virtual view returns (address);
 
     function _prepareSwap(
         address tokenIn,
@@ -792,6 +626,26 @@ abstract contract YieldModuleLiquidUpgradeable is
 
             _tryProcessFee(tokenIn, feeIn, true);
         }
+    }
+
+    function _getYieldToken(address protocolToken) internal returns (address) {
+        address yieldToken = yieldTokenByProtocolToken[protocolToken];
+
+        if (yieldToken != address(0)) {
+            return yieldToken;
+        }
+        
+        return _updateYieldTokenByProtocolToken(protocolToken);
+    }
+
+    function _updateYieldTokenByProtocolToken(address protocolToken) internal returns (address yieldToken) {
+        yieldToken = _getYieldTokenByProtocolToken(protocolToken);
+    
+        require(yieldTokensData[yieldToken].initialized, YieldTokenNotInitialized(yieldToken));
+        require(isProtocolToken[protocolToken] && _getProtocolToken(yieldToken) == protocolToken, ProtocolTokenNotSet(protocolToken));
+
+        yieldTokenByProtocolToken[protocolToken] = yieldToken;
+        emit YieldTokensByProtocolTokensSet(yieldToken);
     }
 
     function _authorizeUpgrade(address newImplementation)

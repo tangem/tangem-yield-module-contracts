@@ -1,15 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@aave/core-v3/contracts/interfaces/IPool.sol";
-import "../core/YieldModuleLiquidUpgradeable.sol";
-import "../interfaces/IAToken.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
 
-contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable {
+import {IAToken} from "../interfaces/IAToken.sol";
+import {YieldModuleLiquidUpgradeable} from "../core/YieldModuleLiquidUpgradeable.sol";
+import {MerklIncentives} from "../merkl/MerklIncentives.sol";
+
+contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable, MerklIncentives {
     using SafeERC20 for IERC20;
 
     IPool public immutable pool;
+
+    // TODO: move to constructor
+    address distributorRegistryMock;
     
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor(
@@ -19,6 +25,7 @@ contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable {
         address trustedForwarder_,
         address swapExecutionRegistry_
     )
+        MerklIncentives(distributorRegistryMock)
         YieldModuleLiquidUpgradeable(
             yieldProcessor_,
             factory_,
