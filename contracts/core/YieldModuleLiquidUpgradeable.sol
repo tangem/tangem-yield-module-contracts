@@ -413,6 +413,8 @@ abstract contract YieldModuleLiquidUpgradeable is
         require(rewardTokens.length > 0, RewardTokensEmpty());
         require(rewardTokens.length == cumulativeAmounts.length && cumulativeAmounts.length == proofs.length, RewardTokensLengthsMismatch());
 
+        _validateRewardTokens(rewardTokens);
+
         uint256[] memory balancesBefore = new uint256[](rewardTokens.length);
         address[] memory users = new address[](rewardTokens.length);
         address[] memory recipients = new address[](rewardTokens.length);
@@ -470,7 +472,8 @@ abstract contract YieldModuleLiquidUpgradeable is
                 finalAmount = _pullFromProtocolToOwner(finalToken, type(uint256).max);
                 finalRecipient = owner;
             } else if (actions[i] == TokenAction.LEAVE_IN_POOL) {
-                _increaseProtocolBalanceWithoutFee(rewardTokens[i], received);
+                address yieldToken = yieldTokenByProtocolToken[rewardTokens[i]];
+                _increaseProtocolBalanceWithoutFee(yieldToken, received);
             }
 
             // TODO: mb add separate event when finalAmount and finalRecipient don't match with reward token (_pushToProtocol, _pullFromProtocolToOwner)
@@ -505,6 +508,17 @@ abstract contract YieldModuleLiquidUpgradeable is
             return (address(this), TokenAction.PUSH_TO_PROTOCOL);
         } else {
             return (owner, TokenAction.SEND_TO_OWNER); // i.e. inactive USDC or other tokens (never initialized in module)
+        }
+    }
+
+    function _validateRewardTokens(address[] calldata rewardTokens) internal pure {
+        for (uint256 i; i < rewardTokens.length; ++i) {
+            for (uint256 k = i + 1; k < rewardTokens.length; ++k) {
+                require(
+                    rewardTokens[i] != rewardTokens[k],
+                    DuplicateRewardToken(rewardTokens[i])
+                );
+            }
         }
     }
 
