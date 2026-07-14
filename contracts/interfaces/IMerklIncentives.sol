@@ -2,6 +2,7 @@
 pragma solidity ^0.8.29;
 
 interface IMerklIncentives {
+    error DistributorNotAllowed(address distributor);
     error DuplicateRewardToken(address rewardToken);
     error MerklClaimedNoReward(address rewardToken, address finalRecipient);
     error RewardTokensEmpty();

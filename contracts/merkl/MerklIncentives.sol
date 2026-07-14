@@ -5,7 +5,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IMerklIncentives} from "../interfaces/IMerklIncentives.sol";
 import {IMerklDistributor} from "../interfaces/IMerklDistributor.sol";
-import {IMerklDistributorsRegistry} from "../interfaces/IMerklDistributorsRegistry.sol";
 
 import {Requires} from "../common/Requires.sol";
 import {YieldModuleLiquidUpgradeable} from "../core/YieldModuleLiquidUpgradeable.sol";
@@ -14,47 +13,53 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
     using Requires for uint256;
     using Requires for address;
 
-    IMerklDistributorsRegistry public immutable distributorRegistry;
+    IMerklDistributor public immutable distributor;
 
     enum TokenAction {
         PUSH_TO_PROTOCOL,
-        PULL_TO_OWNER,
+        UNWRAP_TO_OWNER,
         SEND_TO_OWNER,
-        LEAVE_IN_POOL
+        KEEP_IN_MODULE
     }
 
-    constructor(address distributorRegistry_) {
-        distributorRegistry = IMerklDistributorsRegistry(distributorRegistry_);
+    struct RewardRoute {
+        address recipient;
+        address yieldToken;
+        TokenAction tokenAction;
+    }
+
+    constructor(address distributor_) {
+        distributor = IMerklDistributor(distributor_);
     }
 
     function claimMerklRewardsOwner(
-        address distributor,
+        address _distributor,
         address[] calldata rewardTokens,
         uint256[] calldata cumulativeAmounts,
         bytes32[][] calldata proofs
     ) external onlyOwner nonReentrant {
-        _claimMerklRewards(distributor, rewardTokens, cumulativeAmounts, proofs, owner);
+        _claimMerklRewards(_distributor, rewardTokens, cumulativeAmounts, proofs);
     }
 
     function claimMerklRewardsBE(
-        address distributor,
+        address _distributor,
         address[] calldata rewardTokens,
         uint256[] calldata cumulativeAmounts,
         bytes32[][] calldata proofs
     ) external onlyProcessor nonReentrant {
-        _claimMerklRewards(distributor, rewardTokens, cumulativeAmounts, proofs, address(processor));
+        _claimMerklRewards(_distributor, rewardTokens, cumulativeAmounts, proofs);
     }
 
     function _claimMerklRewards(
-        address distributor,
+        address _distributor, // TODO: mb remove this parameter?
         address[] calldata rewardTokens,
         uint256[] calldata cumulativeAmounts,
-        bytes32[][] calldata proofs,
-        address caller
+        bytes32[][] calldata proofs
     ) private {
+        // TODO: if we remove the distributor parameter, we cat remove this check
         require(
-            distributorRegistry.allowedMerklDistributors(distributor),
-            IMerklDistributorsRegistry.DistributorNotAllowed(distributor)
+            _distributor == address(distributor),
+            DistributorNotAllowed(address(distributor))
         );
         require(rewardTokens.length > 0, RewardTokensEmpty());
         require(
@@ -75,46 +80,46 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             rewardTokens[i].requireNotZero();
             cumulativeAmounts[i].requireNotZero();
 
-            (address finalRecipient, TokenAction action) =
-                _routeRewardsByTokenPolicy(rewardTokens[i]);
+            RewardRoute memory rewardRoute = _classifyReward(rewardTokens[i]);
 
-            balancesBefore[i] = IERC20(rewardTokens[i]).balanceOf(finalRecipient);
+            balancesBefore[i] = IERC20(rewardTokens[i]).balanceOf(rewardRoute.recipient);
             users[i] = address(this);
-            recipients[i] = finalRecipient;
-            actions[i] = action;
+            recipients[i] = rewardRoute.recipient;
+            actions[i] = rewardRoute.tokenAction;
         }
 
-        IMerklDistributor(distributor)
-            .claimWithRecipient(
-                users, rewardTokens, cumulativeAmounts, proofs, recipients, emptyDatas
-            );
-
-        _processClaimedRewards(
-            distributor, rewardTokens, recipients, actions, balancesBefore, caller
+        distributor.claimWithRecipient(
+            users, rewardTokens, cumulativeAmounts, proofs, recipients, emptyDatas
         );
+
+        _processClaimedRewards(rewardTokens, recipients, actions, balancesBefore);
     }
 
     function _processClaimedRewards(
-        address distributor,
         address[] calldata rewardTokens,
         address[] memory recipients,
         TokenAction[] memory actions,
-        uint256[] memory balancesBefore,
-        address caller
+        uint256[] memory balancesBefore
     ) private {
+        uint256[] memory received = new uint256[](rewardTokens.length);
         for (uint256 i; i < rewardTokens.length; ++i) {
             uint256 balanceAfter = IERC20(rewardTokens[i]).balanceOf(recipients[i]);
-            uint256 received =
-                balanceAfter > balancesBefore[i] ? (balanceAfter - balancesBefore[i]) : 0;
-            require(received > 0, MerklClaimedNoReward(rewardTokens[i], recipients[i]));
+            require(
+                balanceAfter > balancesBefore[i],
+                MerklClaimedNoReward(rewardTokens[i], recipients[i])
+            );
 
+            received[i] = balanceAfter - balancesBefore[i];
+        }
+
+        for (uint256 i; i < rewardTokens.length; ++i) {
             address finalToken = rewardTokens[i];
-            uint256 finalAmount = received;
+            uint256 finalAmount = received[i];
             address finalRecipient = recipients[i];
 
             if (actions[i] == TokenAction.PUSH_TO_PROTOCOL) {
                 uint256 protocolBalanceBefore = _protocolBalance(rewardTokens[i]);
-                _pushToProtocol(rewardTokens[i], received);
+                _pushToProtocol(rewardTokens[i], received[i]);
 
                 uint256 protocolBalanceAfter = _protocolBalance(rewardTokens[i]);
                 require(
@@ -126,48 +131,51 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
                 finalAmount = protocolBalanceAfter - protocolBalanceBefore;
 
                 _increaseProtocolBalanceWithoutFee(rewardTokens[i], finalAmount);
-            } else if (actions[i] == TokenAction.PULL_TO_OWNER) {
+            } else if (actions[i] == TokenAction.UNWRAP_TO_OWNER) {
                 finalToken = yieldTokenByProtocolToken[rewardTokens[i]];
                 finalAmount = _pullFromProtocolToOwner(finalToken, type(uint256).max);
                 finalRecipient = owner;
-            } else if (actions[i] == TokenAction.LEAVE_IN_POOL) {
+            } else if (actions[i] == TokenAction.KEEP_IN_MODULE) {
                 address yieldToken = yieldTokenByProtocolToken[rewardTokens[i]];
-                _increaseProtocolBalanceWithoutFee(yieldToken, received);
+                _increaseProtocolBalanceWithoutFee(yieldToken, received[i]);
             }
 
             emit MerklClaimed(
-                distributor,
+                address(distributor),
                 rewardTokens[i],
-                received,
+                received[i],
                 finalRecipient,
                 finalToken,
                 finalAmount,
-                caller
+                _msgSender()
             );
         }
     }
 
-    function _routeRewardsByTokenPolicy(address rewardToken)
-        private
-        returns (address finalRecipient, TokenAction action)
-    {
+    function _classifyReward(address rewardToken) private returns (RewardRoute memory rewardRoute) {
         if (isProtocolToken[rewardToken]) {
-            // i.e aUSDC
-            address yieldToken = _getYieldToken(rewardToken); // i.e. USDC (underlying)
+            address yieldToken = _getYieldToken(rewardToken);
 
-            if (yieldTokensData[yieldToken].active) {
-                // active USDC (underlying)
-                return (address(this), TokenAction.LEAVE_IN_POOL);
-            } else {
-                // i.e. inactive USDC (underlying)
-                return (address(this), TokenAction.PULL_TO_OWNER);
-            }
-        } else if (yieldTokensData[rewardToken].active) {
-            // i.e. active USDC (underlying)
-            return (address(this), TokenAction.PUSH_TO_PROTOCOL);
-        } else {
-            return (owner, TokenAction.SEND_TO_OWNER); // i.e. inactive USDC or other tokens (never initialized in module)
+            return RewardRoute({
+                recipient: address(this),
+                yieldToken: yieldToken,
+                tokenAction: yieldTokensData[yieldToken].active
+                    ? TokenAction.KEEP_IN_MODULE
+                    : TokenAction.UNWRAP_TO_OWNER
+            });
         }
+
+        if (yieldTokensData[rewardToken].active) {
+            return RewardRoute({
+                recipient: address(this),
+                yieldToken: rewardToken,
+                tokenAction: TokenAction.PUSH_TO_PROTOCOL
+            });
+        }
+
+        return RewardRoute({
+            recipient: owner, yieldToken: rewardToken, tokenAction: TokenAction.SEND_TO_OWNER
+        });
     }
 
     function _validateRewardTokens(address[] calldata rewardTokens) private pure {
