@@ -681,7 +681,14 @@ abstract contract YieldModuleLiquidUpgradeable is
     }
 
     function _increaseProtocolBalanceWithoutFee(address token, uint amount) private {
-        latestFeePaymentStates[token].protocolBalance += amount;
+        LatestFeePaymentState storage latestFeePaymentState = latestFeePaymentStates[token];
+        uint newProtocolBalance = latestFeePaymentState.protocolBalance + amount;
+
+        require(newProtocolBalance <= _protocolBalance(token), FeeCheckpointExceedsBalance());
+
+        latestFeePaymentState.protocolBalance = newProtocolBalance;
+
+        emit LatestFeePaymentStateUpdated(token, newProtocolBalance, latestFeePaymentState.serviceFeeRate);
     }
 
     function _calculateServiceFee(address yieldToken, uint protocolBalance_) private view returns (uint) {
