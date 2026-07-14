@@ -26,6 +26,8 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         address recipient;
         address yieldToken;
         TokenAction tokenAction;
+        uint256 balanceBefore;
+        uint256 received;
     }
 
     constructor(address distributor_) {
@@ -58,10 +60,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         bytes32[][] calldata proofs
     ) private {
         // TODO: if we remove the distributor parameter, we cat remove this check
-        require(
-            _distributor == address(distributor),
-            DistributorNotAllowed(address(distributor))
-        );
+        require(_distributor == address(distributor), DistributorNotAllowed(address(distributor)));
         require(rewardTokens.length > 0, RewardTokensEmpty());
         require(
             rewardTokens.length == cumulativeAmounts.length
@@ -69,10 +68,9 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             RewardTokensLengthsMismatch()
         );
 
-        uint256[] memory balancesBefore = new uint256[](rewardTokens.length);
+        RewardRoute[] memory routes = new RewardRoute[](rewardTokens.length);
         address[] memory users = new address[](rewardTokens.length);
         address[] memory recipients = new address[](rewardTokens.length);
-        TokenAction[] memory actions = new TokenAction[](rewardTokens.length);
         bytes[] memory emptyDatas = new bytes[](rewardTokens.length);
 
         for (uint256 i; i < rewardTokens.length; ++i) {
@@ -80,105 +78,94 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             cumulativeAmounts[i].requireNotZero();
 
             // Check for duplicate reward tokens
-            for(uint256 k; k < i; ++k) {
+            for (uint256 k; k < i; ++k) {
                 require(rewardTokens[k] != rewardTokens[i], DuplicateRewardToken(rewardTokens[i]));
             }
 
-            RewardRoute memory rewardRoute = _classifyReward(rewardTokens[i]);
+            RewardRoute memory route = _classifyReward(rewardTokens[i]);
 
-            balancesBefore[i] = IERC20(rewardTokens[i]).balanceOf(rewardRoute.recipient);
+            route.balanceBefore = IERC20(rewardTokens[i]).balanceOf(route.recipient);
+            routes[i] = route;
             users[i] = address(this);
-            recipients[i] = rewardRoute.recipient;
-            actions[i] = rewardRoute.tokenAction;
+            recipients[i] = route.recipient;
         }
 
         distributor.claimWithRecipient(
             users, rewardTokens, cumulativeAmounts, proofs, recipients, emptyDatas
         );
 
-        _processClaimedRewards(rewardTokens, recipients, actions, balancesBefore);
+        _processClaimedRewards(rewardTokens, routes);
     }
 
-    function _processClaimedRewards(
-        address[] calldata rewardTokens,
-        address[] memory recipients,
-        TokenAction[] memory actions,
-        uint256[] memory balancesBefore
-    ) private {
-        uint256[] memory received = new uint256[](rewardTokens.length);
-        for (uint256 i; i < rewardTokens.length; ++i) {
-            uint256 balanceAfter = IERC20(rewardTokens[i]).balanceOf(recipients[i]);
-            require(
-                balanceAfter > balancesBefore[i],
-                MerklClaimedNoReward(rewardTokens[i], recipients[i])
-            );
+    function _classifyReward(address rewardToken) private returns (RewardRoute memory route) {
+        route.recipient = address(this);
 
-            received[i] = balanceAfter - balancesBefore[i];
-        }
-
-        for (uint256 i; i < rewardTokens.length; ++i) {
-            address finalToken = rewardTokens[i];
-            uint256 finalAmount = received[i];
-            address finalRecipient = recipients[i];
-
-            if (actions[i] == TokenAction.PUSH_TO_PROTOCOL) {
-                uint256 protocolBalanceBefore = _protocolBalance(rewardTokens[i]);
-                _pushToProtocol(rewardTokens[i], received[i]);
-
-                uint256 protocolBalanceAfter = _protocolBalance(rewardTokens[i]);
-                require(
-                    protocolBalanceAfter > protocolBalanceBefore,
-                    MerklClaimedNoReward(rewardTokens[i], address(this))
-                ); // TODO: new error ? ProtocolDepositFailed(token)
-
-                finalToken = address(protocolTokens[rewardTokens[i]]);
-                finalAmount = protocolBalanceAfter - protocolBalanceBefore;
-
-                _increaseProtocolBalanceWithoutFee(rewardTokens[i], finalAmount);
-            } else if (actions[i] == TokenAction.UNWRAP_TO_OWNER) {
-                finalToken = yieldTokenByProtocolToken[rewardTokens[i]];
-                finalAmount = _pullFromProtocolToOwner(finalToken, type(uint256).max);
-                finalRecipient = owner;
-            } else if (actions[i] == TokenAction.KEEP_IN_MODULE) {
-                address yieldToken = yieldTokenByProtocolToken[rewardTokens[i]];
-                _increaseProtocolBalanceWithoutFee(yieldToken, received[i]);
-            }
-
-            emit MerklClaimed(
-                address(distributor),
-                rewardTokens[i],
-                received[i],
-                finalRecipient,
-                finalToken,
-                finalAmount,
-                _msgSender()
-            );
-        }
-    }
-
-    function _classifyReward(address rewardToken) private returns (RewardRoute memory rewardRoute) {
         if (isProtocolToken[rewardToken]) {
-            address yieldToken = _getYieldToken(rewardToken);
+            route.yieldToken = _getYieldToken(rewardToken);
+            route.tokenAction = yieldTokensData[route.yieldToken].active
+                ? TokenAction.KEEP_IN_MODULE
+                : TokenAction.UNWRAP_TO_OWNER;
+        } else if (yieldTokensData[rewardToken].active) {
+            route.yieldToken = rewardToken;
+            route.tokenAction = TokenAction.PUSH_TO_PROTOCOL;
+        } else {
+            route.recipient = owner;
+            route.tokenAction = TokenAction.SEND_TO_OWNER;
+        }
+    }
 
-            return RewardRoute({
-                recipient: address(this),
-                yieldToken: yieldToken,
-                tokenAction: yieldTokensData[yieldToken].active
-                    ? TokenAction.KEEP_IN_MODULE
-                    : TokenAction.UNWRAP_TO_OWNER
-            });
+    function _processClaimedRewards(address[] calldata rewardTokens, RewardRoute[] memory routes)
+        private
+    {
+        for (uint256 i; i < rewardTokens.length; ++i) {
+            uint256 balanceAfter = IERC20(rewardTokens[i]).balanceOf(routes[i].recipient);
+
+            require(
+                balanceAfter > routes[i].balanceBefore,
+                MerklClaimedNoReward(rewardTokens[i], routes[i].recipient)
+            );
+
+            routes[i].received = balanceAfter - routes[i].balanceBefore;
         }
 
-        if (yieldTokensData[rewardToken].active) {
-            return RewardRoute({
-                recipient: address(this),
-                yieldToken: rewardToken,
-                tokenAction: TokenAction.PUSH_TO_PROTOCOL
-            });
+        for (uint256 i; i < rewardTokens.length; ++i) {
+            _routeClaimedReward(rewardTokens[i], routes[i]);
+        }
+    }
+
+    function _routeClaimedReward(address rewardToken, RewardRoute memory route) private {
+        address finalToken = rewardToken;
+        uint256 finalAmount = route.received;
+        address finalRecipient = route.recipient;
+
+        if (route.tokenAction == TokenAction.PUSH_TO_PROTOCOL) {
+            uint256 protocolBalanceBefore = _protocolBalance(rewardToken);
+            _pushToProtocol(rewardToken, route.received);
+            uint256 protocolBalanceAfter = _protocolBalance(rewardToken);
+            require(
+                protocolBalanceAfter > protocolBalanceBefore, ProtocolDepositFailed(rewardToken)
+            );
+
+            finalToken = address(protocolTokens[rewardToken]);
+            finalAmount = protocolBalanceAfter - protocolBalanceBefore;
+
+            _increaseProtocolBalanceWithoutFee(rewardToken, finalAmount);
+        } else if (route.tokenAction == TokenAction.UNWRAP_TO_OWNER) {
+            finalToken = route.yieldToken;
+            finalAmount = _pullFromProtocolToOwner(route.yieldToken, route.received);
+            finalRecipient = owner;
+        } else if (route.tokenAction == TokenAction.KEEP_IN_MODULE) {
+            _increaseProtocolBalanceWithoutFee(route.yieldToken, route.received);
         }
 
-        return RewardRoute({
-            recipient: owner, yieldToken: rewardToken, tokenAction: TokenAction.SEND_TO_OWNER
-        });
+        emit MerklClaimed(
+            address(distributor),
+            rewardToken,
+            route.received,
+            finalRecipient,
+            finalToken,
+            finalAmount,
+            _msgSender()
+        );
     }
 }
