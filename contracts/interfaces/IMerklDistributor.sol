@@ -10,7 +10,4 @@ interface IMerklDistributor {
         address[] calldata recipients,
         bytes[] memory datas
     ) external;
-
-    // TODO: is it needed to FE or BE?
-    function getMerkleRoot() external view returns (bytes32);
 }

@@ -29,6 +29,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
     }
 
     constructor(address distributor_) {
+        distributor_.requireNotZero();
         distributor = IMerklDistributor(distributor_);
     }
 
@@ -68,8 +69,6 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             RewardTokensLengthsMismatch()
         );
 
-        _validateRewardTokens(rewardTokens);
-
         uint256[] memory balancesBefore = new uint256[](rewardTokens.length);
         address[] memory users = new address[](rewardTokens.length);
         address[] memory recipients = new address[](rewardTokens.length);
@@ -79,6 +78,11 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         for (uint256 i; i < rewardTokens.length; ++i) {
             rewardTokens[i].requireNotZero();
             cumulativeAmounts[i].requireNotZero();
+
+            // Check for duplicate reward tokens
+            for(uint256 k; k < i; ++k) {
+                require(rewardTokens[k] != rewardTokens[i], DuplicateRewardToken(rewardTokens[i]));
+            }
 
             RewardRoute memory rewardRoute = _classifyReward(rewardTokens[i]);
 
@@ -125,7 +129,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
                 require(
                     protocolBalanceAfter > protocolBalanceBefore,
                     MerklClaimedNoReward(rewardTokens[i], address(this))
-                );
+                ); // TODO: new error ? ProtocolDepositFailed(token)
 
                 finalToken = address(protocolTokens[rewardTokens[i]]);
                 finalAmount = protocolBalanceAfter - protocolBalanceBefore;
@@ -176,13 +180,5 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         return RewardRoute({
             recipient: owner, yieldToken: rewardToken, tokenAction: TokenAction.SEND_TO_OWNER
         });
-    }
-
-    function _validateRewardTokens(address[] calldata rewardTokens) private pure {
-        for (uint256 i; i < rewardTokens.length; ++i) {
-            for (uint256 k = i + 1; k < rewardTokens.length; ++k) {
-                require(rewardTokens[i] != rewardTokens[k], DuplicateRewardToken(rewardTokens[i]));
-            }
-        }
     }
 }
