@@ -41,17 +41,7 @@ interface IYieldModule {
         bool depositedToProtocol
     );
     event WithdrawNativeProcessed(address indexed to, uint amount);
-    event MerklClaimed(
-        address indexed distributor,
-        address indexed rewardToken,
-        uint256 received,
-        address finalRecipient,
-        address finalToken,
-        uint256 finalAmount,
-        address indexed caller
-    );
     event YieldTokensByProtocolTokensSet(address yieldToken);
-    event MerklDistributorsSet(address[] distributors, bool[] allowances);
 
     error OnlyOwner();
     error OnlyOwnerOrFactory();
@@ -79,14 +69,8 @@ interface IYieldModule {
     error TokenInEqualsTokenOut();
     error SendingToThis();
 
-    error DistributorNotAllowed();
-    error RewardTokensEmpty();
-    error RewardTokensLengthsMismatch();
-    error MerklClaimedNoReward(address rewardToken, address finalRecipient);
-    error YieldTokenNotSet(address yieldToken);
     error ProtocolTokenNotSet(address protocolToken);
     error YieldTokenNotInitialized(address yieldToken);
-    error DuplicateRewardToken(address rewardToken);
     error FeeCheckpointExceedsBalance();
 
     function initialize(address owner) external;
@@ -138,20 +122,4 @@ interface IYieldModule {
     function effectiveBalance(address yieldToken) external view returns (uint);
 
     function calculateServiceFee(address yieldToken) external view returns (uint);
-
-    function claimMerklRewardsOwner(
-        address distributor,
-        address[] calldata rewardTokens,
-        uint256[] calldata cumulativeAmounts,
-        bytes32[][] calldata proofs
-    ) external;
-
-    function claimMerklRewardsBE(
-        address distributor,
-        address[] calldata rewardTokens,
-        uint256[] calldata cumulativeAmounts,
-        bytes32[][] calldata proofs
-    ) external;
-
-    function setAllowedMerklDistributors(address[] calldata distributors, bool[] calldata allowances) external;
 }
