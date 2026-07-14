@@ -49,7 +49,8 @@ abstract contract YieldModuleLiquidUpgradeable is
     enum TokenAction {
         PUSH_TO_PROTOCOL,
         PULL_TO_OWNER,
-        SKIP
+        SEND_TO_OWNER,
+        LEAVE_IN_POOL
     }
 
     IYieldProcessor public immutable processor;
@@ -462,10 +463,14 @@ abstract contract YieldModuleLiquidUpgradeable is
 
                 finalToken = address(protocolTokens[rewardTokens[i]]);
                 finalAmount = protocolBalanceAfter - protocolBalanceBefore;
+
+                _increaseProtocolBalanceWithoutFee(rewardTokens[i], finalAmount);
             } else if (actions[i] == TokenAction.PULL_TO_OWNER) {
                 finalToken = yieldTokenByProtocolToken[rewardTokens[i]];
                 finalAmount = _pullFromProtocolToOwner(finalToken, type(uint256).max);
                 finalRecipient = owner;
+            } else if (actions[i] == TokenAction.LEAVE_IN_POOL) {
+                _increaseProtocolBalanceWithoutFee(rewardTokens[i], received);
             }
 
             // TODO: mb add separate event when finalAmount and finalRecipient don't match with reward token (_pushToProtocol, _pullFromProtocolToOwner)
@@ -492,14 +497,14 @@ abstract contract YieldModuleLiquidUpgradeable is
             require(yieldToken != address(0), YieldTokenNotSet(yieldToken));
 
             if (yieldTokensData[yieldToken].active) { // active USDC (underlying)
-                return (address(this), TokenAction.SKIP);
+                return (address(this), TokenAction.LEAVE_IN_POOL);
             } else { // i.e. inactive USDC (underlying)
                 return (address(this), TokenAction.PULL_TO_OWNER);
             }
         } else if (yieldTokensData[rewardToken].active) { // i.e. active USDC (underlying)
             return (address(this), TokenAction.PUSH_TO_PROTOCOL);
         } else {
-            return (owner, TokenAction.SKIP); // i.e. inactive USDC or other tokens (never initialized in module)
+            return (owner, TokenAction.SEND_TO_OWNER); // i.e. inactive USDC or other tokens (never initialized in module)
         }
     }
 
@@ -659,6 +664,10 @@ abstract contract YieldModuleLiquidUpgradeable is
         latestFeePaymentStates[token] = LatestFeePaymentState(protocolBalance_, serviceFeeRate);
 
         emit LatestFeePaymentStateUpdated(token, protocolBalance_, serviceFeeRate);
+    }
+
+    function _increaseProtocolBalanceWithoutFee(address token, uint amount) private {
+        latestFeePaymentStates[token].protocolBalance += amount;
     }
 
     function _calculateServiceFee(address yieldToken, uint protocolBalance_) private view returns (uint) {
