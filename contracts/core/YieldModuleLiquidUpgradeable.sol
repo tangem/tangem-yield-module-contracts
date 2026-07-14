@@ -68,11 +68,8 @@ abstract contract YieldModuleLiquidUpgradeable is
     mapping(address => uint) public feeDebts;
     mapping(address => bool) public isProtocolToken;
 
-    // TODO: new state, mb move to separate contract and storage
-    // set yieldTokenByProtocolToken during initialization?
     // protocol token => yield token
     mapping(address => address) public yieldTokenByProtocolToken;
-    // TODO: mb move to separate contract?
     // distributor => is allowed
     mapping(address => bool) public allowedMerklDistributors;
 
@@ -456,7 +453,6 @@ abstract contract YieldModuleLiquidUpgradeable is
             address finalRecipient = recipients[i];
 
             if (actions[i] == TokenAction.PUSH_TO_PROTOCOL) {
-                // TODO: mb _pushToProtocol should return final amount after supply (if other protocols used)?
                 uint256 protocolBalanceBefore = _protocolBalance(rewardTokens[i]);
                 _pushToProtocol(rewardTokens[i], received);
 
@@ -476,18 +472,6 @@ abstract contract YieldModuleLiquidUpgradeable is
                 _increaseProtocolBalanceWithoutFee(yieldToken, received);
             }
 
-            // TODO: mb add separate event when finalAmount and finalRecipient don't match with reward token (_pushToProtocol, _pullFromProtocolToOwner)
-            // _pushToProtocol:             recipient == address(this)
-            //                              rewardToken == underlying
-            //
-            //                            v  finalRecipient == address(this)
-            //                            x  finalToken == protocolToken
-            //
-            // _pullFromProtocolToOwner:    recipient == address(this)
-            //                              rewardToken == protocolToken
-            //
-            //                            x  finalRecipient == owner
-            //                            x  finalToken == underlying
             emit MerklClaimed(distributor, rewardTokens[i], received, finalRecipient, finalToken, finalAmount, caller);
         }
     }
@@ -546,8 +530,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         yieldToken = _getYieldTokenByProtocolToken(protocolToken);
     
         require(yieldTokensData[yieldToken].initialized, YieldTokenNotInitialized(yieldToken));
-        require(isProtocolToken[protocolToken], ProtocolTokenNotSet(protocolToken));
-        require(_getProtocolToken(yieldToken) == protocolToken, ProtocolTokenNotSet(protocolToken)); // TODO: new event?
+        require(isProtocolToken[protocolToken] && _getProtocolToken(yieldToken) == protocolToken, ProtocolTokenNotSet(protocolToken));
 
         yieldTokenByProtocolToken[protocolToken] = yieldToken;
         emit YieldTokensByProtocolTokensSet(yieldToken);
