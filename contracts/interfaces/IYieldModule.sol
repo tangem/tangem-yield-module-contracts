@@ -86,6 +86,7 @@ interface IYieldModule {
     error YieldTokenNotSet(address yieldToken);
     error ProtocolTokenNotSet(address protocolToken);
     error YieldTokenNotInitialized(address yieldToken);
+    error DuplicateRewardToken(address rewardToken);
 
     function initialize(address owner) external;
 
