@@ -7,61 +7,62 @@ import { TangemAaveV3YieldModuleBase } from "./base/TangemAaveV3YieldModuleBase.
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
-contract InitYieldTokenTest is TangemAaveV3YieldModuleBase {
+contract YieldTokenLifecycleTest is TangemAaveV3YieldModuleBase {
     uint240 internal constant MAX_NETWORK_FEE = 20e6;
+    uint240 internal constant NEW_MAX_NETWORK_FEE = 30e6;
 
     TangemAaveV3YieldModuleHarness internal yieldModule;
+    TangemAaveV3YieldModuleHarness internal initModule;
+    address internal initOwner = makeAddr("initOwner");
 
     function setUp() public override {
         super.setUp();
-        yieldModule = _deployYieldModule(owner, address(0), 0);
+
+        // Main module: yield token active then deactivated (reactivateToken tests)
+        yieldModule = _deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
+
+        vm.prank(owner);
+        yieldModule.withdrawAndDeactivate(address(yieldToken));
+
+        // Separate module with no active yield token (initYieldToken tests)
+        initModule = _deployYieldModule(initOwner, address(0), 0);
     }
 
+    /* ======================================================== initYieldToken ===================================================== */
+
     function test_initYieldToken_InitializesYieldToken() public {
-        vm.prank(owner);
-        yieldModule.initYieldToken(address(yieldToken), MAX_NETWORK_FEE);
+        vm.prank(initOwner);
+        initModule.initYieldToken(address(yieldToken), MAX_NETWORK_FEE);
 
         (bool initialized, bool active, uint240 maxNetworkFee) =
-            yieldModule.yieldTokensData(address(yieldToken));
+            initModule.yieldTokensData(address(yieldToken));
         assertTrue(initialized);
         assertTrue(active);
         assertEq(maxNetworkFee, MAX_NETWORK_FEE);
 
-        assertEq(address(yieldModule.protocolTokens(address(yieldToken))), address(protocolToken));
-        assertTrue(yieldModule.isProtocolToken(address(protocolToken)));
+        assertEq(address(initModule.protocolTokens(address(yieldToken))), address(protocolToken));
+        assertTrue(initModule.isProtocolToken(address(protocolToken)));
     }
 
     function test_initYieldToken_RevertsOnlyOwnerOrFactory() public {
         vm.expectRevert(IYieldModule.OnlyOwnerOrFactory.selector);
         vm.prank(otherAccount);
-        yieldModule.initYieldToken(address(yieldToken), MAX_NETWORK_FEE);
+        initModule.initYieldToken(address(yieldToken), MAX_NETWORK_FEE);
     }
 
     function test_initYieldToken_EmitsYieldTokenInitialized() public {
-        vm.expectEmit(address(yieldModule));
+        vm.expectEmit(address(initModule));
         emit IYieldModule.YieldTokenInitialized(
             address(yieldToken),
             address(protocolToken),
             MAX_NETWORK_FEE
         );
 
-        vm.prank(owner);
-        yieldModule.initYieldToken(address(yieldToken), MAX_NETWORK_FEE);
+        vm.prank(initOwner);
+        initModule.initYieldToken(address(yieldToken), MAX_NETWORK_FEE);
     }
-}
 
-contract ReactivateTokenTest is TangemAaveV3YieldModuleBase {
-    uint240 internal constant NEW_MAX_NETWORK_FEE = 30e6;
-
-    TangemAaveV3YieldModuleHarness internal yieldModule;
-
-    function setUp() public override {
-        super.setUp();
-        yieldModule = _deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
-
-        vm.prank(owner);
-        yieldModule.withdrawAndDeactivate(address(yieldToken));
-    }
+    /* ====================================================== reactivateToken ===================================================== */
 
     function test_reactivateToken_ReactivatesYieldToken() public {
         (, bool active,) = yieldModule.yieldTokensData(address(yieldToken));
