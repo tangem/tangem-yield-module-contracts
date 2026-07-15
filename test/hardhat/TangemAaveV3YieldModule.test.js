@@ -1,6 +1,6 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const { deployTestSetup } = require("../scripts/TestDeploy");
+const { deployTestSetup } = require("../../scripts/TestDeploy");
 
 describe("TangemBridgeProcessor", function () {
   const PRECISION = 10000;
