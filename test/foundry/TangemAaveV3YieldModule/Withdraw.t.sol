@@ -70,14 +70,31 @@ contract WithdrawTest is TangemAaveV3YieldModuleBase {
         assertEq(serviceFeeRate, newFeeRate);
     }
 
-    function test_withdraw_RevertsInsufficientFundsWhenAmountPlusFeeExceedsProtocolBalance()
-        public
-    {
-        uint tooMuch = INITIAL_OWNER_BALANCE + ACCUMULATED_REVENUE - serviceFee + 1;
+    // any amount up to protocolBalance - fee succeeds; the fee is always reserved
+    function testFuzz_withdraw(uint amount) public {
+        uint protocolBalance = INITIAL_OWNER_BALANCE + ACCUMULATED_REVENUE;
+        amount = bound(amount, 1, protocolBalance - serviceFee);
+
+        vm.prank(owner);
+        yieldModule.withdraw(address(yieldToken), amount);
+
+        assertEq(yieldToken.balanceOf(owner), amount);
+        assertEq(protocolToken.balanceOf(feeReceiver), serviceFee);
+        assertEq(
+            yieldModule.protocolBalance(address(yieldToken)),
+            protocolBalance - amount - serviceFee
+        );
+    }
+
+    function testFuzz_withdraw_RevertsInsufficientFundsWhenAmountPlusFeeExceedsProtocolBalance(
+        uint amount
+    ) public {
+        uint protocolBalance = INITIAL_OWNER_BALANCE + ACCUMULATED_REVENUE;
+        amount = bound(amount, protocolBalance - serviceFee + 1, type(uint128).max);
 
         vm.expectRevert(IYieldModule.InsufficientFunds.selector);
         vm.prank(owner);
-        yieldModule.withdraw(address(yieldToken), tooMuch);
+        yieldModule.withdraw(address(yieldToken), amount);
     }
 
     function test_withdraw_RevertsTokenNotActive() public {

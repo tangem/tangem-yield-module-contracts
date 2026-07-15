@@ -189,6 +189,64 @@ contract SwapTest is SwapTestBase {
         vm.expectRevert(IYieldModule.InsufficientFunds.selector);
         _swap(amountIn, _revertEmptyData());
     }
+
+    /// Seeds the three funding sources independently: protocol first (via owner enter),
+    /// then module residue and fresh owner balance. No revenue => service fee is zero.
+    function _seedFundingSources(uint moduleBalance, uint ownerBalance, uint protocolBalance) internal {
+        _mintYieldToken(owner, protocolBalance);
+        vm.prank(owner);
+        yieldModule.enterProtocolByOwner(tokenIn);
+
+        _mintYieldToken(address(yieldModule), moduleBalance);
+        _mintYieldToken(owner, ownerBalance);
+    }
+
+    // _prepareSwap funds the swap from module residue first, then owner, then protocol
+    function testFuzz_swap_FundsFromModuleThenOwnerThenProtocol(
+        uint amountIn,
+        uint moduleBalance,
+        uint ownerBalance,
+        uint protocolBalance
+    ) public {
+        moduleBalance = bound(moduleBalance, 0, 10_000e6);
+        ownerBalance = bound(ownerBalance, 0, 10_000e6);
+        protocolBalance = bound(protocolBalance, 1, 100_000e6);
+        amountIn = bound(amountIn, 1, moduleBalance + ownerBalance + protocolBalance);
+
+        _seedFundingSources(moduleBalance, ownerBalance, protocolBalance);
+
+        uint fromModule = amountIn < moduleBalance ? amountIn : moduleBalance;
+        uint fromOwner = amountIn - fromModule < ownerBalance ? amountIn - fromModule : ownerBalance;
+        uint fromProtocol = amountIn - fromModule - fromOwner;
+
+        uint sinkBalanceBefore = yieldToken.balanceOf(backend);
+
+        _swap(amountIn, _swapExactInData(address(0), amountIn, 0));
+
+        assertEq(yieldToken.balanceOf(backend) - sinkBalanceBefore, amountIn, "sink");
+        assertEq(yieldToken.balanceOf(address(yieldModule)), moduleBalance - fromModule, "module");
+        assertEq(yieldToken.balanceOf(owner), ownerBalance - fromOwner, "owner");
+        assertEq(yieldModule.protocolBalance(tokenIn), protocolBalance - fromProtocol, "protocol");
+        assertEq(yieldToken.allowance(address(yieldModule), address(swapProvider)), 0, "allowance");
+    }
+
+    function testFuzz_swap_RevertsInsufficientFundsWhenSourcesCannotCoverAmount(
+        uint amountIn,
+        uint moduleBalance,
+        uint ownerBalance,
+        uint protocolBalance
+    ) public {
+        moduleBalance = bound(moduleBalance, 0, 10_000e6);
+        ownerBalance = bound(ownerBalance, 0, 10_000e6);
+        protocolBalance = bound(protocolBalance, 1, 100_000e6);
+        uint total = moduleBalance + ownerBalance + protocolBalance;
+        amountIn = bound(amountIn, total + 1, 2 * total);
+
+        _seedFundingSources(moduleBalance, ownerBalance, protocolBalance);
+
+        vm.expectRevert(IYieldModule.InsufficientFunds.selector);
+        _swap(amountIn, _revertEmptyData());
+    }
 }
 
 contract SwapAndReceiveTest is SwapTestBase {
