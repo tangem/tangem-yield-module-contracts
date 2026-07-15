@@ -12,10 +12,7 @@ import { PRECISION } from "contracts/resources/Constants.sol";
 import { AaveV3PoolMock } from "contracts/test/AaveV3PoolMock.sol";
 
 contract SendTest is TangemAaveV3YieldModuleBase {
-    uint internal constant INITIAL_OWNER_BALANCE = 400_000e6;
-    uint internal constant ACCUMULATED_REVENUE = 10_000e6;
-    uint internal constant PROTOCOL_BALANCE = INITIAL_OWNER_BALANCE + ACCUMULATED_REVENUE;
-    uint internal constant FRESH_OWNER_BALANCE = 5_000e6;
+    uint internal constant SEND_FRESH_OWNER_BALANCE = 5_000e6;
     uint internal constant SEND_AMOUNT = 25_000e6;
 
     TangemAaveV3YieldModuleHarness internal yieldModule;
@@ -30,7 +27,7 @@ contract SendTest is TangemAaveV3YieldModuleBase {
         yieldModule = _deployYieldModuleWithFunds(owner, INITIAL_OWNER_BALANCE);
         _enterViaProcessor(yieldModule, 0);
 
-        _mintYieldToken(owner, FRESH_OWNER_BALANCE);
+        _mintYieldToken(owner, SEND_FRESH_OWNER_BALANCE);
         _generateRevenue(address(yieldModule), ACCUMULATED_REVENUE);
 
         serviceFee = ACCUMULATED_REVENUE * SERVICE_FEE_RATE / PRECISION;
@@ -43,7 +40,7 @@ contract SendTest is TangemAaveV3YieldModuleBase {
 
     function test_send_WithdrawsMissingAmountFromPoolToOwner() public {
         vm.expectEmit(address(pool));
-        emit AaveV3PoolMock.Withdraw(address(yieldToken), SEND_AMOUNT - FRESH_OWNER_BALANCE, owner);
+        emit AaveV3PoolMock.Withdraw(address(yieldToken), SEND_AMOUNT - SEND_FRESH_OWNER_BALANCE, owner);
 
         _send(SEND_AMOUNT);
     }
@@ -90,7 +87,7 @@ contract SendTest is TangemAaveV3YieldModuleBase {
         _setServiceFeeRate(newFeeRate);
 
         uint expectedProtocolBalance =
-            PROTOCOL_BALANCE - SEND_AMOUNT - serviceFee + FRESH_OWNER_BALANCE;
+            PROTOCOL_BALANCE - SEND_AMOUNT - serviceFee + SEND_FRESH_OWNER_BALANCE;
 
         (uint protocolBalance, uint serviceFeeRate) =
             yieldModule.latestFeePaymentStates(address(yieldToken));
@@ -134,8 +131,8 @@ contract SendTest is TangemAaveV3YieldModuleBase {
 
     // owner balance covers the amount first; only the missing part is pulled (with fee reserved)
     function testFuzz_send(uint amount) public {
-        amount = bound(amount, 1, FRESH_OWNER_BALANCE + PROTOCOL_BALANCE - serviceFee);
-        uint pullAmount = amount > FRESH_OWNER_BALANCE ? amount - FRESH_OWNER_BALANCE : 0;
+        amount = bound(amount, 1, SEND_FRESH_OWNER_BALANCE + PROTOCOL_BALANCE - serviceFee);
+        uint pullAmount = amount > SEND_FRESH_OWNER_BALANCE ? amount - SEND_FRESH_OWNER_BALANCE : 0;
 
         vm.prank(owner);
         yieldModule.send(address(yieldToken), receiver, amount);
@@ -159,7 +156,7 @@ contract SendTest is TangemAaveV3YieldModuleBase {
     function testFuzz_send_RevertsInsufficientFundsWhenPullAmountExceedsProtocolBalanceMinusFee(
         uint amount
     ) public {
-        uint maxAmount = FRESH_OWNER_BALANCE + PROTOCOL_BALANCE - serviceFee;
+        uint maxAmount = SEND_FRESH_OWNER_BALANCE + PROTOCOL_BALANCE - serviceFee;
         amount = bound(amount, maxAmount + 1, type(uint128).max);
 
         vm.expectRevert(IYieldModule.InsufficientFunds.selector);
