@@ -4,7 +4,7 @@
   "description": "EVM smart contracts for Tangem Yield Module",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "format:sol": "forge fmt"
   },
   "repository": {
     "type": "git",
