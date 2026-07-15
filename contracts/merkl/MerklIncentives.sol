@@ -36,31 +36,26 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
     }
 
     function claimMerklRewardsOwner(
-        address _distributor,
         address[] calldata rewardTokens,
         uint256[] calldata cumulativeAmounts,
         bytes32[][] calldata proofs
     ) external onlyOwner nonReentrant {
-        _claimMerklRewards(_distributor, rewardTokens, cumulativeAmounts, proofs);
+        _claimMerklRewards(rewardTokens, cumulativeAmounts, proofs);
     }
 
     function claimMerklRewardsBE(
-        address _distributor,
         address[] calldata rewardTokens,
         uint256[] calldata cumulativeAmounts,
         bytes32[][] calldata proofs
     ) external onlyProcessor nonReentrant {
-        _claimMerklRewards(_distributor, rewardTokens, cumulativeAmounts, proofs);
+        _claimMerklRewards(rewardTokens, cumulativeAmounts, proofs);
     }
 
     function _claimMerklRewards(
-        address _distributor, // TODO: mb remove this parameter?
         address[] calldata rewardTokens,
         uint256[] calldata cumulativeAmounts,
         bytes32[][] calldata proofs
     ) private {
-        // TODO: if we remove the distributor parameter, we cat remove this check
-        require(_distributor == address(distributor), DistributorNotAllowed(address(distributor)));
         require(rewardTokens.length > 0, RewardTokensEmpty());
         require(
             rewardTokens.length == cumulativeAmounts.length
