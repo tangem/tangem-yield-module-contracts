@@ -5,6 +5,34 @@ pragma solidity ^0.8.29;
 import { TangemAaveV3YieldModuleHarness } from "../harnesses/TangemAaveV3YieldModuleHarness.sol";
 import { TangemAaveV3YieldModuleBase } from "./base/TangemAaveV3YieldModuleBase.sol";
 
+import { PRECISION } from "contracts/resources/Constants.sol";
+
+contract ServiceFeeViewsTest is TangemAaveV3YieldModuleBase {
+    uint internal constant INITIAL_OWNER_BALANCE = 200_000e6;
+
+    function test_calculateServiceFee_AfterRevenue() public {
+        TangemAaveV3YieldModuleHarness yieldModule =
+            _deployEnteredYieldModule(owner, INITIAL_OWNER_BALANCE);
+        uint revenue = 10_000e6;
+
+        _generateRevenue(address(yieldModule), revenue);
+
+        uint expectedFee = revenue * SERVICE_FEE_RATE / PRECISION;
+        assertEq(yieldModule.calculateServiceFee(address(yieldToken)), expectedFee);
+    }
+
+    // example of pre-seeding internal state through the harness
+    function test_calculateServiceFee_IncludesPreseededFeeDebt() public {
+        TangemAaveV3YieldModuleHarness yieldModule =
+            _deployEnteredYieldModule(owner, INITIAL_OWNER_BALANCE);
+        uint feeDebt = 700e6;
+
+        yieldModule.exposed_setFeeDebt(address(yieldToken), feeDebt);
+
+        assertEq(yieldModule.calculateServiceFee(address(yieldToken)), feeDebt);
+    }
+}
+
 contract FeeDebtAndEffectiveBalancesTest is TangemAaveV3YieldModuleBase {
     TangemAaveV3YieldModuleHarness internal yieldModule;
     uint internal remainingFeeDebt;
