@@ -370,12 +370,24 @@ contract EnterProtocolTest is TangemAaveV3YieldModuleBase {
         _enterViaProcessor(yieldModule, NETWORK_FEE);
     }
 
-    function test_enterProtocol_RevertsNetworkFeeExceedsMax() public {
+    function testFuzz_enterProtocol_AnyNetworkFeeUpToMax(uint networkFee) public {
+        networkFee = bound(networkFee, 0, DEFAULT_MAX_NETWORK_FEE);
+
+        _enterViaProcessor(yieldModule, networkFee);
+
+        assertEq(yieldModule.protocolBalance(address(yieldToken)), TOTAL_ENTER_AMOUNT - networkFee);
+        assertEq(protocolToken.balanceOf(feeReceiver), networkFee);
+
+        (uint protocolBalance,) = yieldModule.latestFeePaymentStates(address(yieldToken));
+        assertEq(protocolBalance, TOTAL_ENTER_AMOUNT - networkFee);
+    }
+
+    function testFuzz_enterProtocol_RevertsNetworkFeeExceedsMax(uint networkFee) public {
+        networkFee = bound(networkFee, uint(DEFAULT_MAX_NETWORK_FEE) + 1, type(uint128).max);
+
         vm.expectRevert(IYieldModule.NetworkFeeExceedsMax.selector);
         vm.prank(backend);
-        processor.enterProtocol(
-            address(yieldModule), address(yieldToken), uint(DEFAULT_MAX_NETWORK_FEE) + 1
-        );
+        processor.enterProtocol(address(yieldModule), address(yieldToken), networkFee);
     }
 
     function test_enterProtocol_RevertsNetworkFeeExceedsAmount() public {
@@ -470,5 +482,31 @@ contract EnterProtocolTest is TangemAaveV3YieldModuleBase {
         );
 
         _enterViaProcessor(yieldModule, NETWORK_FEE);
+    }
+
+    // fee is computed with the rate stored at the previous payment; the new rate is stored for later
+    function testFuzz_enterProtocol_ConsecutiveEnter(uint revenue, uint newFeeRate) public {
+        revenue = bound(revenue, 0, 1_000_000e6);
+        newFeeRate = bound(newFeeRate, 0, PRECISION);
+
+        vm.prank(owner);
+        yieldModule.enterProtocolByOwner(address(yieldToken));
+
+        _mintYieldToken(owner, FRESH_OWNER_BALANCE);
+        _generateRevenue(address(yieldModule), revenue);
+        _setServiceFeeRate(newFeeRate);
+
+        uint serviceFee = revenue * SERVICE_FEE_RATE / PRECISION;
+
+        _enterViaProcessor(yieldModule, NETWORK_FEE);
+
+        (uint protocolBalance, uint storedFeeRate) =
+            yieldModule.latestFeePaymentStates(address(yieldToken));
+        assertEq(
+            protocolBalance,
+            TOTAL_ENTER_AMOUNT + revenue + FRESH_OWNER_BALANCE - serviceFee - NETWORK_FEE
+        );
+        assertEq(storedFeeRate, newFeeRate);
+        assertEq(protocolToken.balanceOf(feeReceiver), serviceFee + NETWORK_FEE);
     }
 }

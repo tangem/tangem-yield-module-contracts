@@ -132,17 +132,38 @@ contract SendTest is TangemAaveV3YieldModuleBase {
         _send(SEND_AMOUNT);
     }
 
-    function test_send_RevertsInsufficientFundsWhenPullAmountExceedsProtocolBalanceMinusFee()
-        public
-    {
-        uint protocolBalance = yieldModule.protocolBalance(address(yieldToken));
-        uint fee = yieldModule.calculateServiceFee(address(yieldToken));
+    // owner balance covers the amount first; only the missing part is pulled (with fee reserved)
+    function testFuzz_send(uint amount) public {
+        amount = bound(amount, 1, FRESH_OWNER_BALANCE + PROTOCOL_BALANCE - serviceFee);
+        uint pullAmount = amount > FRESH_OWNER_BALANCE ? amount - FRESH_OWNER_BALANCE : 0;
 
-        // pullAmount = protocolBalance - fee + 1 => must fail due to fee reservation
-        uint sendAmount = FRESH_OWNER_BALANCE + protocolBalance - fee + 1;
+        vm.prank(owner);
+        yieldModule.send(address(yieldToken), receiver, amount);
+
+        assertEq(yieldToken.balanceOf(receiver), amount, "receiver");
+
+        if (pullAmount > 0) {
+            assertEq(
+                yieldModule.protocolBalance(address(yieldToken)),
+                PROTOCOL_BALANCE - pullAmount - serviceFee,
+                "protocol"
+            );
+            assertEq(protocolToken.balanceOf(feeReceiver), serviceFee, "fee");
+        } else {
+            // protocol untouched => no fee processed
+            assertEq(yieldModule.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE, "protocol");
+            assertEq(protocolToken.balanceOf(feeReceiver), 0, "fee");
+        }
+    }
+
+    function testFuzz_send_RevertsInsufficientFundsWhenPullAmountExceedsProtocolBalanceMinusFee(
+        uint amount
+    ) public {
+        uint maxAmount = FRESH_OWNER_BALANCE + PROTOCOL_BALANCE - serviceFee;
+        amount = bound(amount, maxAmount + 1, type(uint128).max);
 
         vm.expectRevert(IYieldModule.InsufficientFunds.selector);
         vm.prank(owner);
-        yieldModule.send(address(yieldToken), receiver, sendAmount);
+        yieldModule.send(address(yieldToken), receiver, amount);
     }
 }

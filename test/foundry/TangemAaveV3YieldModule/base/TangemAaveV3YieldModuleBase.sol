@@ -23,6 +23,9 @@ abstract contract TangemAaveV3YieldModuleBase is TangemBaseTest {
     bytes32 internal constant FEE_PAYMENT_FAILED_EVENT_SIG =
         keccak256("FeePaymentFailed(address,uint256)");
 
+    uint internal constant FEE_DEBT_SCENARIO_DEPOSIT = 100_000e6;
+    uint internal constant FEE_DEBT_SCENARIO_REVENUE = 10_000e6;
+
     TestERC20 public yieldToken;
     TestERC20 public protocolToken;
     TangemERC2771Forwarder public forwarder;
@@ -123,28 +126,37 @@ abstract contract TangemAaveV3YieldModuleBase is TangemBaseTest {
         internal
         returns (TangemAaveV3YieldModuleHarness yieldModule, uint remainingFeeDebt)
     {
-        uint deposit = 100_000e6;
-        uint revenue = 10_000e6;
         uint smallDeposit = 1e6;
-        uint expectedDebt = revenue * SERVICE_FEE_RATE / PRECISION;
+        uint feeDebt;
+        (yieldModule, feeDebt) = _createFeeDebtState(moduleOwner, smallDeposit);
+        remainingFeeDebt = feeDebt - smallDeposit;
+    }
+
+    /// Same scenario with a configurable re-enter deposit (paid toward the debt).
+    /// Returns the full debt as it was before the re-enter payment.
+    function _createFeeDebtState(
+        address moduleOwner,
+        uint reEnterDeposit
+    ) internal returns (TangemAaveV3YieldModuleHarness yieldModule, uint feeDebt) {
+        feeDebt = FEE_DEBT_SCENARIO_REVENUE * SERVICE_FEE_RATE / PRECISION;
 
         yieldModule = _deployYieldModule(moduleOwner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
-        _mintYieldToken(moduleOwner, deposit);
+        _mintYieldToken(moduleOwner, FEE_DEBT_SCENARIO_DEPOSIT);
         vm.prank(moduleOwner);
         yieldToken.approve(address(yieldModule), type(uint).max);
 
         _enterViaProcessor(yieldModule, 0);
-        _generateRevenue(address(yieldModule), revenue);
+        _generateRevenue(address(yieldModule), FEE_DEBT_SCENARIO_REVENUE);
 
         // revoke allowance so the exit fee payment (owner transferFrom path) fails => debt persists
         vm.prank(moduleOwner);
         yieldToken.approve(address(yieldModule), 0);
 
         vm.expectEmit(address(yieldModule));
-        emit IYieldModule.FeePaymentFailed(address(yieldToken), expectedDebt);
+        emit IYieldModule.FeePaymentFailed(address(yieldToken), feeDebt);
         _exitViaProcessor(yieldModule, 0);
 
-        // remove withdrawn funds so the re-enter below pushes protocol balance below the debt
+        // remove withdrawn funds so the re-enter below controls the protocol balance exactly
         uint ownerBalanceAfterExit = yieldToken.balanceOf(moduleOwner);
         vm.prank(moduleOwner);
         yieldToken.transfer(backend, ownerBalanceAfterExit);
@@ -152,13 +164,11 @@ abstract contract TangemAaveV3YieldModuleBase is TangemBaseTest {
         vm.prank(moduleOwner);
         yieldModule.reactivateToken(address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
 
-        _mintYieldToken(moduleOwner, smallDeposit);
+        _mintYieldToken(moduleOwner, reEnterDeposit);
         vm.startPrank(moduleOwner);
         yieldToken.approve(address(yieldModule), type(uint).max);
         yieldModule.enterProtocolByOwner(address(yieldToken));
         vm.stopPrank();
-
-        remainingFeeDebt = expectedDebt - smallDeposit;
     }
 
     function _enterViaProcessor(
