@@ -27,10 +27,8 @@ contract WithdrawTest is TangemAaveV3YieldModuleBase {
         super.setUp();
 
         // Main module: funded, entered, revenue generated (withdraw & withdrawAndDeactivate)
-        yieldModule = _deployYieldModuleWithFunds(owner, INITIAL_OWNER_BALANCE);
-        _enterViaProcessor(yieldModule, 0);
-        _generateRevenue(address(yieldModule), ACCUMULATED_REVENUE);
-        serviceFee = ACCUMULATED_REVENUE * SERVICE_FEE_RATE / PRECISION;
+        yieldModule = _deployEnteredRevenueModule(owner);
+        serviceFee = ACCUMULATED_SERVICE_FEE;
 
         // Separate module with no active yield token (withdrawNonYieldToken tests)
         nonYieldModule = _deployYieldModule(nonYieldOwner, address(0), 0);
@@ -44,8 +42,7 @@ contract WithdrawTest is TangemAaveV3YieldModuleBase {
         vm.expectEmit(address(pool));
         emit AaveV3PoolMock.Withdraw(address(yieldToken), WITHDRAW_AMOUNT, owner);
 
-        vm.prank(owner);
-        yieldModule.withdraw(address(yieldToken), WITHDRAW_AMOUNT);
+        _withdraw(yieldModule, owner, address(yieldToken), WITHDRAW_AMOUNT);
     }
 
     function test_withdraw_ProcessesServiceFeeAndEmitsWithdrawProcessed() public {
@@ -56,8 +53,7 @@ contract WithdrawTest is TangemAaveV3YieldModuleBase {
         vm.expectEmit(address(yieldModule));
         emit IYieldModule.WithdrawProcessed(address(yieldToken), WITHDRAW_AMOUNT);
 
-        vm.prank(owner);
-        yieldModule.withdraw(address(yieldToken), WITHDRAW_AMOUNT);
+        _withdraw(yieldModule, owner, address(yieldToken), WITHDRAW_AMOUNT);
     }
 
     function test_withdraw_UpdatesLatestFeePaymentState() public {
@@ -70,8 +66,7 @@ contract WithdrawTest is TangemAaveV3YieldModuleBase {
         assertEq(protocolBalance, INITIAL_OWNER_BALANCE);
         assertEq(serviceFeeRate, SERVICE_FEE_RATE);
 
-        vm.prank(owner);
-        yieldModule.withdraw(address(yieldToken), WITHDRAW_AMOUNT);
+        _withdraw(yieldModule, owner, address(yieldToken), WITHDRAW_AMOUNT);
 
         (protocolBalance, serviceFeeRate) = yieldModule.latestFeePaymentStates(address(yieldToken));
         assertEq(protocolBalance, expectedProtocolBalance);
@@ -82,8 +77,7 @@ contract WithdrawTest is TangemAaveV3YieldModuleBase {
     function testFuzz_withdraw(uint amount) public {
         amount = bound(amount, 1, PROTOCOL_BALANCE - serviceFee);
 
-        vm.prank(owner);
-        yieldModule.withdraw(address(yieldToken), amount);
+        _withdraw(yieldModule, owner, address(yieldToken), amount);
 
         assertEq(yieldToken.balanceOf(owner), amount);
         assertEq(protocolToken.balanceOf(feeReceiver), serviceFee);
@@ -94,23 +88,19 @@ contract WithdrawTest is TangemAaveV3YieldModuleBase {
         amount = bound(amount, PROTOCOL_BALANCE - serviceFee + 1, type(uint128).max);
 
         vm.expectRevert(IYieldModule.InsufficientFunds.selector);
-        vm.prank(owner);
-        yieldModule.withdraw(address(yieldToken), amount);
+        _withdraw(yieldModule, owner, address(yieldToken), amount);
     }
 
     function test_withdraw_RevertsTokenNotActive() public {
-        vm.prank(owner);
-        yieldModule.withdrawAndDeactivate(address(yieldToken));
+        _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
 
         vm.expectRevert(IYieldModule.TokenNotActive.selector);
-        vm.prank(owner);
-        yieldModule.withdraw(address(yieldToken), 1e6);
+        _withdraw(yieldModule, owner, address(yieldToken), 1e6);
     }
 
     function test_withdraw_RevertsZeroAmount() public {
         vm.expectRevert(Requires.ZeroAmount.selector);
-        vm.prank(owner);
-        yieldModule.withdraw(address(yieldToken), 0);
+        _withdraw(yieldModule, owner, address(yieldToken), 0);
     }
 
     function test_withdraw_RevertsOnlyOwner() public {
@@ -145,16 +135,14 @@ contract WithdrawTest is TangemAaveV3YieldModuleBase {
         vm.expectEmit(address(pool));
         emit AaveV3PoolMock.Withdraw(address(yieldToken), PROTOCOL_BALANCE - serviceFee, owner);
 
-        vm.prank(owner);
-        yieldModule.withdrawAndDeactivate(address(yieldToken));
+        _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
     }
 
     function test_withdrawAndDeactivate_DeactivatesYieldToken() public {
         (, bool active,) = yieldModule.yieldTokensData(address(yieldToken));
         assertTrue(active);
 
-        vm.prank(owner);
-        yieldModule.withdrawAndDeactivate(address(yieldToken));
+        _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
 
         (, active,) = yieldModule.yieldTokensData(address(yieldToken));
         assertFalse(active);
@@ -170,8 +158,7 @@ contract WithdrawTest is TangemAaveV3YieldModuleBase {
         vm.expectEmit(address(yieldModule));
         emit IYieldModule.WithdrawAndDeactivateProcessed(address(yieldToken), PROTOCOL_BALANCE - serviceFee);
 
-        vm.prank(owner);
-        yieldModule.withdrawAndDeactivate(address(yieldToken));
+        _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
     }
 
     function test_withdrawAndDeactivate_SetsLatestFeePaymentState() public {
@@ -182,8 +169,7 @@ contract WithdrawTest is TangemAaveV3YieldModuleBase {
         assertEq(protocolBalance, INITIAL_OWNER_BALANCE);
         assertEq(serviceFeeRate, SERVICE_FEE_RATE);
 
-        vm.prank(owner);
-        yieldModule.withdrawAndDeactivate(address(yieldToken));
+        _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
 
         (protocolBalance, serviceFeeRate) = yieldModule.latestFeePaymentStates(address(yieldToken));
         assertEq(protocolBalance, 0);
@@ -194,16 +180,14 @@ contract WithdrawTest is TangemAaveV3YieldModuleBase {
         vm.expectEmit(address(protocolToken));
         emit IERC20.Transfer(address(yieldModule), feeReceiver, serviceFee);
 
-        vm.prank(owner);
-        yieldModule.withdrawAndDeactivate(address(yieldToken));
+        _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
     }
 
     function test_withdrawAndDeactivate_EmitsFeePaymentProcessed() public {
         vm.expectEmit(address(yieldModule));
         emit IYieldModule.FeePaymentProcessed(address(yieldToken), serviceFee, feeReceiver);
 
-        vm.prank(owner);
-        yieldModule.withdrawAndDeactivate(address(yieldToken));
+        _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
     }
 
     function test_withdrawAndDeactivate_SyncsLatestFeePaymentStateWithoutFeeWhenFeeIsZero() public {

@@ -30,7 +30,7 @@ contract SendTest is TangemAaveV3YieldModuleBase {
         _mintYieldToken(owner, SEND_FRESH_OWNER_BALANCE);
         _generateRevenue(address(yieldModule), ACCUMULATED_REVENUE);
 
-        serviceFee = ACCUMULATED_REVENUE * SERVICE_FEE_RATE / PRECISION;
+        serviceFee = ACCUMULATED_SERVICE_FEE;
     }
 
     function _send(uint amount) internal {

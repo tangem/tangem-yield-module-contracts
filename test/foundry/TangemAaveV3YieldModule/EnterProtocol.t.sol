@@ -133,7 +133,7 @@ contract EnterProtocolTest is TangemAaveV3YieldModuleBase {
 
     /// first enter without a network fee, then accumulate revenue and change the fee rate
     function _setupConsecutiveEnter() internal returns (uint serviceFee) {
-        serviceFee = ACCUMULATED_REVENUE * SERVICE_FEE_RATE / PRECISION;
+        serviceFee = ACCUMULATED_SERVICE_FEE;
 
         vm.prank(owner);
         yieldModule.enterProtocolByOwner(address(yieldToken));
@@ -270,7 +270,7 @@ contract EnterProtocolTest is TangemAaveV3YieldModuleBase {
 
     /// enter all, accumulate revenue, mint fresh funds, change the fee rate
     function _setupConsecutiveEnterByOwner() internal returns (uint serviceFee) {
-        serviceFee = ACCUMULATED_REVENUE * SERVICE_FEE_RATE / PRECISION;
+        serviceFee = ACCUMULATED_SERVICE_FEE;
 
         _enterByOwner();
         _mintYieldToken(owner, FRESH_OWNER_BALANCE);
@@ -319,7 +319,7 @@ contract EnterProtocolTest is TangemAaveV3YieldModuleBase {
     }
 
     function _setupConsecutiveEnterByOwnerAmount() internal returns (uint serviceFee) {
-        serviceFee = ACCUMULATED_REVENUE * SERVICE_FEE_RATE / PRECISION;
+        serviceFee = ACCUMULATED_SERVICE_FEE;
 
         _enterByOwnerAmount(ENTER_AMOUNT);
         _mintYieldToken(amountOwner, FRESH_OWNER_BALANCE);
