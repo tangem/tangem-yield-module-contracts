@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
+import { Vm } from "forge-std/src/Test.sol";
+
 import { TangemAaveV3YieldModuleHarness } from "test/foundry/harnesses/TangemAaveV3YieldModuleHarness.sol";
 import { TangemBaseTest } from "test/foundry/helpers/TangemBaseTest.sol";
 
@@ -222,6 +224,12 @@ abstract contract TangemAaveV3YieldModuleBase is TangemBaseTest {
     /// Simulates protocol yield by minting protocol (aave) tokens to the account.
     function _generateRevenue(address account, uint amount) internal {
         pool.generateRevenue(account, amount);
+    }
+
+    function _assertEventNotEmitted(Vm.Log[] memory entries, bytes32 eventSig) internal pure {
+        for (uint i; i < entries.length; i++) {
+            require(entries[i].topics[0] != eventSig, "expected event not to be emitted");
+        }
     }
 
     function _labelAddresses() internal {

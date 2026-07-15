@@ -1,3 +1,5 @@
+.PHONY: coverage gas_snapshot
+
 coverage:
 	forge coverage --report lcov
 	genhtml --ignore-errors inconsistent --ignore-errors corrupt --ignore-errors category -o ./coverage_report ./lcov.info
