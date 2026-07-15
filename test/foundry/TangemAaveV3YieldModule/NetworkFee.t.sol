@@ -7,7 +7,7 @@ import { TangemAaveV3YieldModuleBase } from "./base/TangemAaveV3YieldModuleBase.
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
-contract SetYieldTokenMaxNetworkFeeTest is TangemAaveV3YieldModuleBase {
+contract NetworkFeeTest is TangemAaveV3YieldModuleBase {
     uint240 internal constant NEW_MAX_NETWORK_FEE = 5e6;
 
     TangemAaveV3YieldModuleHarness internal yieldModule;

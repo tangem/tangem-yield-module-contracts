@@ -18,11 +18,8 @@ contract ExitProtocolTest is TangemAaveV3YieldModuleBase {
     function setUp() public override {
         super.setUp();
 
-        yieldModule = _deployYieldModuleWithFunds(owner, INITIAL_OWNER_BALANCE);
-        _enterViaProcessor(yieldModule, 0);
-        _generateRevenue(address(yieldModule), ACCUMULATED_REVENUE);
-
-        serviceFee = ACCUMULATED_REVENUE * SERVICE_FEE_RATE / PRECISION;
+        yieldModule = _deployEnteredRevenueModule(owner);
+        serviceFee = ACCUMULATED_SERVICE_FEE;
     }
 
     function test_exitProtocol_WithdrawsTotalProtocolBalanceToOwner() public {

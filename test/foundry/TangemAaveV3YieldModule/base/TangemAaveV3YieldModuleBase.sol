@@ -30,6 +30,8 @@ abstract contract TangemAaveV3YieldModuleBase is TangemBaseTest {
     uint internal constant INITIAL_MODULE_BALANCE = 50_000e6;
     uint internal constant TOTAL_ENTER_AMOUNT = INITIAL_OWNER_BALANCE + INITIAL_MODULE_BALANCE;
     uint internal constant ACCUMULATED_REVENUE = 10_000e6;
+    // service fee derived from ACCUMULATED_REVENUE at the default SERVICE_FEE_RATE
+    uint internal constant ACCUMULATED_SERVICE_FEE = ACCUMULATED_REVENUE * SERVICE_FEE_RATE / PRECISION;
     // protocol balance after entering INITIAL_OWNER_BALANCE and generating ACCUMULATED_REVENUE
     uint internal constant PROTOCOL_BALANCE = INITIAL_OWNER_BALANCE + ACCUMULATED_REVENUE;
     uint internal constant FRESH_OWNER_BALANCE = 50_000e6;
@@ -134,6 +136,16 @@ abstract contract TangemAaveV3YieldModuleBase is TangemBaseTest {
         yieldModule.enterProtocolByOwner(address(yieldToken));
     }
 
+    /// Full scenario: deployed, entered and revenue generated (standard ACCUMULATED_REVENUE).
+    function _deployEnteredRevenueModule(address moduleOwner)
+        internal
+        returns (TangemAaveV3YieldModuleHarness yieldModule)
+    {
+        yieldModule = _deployYieldModuleWithFunds(moduleOwner, INITIAL_OWNER_BALANCE);
+        _enterViaProcessor(yieldModule, 0);
+        _generateRevenue(address(yieldModule), ACCUMULATED_REVENUE);
+    }
+
     /// Scenario: fee debt persisted after failed fee payment, protocol balance below the debt.
     /// Mirrors the hardhat "Fee debt persistence" setup: enter, generate revenue, force fee
     /// failure on exit, then reactivate and re-enter with a small deposit (paid toward the debt).
@@ -156,10 +168,7 @@ abstract contract TangemAaveV3YieldModuleBase is TangemBaseTest {
     ) internal returns (TangemAaveV3YieldModuleHarness yieldModule, uint feeDebt) {
         feeDebt = FEE_DEBT_SCENARIO_REVENUE * SERVICE_FEE_RATE / PRECISION;
 
-        yieldModule = _deployYieldModule(moduleOwner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
-        _mintYieldToken(moduleOwner, FEE_DEBT_SCENARIO_DEPOSIT);
-        vm.prank(moduleOwner);
-        yieldToken.approve(address(yieldModule), type(uint).max);
+        yieldModule = _deployYieldModuleWithFunds(moduleOwner, FEE_DEBT_SCENARIO_DEPOSIT);
 
         _enterViaProcessor(yieldModule, 0);
         _generateRevenue(address(yieldModule), FEE_DEBT_SCENARIO_REVENUE);
@@ -206,6 +215,25 @@ abstract contract TangemAaveV3YieldModuleBase is TangemBaseTest {
     function _collectViaProcessor(TangemAaveV3YieldModuleHarness yieldModule) internal {
         vm.prank(backend);
         processor.collectServiceFee(address(yieldModule), address(yieldToken));
+    }
+
+    function _withdraw(
+        TangemAaveV3YieldModuleHarness yieldModule,
+        address moduleOwner,
+        address token,
+        uint amount
+    ) internal {
+        vm.prank(moduleOwner);
+        yieldModule.withdraw(token, amount);
+    }
+
+    function _withdrawAndDeactivate(
+        TangemAaveV3YieldModuleHarness yieldModule,
+        address moduleOwner,
+        address token
+    ) internal {
+        vm.prank(moduleOwner);
+        yieldModule.withdrawAndDeactivate(token);
     }
 
     function _setServiceFeeRate(uint feeRate) internal {
