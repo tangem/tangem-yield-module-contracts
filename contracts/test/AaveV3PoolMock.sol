@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol";
 import "./TestERC20.sol";
+import "@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol";
 
 contract AaveV3PoolMock {
-
-    event Supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode);
-    event Withdraw(address asset, uint256 amount, address to);
+    event Supply(address asset, uint amount, address onBehalfOf, uint16 referralCode);
+    event Withdraw(address asset, uint amount, address to);
     event GenerateRevenue(address account, uint amount);
 
     TestERC20 public aToken;
@@ -36,15 +35,15 @@ contract AaveV3PoolMock {
         );
     }
 
-    function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external {
+    function supply(address asset, uint amount, address onBehalfOf, uint16 referralCode) external {
         IERC20(asset).transferFrom(msg.sender, address(this), amount);
         aToken.mint(msg.sender, amount);
 
         emit Supply(asset, amount, onBehalfOf, referralCode);
     }
 
-    function withdraw(address asset, uint256 amount, address to) external returns (uint) {
-        if (amount == type(uint256).max) {
+    function withdraw(address asset, uint amount, address to) external returns (uint) {
+        if (amount == type(uint).max) {
             amount = aToken.balanceOf(msg.sender);
         }
 

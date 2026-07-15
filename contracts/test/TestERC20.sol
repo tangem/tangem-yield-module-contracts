@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract TestERC20 is ERC20, Ownable {
     uint fixedTax = 0;
@@ -23,7 +23,7 @@ contract TestERC20 is ERC20, Ownable {
         fixedTax = tax;
     }
 
-    function _update(address from, address to, uint256 value) internal override {
+    function _update(address from, address to, uint value) internal override {
         super._update(from, to, value - fixedTax);
 
         if (fixedTax > 0) {

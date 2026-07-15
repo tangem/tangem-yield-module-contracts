@@ -9,13 +9,10 @@ contract SwapProviderMock {
     function swapExactIn(
         address tokenIn,
         address tokenOut,
-        uint256 amountIn,
-        uint256 amountOut,
+        uint amountIn,
+        uint amountOut,
         address sink
-    ) 
-        external 
-        payable 
-    {
+    ) external payable {
         IERC20(tokenIn).transferFrom(msg.sender, sink, amountIn);
 
         if (tokenOut != address(0) && amountOut > 0) {
@@ -23,25 +20,12 @@ contract SwapProviderMock {
         }
     }
 
-    function spendPartial(
-        address tokenIn,
-        uint256 amountIn,
-        address sink
-    ) 
-        external 
-    {
+    function spendPartial(address tokenIn, uint amountIn, address sink) external {
         require(amountIn > 0, "amountIn=0");
         IERC20(tokenIn).transferFrom(msg.sender, sink, amountIn - 1);
     }
 
-    function swapNoPayout(
-        address tokenIn,
-        uint256 amountIn,
-        address sink
-    ) 
-        external 
-        payable 
-    {
+    function swapNoPayout(address tokenIn, uint amountIn, address sink) external payable {
         IERC20(tokenIn).transferFrom(msg.sender, sink, amountIn);
     }
 
