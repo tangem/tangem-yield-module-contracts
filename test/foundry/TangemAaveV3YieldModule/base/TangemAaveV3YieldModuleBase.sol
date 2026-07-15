@@ -25,8 +25,22 @@ abstract contract TangemAaveV3YieldModuleBase is TangemBaseTest {
     bytes32 internal constant FEE_PAYMENT_FAILED_EVENT_SIG =
         keccak256("FeePaymentFailed(address,uint256)");
 
+    /* Common scenario amounts shared by the feature suites */
+    uint internal constant INITIAL_OWNER_BALANCE = 400_000e6;
+    uint internal constant INITIAL_MODULE_BALANCE = 50_000e6;
+    uint internal constant TOTAL_ENTER_AMOUNT = INITIAL_OWNER_BALANCE + INITIAL_MODULE_BALANCE;
+    uint internal constant ACCUMULATED_REVENUE = 10_000e6;
+    // protocol balance after entering INITIAL_OWNER_BALANCE and generating ACCUMULATED_REVENUE
+    uint internal constant PROTOCOL_BALANCE = INITIAL_OWNER_BALANCE + ACCUMULATED_REVENUE;
+    uint internal constant FRESH_OWNER_BALANCE = 50_000e6;
+    uint internal constant NEW_FEE_RATE = 2_000;
+    // must stay below DEFAULT_MAX_NETWORK_FEE
+    uint internal constant NETWORK_FEE = 1e6;
+
     uint internal constant FEE_DEBT_SCENARIO_DEPOSIT = 100_000e6;
     uint internal constant FEE_DEBT_SCENARIO_REVENUE = 10_000e6;
+    uint internal constant FEE_DEBT_SCENARIO_DEBT =
+        FEE_DEBT_SCENARIO_REVENUE * SERVICE_FEE_RATE / PRECISION;
 
     TestERC20 public yieldToken;
     TestERC20 public protocolToken;

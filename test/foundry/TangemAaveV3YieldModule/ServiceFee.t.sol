@@ -8,11 +8,11 @@ import { TangemAaveV3YieldModuleBase } from "./base/TangemAaveV3YieldModuleBase.
 import { PRECISION } from "contracts/resources/Constants.sol";
 
 contract ServiceFeeViewsTest is TangemAaveV3YieldModuleBase {
-    uint internal constant INITIAL_OWNER_BALANCE = 200_000e6;
+    uint internal constant SF_INITIAL_OWNER_BALANCE = 200_000e6;
 
     function test_calculateServiceFee_AfterRevenue() public {
         TangemAaveV3YieldModuleHarness yieldModule =
-            _deployEnteredYieldModule(owner, INITIAL_OWNER_BALANCE);
+            _deployEnteredYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
         uint revenue = 10_000e6;
 
         _generateRevenue(address(yieldModule), revenue);
@@ -24,7 +24,7 @@ contract ServiceFeeViewsTest is TangemAaveV3YieldModuleBase {
     // example of pre-seeding internal state through the harness
     function test_calculateServiceFee_IncludesPreseededFeeDebt() public {
         TangemAaveV3YieldModuleHarness yieldModule =
-            _deployEnteredYieldModule(owner, INITIAL_OWNER_BALANCE);
+            _deployEnteredYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
         uint feeDebt = 700e6;
 
         yieldModule.exposed_setFeeDebt(address(yieldToken), feeDebt);
@@ -34,14 +34,14 @@ contract ServiceFeeViewsTest is TangemAaveV3YieldModuleBase {
 
     function testFuzz_calculateServiceFee(uint revenue, uint feeRate, uint feeDebt) public {
         TangemAaveV3YieldModuleHarness yieldModule =
-            _deployEnteredYieldModule(owner, INITIAL_OWNER_BALANCE);
+            _deployEnteredYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
         revenue = bound(revenue, 0, 1_000_000_000e6);
         feeRate = bound(feeRate, 0, PRECISION);
         feeDebt = bound(feeDebt, 0, 1_000_000e6);
 
         // the fee is computed with the rate stored at the latest fee payment
         yieldModule.exposed_setLatestFeePaymentState(
-            address(yieldToken), INITIAL_OWNER_BALANCE, feeRate
+            address(yieldToken), SF_INITIAL_OWNER_BALANCE, feeRate
         );
         yieldModule.exposed_setFeeDebt(address(yieldToken), feeDebt);
         _generateRevenue(address(yieldModule), revenue);
@@ -52,19 +52,19 @@ contract ServiceFeeViewsTest is TangemAaveV3YieldModuleBase {
 
     function testFuzz_effectiveBalances(uint revenue, uint feeRate, uint feeDebt) public {
         TangemAaveV3YieldModuleHarness yieldModule =
-            _deployEnteredYieldModule(owner, INITIAL_OWNER_BALANCE);
+            _deployEnteredYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
         revenue = bound(revenue, 0, 1_000_000e6);
         feeRate = bound(feeRate, 0, PRECISION);
         // large debts make the fee exceed the protocol balance => clamping branch
-        feeDebt = bound(feeDebt, 0, 2 * INITIAL_OWNER_BALANCE);
+        feeDebt = bound(feeDebt, 0, 2 * SF_INITIAL_OWNER_BALANCE);
 
         yieldModule.exposed_setLatestFeePaymentState(
-            address(yieldToken), INITIAL_OWNER_BALANCE, feeRate
+            address(yieldToken), SF_INITIAL_OWNER_BALANCE, feeRate
         );
         yieldModule.exposed_setFeeDebt(address(yieldToken), feeDebt);
         _generateRevenue(address(yieldModule), revenue);
 
-        uint protocolBalance = INITIAL_OWNER_BALANCE + revenue;
+        uint protocolBalance = SF_INITIAL_OWNER_BALANCE + revenue;
         uint fee = yieldModule.calculateServiceFee(address(yieldToken));
         uint expectedEffective = protocolBalance > fee ? protocolBalance - fee : 0;
 

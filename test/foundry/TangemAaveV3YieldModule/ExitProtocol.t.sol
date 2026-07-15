@@ -12,12 +12,6 @@ import { PRECISION } from "contracts/resources/Constants.sol";
 import { AaveV3PoolMock } from "contracts/test/AaveV3PoolMock.sol";
 
 contract ExitProtocolTest is TangemAaveV3YieldModuleBase {
-    // must stay below DEFAULT_MAX_NETWORK_FEE
-    uint internal constant NETWORK_FEE = 1e6;
-    uint internal constant INITIAL_OWNER_BALANCE = 400_000e6;
-    uint internal constant ACCUMULATED_REVENUE = 10_000e6;
-    uint internal constant PROTOCOL_BALANCE = INITIAL_OWNER_BALANCE + ACCUMULATED_REVENUE;
-
     TangemAaveV3YieldModuleHarness internal yieldModule;
     uint internal serviceFee;
 

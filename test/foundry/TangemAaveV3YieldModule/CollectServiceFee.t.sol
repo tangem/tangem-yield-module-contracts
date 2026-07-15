@@ -11,9 +11,6 @@ import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 import { PRECISION } from "contracts/resources/Constants.sol";
 
 contract CollectServiceFeeTest is TangemAaveV3YieldModuleBase {
-    uint internal constant INITIAL_OWNER_BALANCE = 400_000e6;
-    uint internal constant ACCUMULATED_REVENUE = 10_000e6;
-
     TangemAaveV3YieldModuleHarness internal yieldModule;
     uint internal serviceFee;
 
