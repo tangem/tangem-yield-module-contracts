@@ -77,7 +77,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
                 require(rewardTokens[k] != rewardTokens[i], DuplicateRewardToken(rewardTokens[i]));
             }
 
-            RewardRoute memory route = _classifyReward(rewardTokens[i]);
+            RewardRoute memory route = _classifyRewardRoute(rewardTokens[i]);
 
             route.balanceBefore = IERC20(rewardTokens[i]).balanceOf(route.recipient);
             routes[i] = route;
@@ -92,7 +92,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         _processClaimedRewards(rewardTokens, routes);
     }
 
-    function _classifyReward(address rewardToken) private returns (RewardRoute memory route) {
+    function _classifyRewardRoute(address rewardToken) private returns (RewardRoute memory route) {
         route.recipient = address(this);
 
         if (isProtocolToken[rewardToken]) {
