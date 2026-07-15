@@ -15,3 +15,14 @@ remappings = [
     "forge-std/=node_modules/forge-std/",
     "contracts/=contracts/",
 ]
+
+[fmt]
+tab_width = 4
+line_length = 120
+multiline_func_header = "params_first_multi"
+single_line_statement_blocks = "preserve"
+prefer_compact = "events_errors"
+single_line_imports = true
+bracket_spacing = true
+sort_imports = true
+int_types = "short"

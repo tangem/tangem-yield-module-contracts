@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {IMerklIncentives} from "../interfaces/IMerklIncentives.sol";
-import {IMerklDistributor} from "../interfaces/IMerklDistributor.sol";
+import { IMerklDistributor } from "../interfaces/IMerklDistributor.sol";
+import { IMerklIncentives } from "../interfaces/IMerklIncentives.sol";
 
-import {Requires} from "../common/Requires.sol";
-import {YieldModuleLiquidUpgradeable} from "../core/YieldModuleLiquidUpgradeable.sol";
+import { Requires } from "../common/Requires.sol";
+import { YieldModuleLiquidUpgradeable } from "../core/YieldModuleLiquidUpgradeable.sol";
 
 abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradeable {
-    using Requires for uint256;
+    using Requires for uint;
     using Requires for address;
 
     IMerklDistributor public immutable distributor;
@@ -26,8 +26,8 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         address recipient;
         address yieldToken;
         TokenAction tokenAction;
-        uint256 balanceBefore;
-        uint256 received;
+        uint balanceBefore;
+        uint received;
     }
 
     constructor(address distributor_) {
@@ -37,7 +37,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
 
     function claimMerklRewardsOwner(
         address[] calldata rewardTokens,
-        uint256[] calldata cumulativeAmounts,
+        uint[] calldata cumulativeAmounts,
         bytes32[][] calldata proofs
     ) external onlyOwner nonReentrant {
         _claimMerklRewards(rewardTokens, cumulativeAmounts, proofs);
@@ -45,7 +45,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
 
     function claimMerklRewardsBE(
         address[] calldata rewardTokens,
-        uint256[] calldata cumulativeAmounts,
+        uint[] calldata cumulativeAmounts,
         bytes32[][] calldata proofs
     ) external onlyProcessor nonReentrant {
         _claimMerklRewards(rewardTokens, cumulativeAmounts, proofs);
@@ -53,7 +53,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
 
     function _claimMerklRewards(
         address[] calldata rewardTokens,
-        uint256[] calldata cumulativeAmounts,
+        uint[] calldata cumulativeAmounts,
         bytes32[][] calldata proofs
     ) private {
         require(rewardTokens.length > 0, RewardTokensEmpty());
@@ -68,12 +68,12 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         address[] memory recipients = new address[](rewardTokens.length);
         bytes[] memory emptyDatas = new bytes[](rewardTokens.length);
 
-        for (uint256 i; i < rewardTokens.length; ++i) {
+        for (uint i; i < rewardTokens.length; ++i) {
             rewardTokens[i].requireNotZero();
             cumulativeAmounts[i].requireNotZero();
 
             // Check for duplicate reward tokens
-            for (uint256 k; k < i; ++k) {
+            for (uint k; k < i; ++k) {
                 require(rewardTokens[k] != rewardTokens[i], DuplicateRewardToken(rewardTokens[i]));
             }
 
@@ -109,11 +109,12 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         }
     }
 
-    function _processClaimedRewards(address[] calldata rewardTokens, RewardRoute[] memory routes)
-        private
-    {
-        for (uint256 i; i < rewardTokens.length; ++i) {
-            uint256 balanceAfter = IERC20(rewardTokens[i]).balanceOf(routes[i].recipient);
+    function _processClaimedRewards(
+        address[] calldata rewardTokens,
+        RewardRoute[] memory routes
+    ) private {
+        for (uint i; i < rewardTokens.length; ++i) {
+            uint balanceAfter = IERC20(rewardTokens[i]).balanceOf(routes[i].recipient);
 
             require(
                 balanceAfter > routes[i].balanceBefore,
@@ -123,20 +124,20 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             routes[i].received = balanceAfter - routes[i].balanceBefore;
         }
 
-        for (uint256 i; i < rewardTokens.length; ++i) {
+        for (uint i; i < rewardTokens.length; ++i) {
             _routeClaimedReward(rewardTokens[i], routes[i]);
         }
     }
 
     function _routeClaimedReward(address rewardToken, RewardRoute memory route) private {
         address finalToken = rewardToken;
-        uint256 finalAmount = route.received;
+        uint finalAmount = route.received;
         address finalRecipient = route.recipient;
 
         if (route.tokenAction == TokenAction.PUSH_TO_PROTOCOL) {
-            uint256 protocolBalanceBefore = _protocolBalance(rewardToken);
+            uint protocolBalanceBefore = _protocolBalance(rewardToken);
             _pushToProtocol(rewardToken, route.received);
-            uint256 protocolBalanceAfter = _protocolBalance(rewardToken);
+            uint protocolBalanceAfter = _protocolBalance(rewardToken);
             require(
                 protocolBalanceAfter > protocolBalanceBefore, ProtocolDepositFailed(rewardToken)
             );
