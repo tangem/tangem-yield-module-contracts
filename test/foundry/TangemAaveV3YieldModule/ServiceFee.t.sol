@@ -7,8 +7,20 @@ import { TangemAaveV3YieldModuleBase } from "./base/TangemAaveV3YieldModuleBase.
 
 import { PRECISION } from "contracts/resources/Constants.sol";
 
-contract ServiceFeeViewsTest is TangemAaveV3YieldModuleBase {
+contract ServiceFeeTest is TangemAaveV3YieldModuleBase {
     uint internal constant SF_INITIAL_OWNER_BALANCE = 200_000e6;
+    uint internal feeDebt = FEE_DEBT_SCENARIO_REVENUE * SERVICE_FEE_RATE / PRECISION;
+
+    TangemAaveV3YieldModuleHarness internal debtModule;
+    uint internal remainingFeeDebt;
+    address internal debtOwner = makeAddr("debtOwner");
+
+    function setUp() public override {
+        super.setUp();
+        (debtModule, remainingFeeDebt) = _createFeeDebtState(debtOwner);
+    }
+
+    /* ==================================================== calculateServiceFee ==================================================== */
 
     function test_calculateServiceFee_AfterRevenue() public {
         TangemAaveV3YieldModuleHarness yieldModule =
@@ -25,43 +37,43 @@ contract ServiceFeeViewsTest is TangemAaveV3YieldModuleBase {
     function test_calculateServiceFee_IncludesPreseededFeeDebt() public {
         TangemAaveV3YieldModuleHarness yieldModule =
             _deployEnteredYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
-        uint feeDebt = 700e6;
+        uint feeDebt_ = 700e6;
 
-        yieldModule.exposed_setFeeDebt(address(yieldToken), feeDebt);
+        yieldModule.exposed_setFeeDebt(address(yieldToken), feeDebt_);
 
-        assertEq(yieldModule.calculateServiceFee(address(yieldToken)), feeDebt);
+        assertEq(yieldModule.calculateServiceFee(address(yieldToken)), feeDebt_);
     }
 
-    function testFuzz_calculateServiceFee(uint revenue, uint feeRate, uint feeDebt) public {
+    function testFuzz_calculateServiceFee(uint revenue, uint feeRate, uint feeDebt_) public {
         TangemAaveV3YieldModuleHarness yieldModule =
             _deployEnteredYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
         revenue = bound(revenue, 0, 1_000_000_000e6);
         feeRate = bound(feeRate, 0, PRECISION);
-        feeDebt = bound(feeDebt, 0, 1_000_000e6);
+        feeDebt_ = bound(feeDebt_, 0, 1_000_000e6);
 
         // the fee is computed with the rate stored at the latest fee payment
         yieldModule.exposed_setLatestFeePaymentState(
             address(yieldToken), SF_INITIAL_OWNER_BALANCE, feeRate
         );
-        yieldModule.exposed_setFeeDebt(address(yieldToken), feeDebt);
+        yieldModule.exposed_setFeeDebt(address(yieldToken), feeDebt_);
         _generateRevenue(address(yieldModule), revenue);
 
-        uint expectedFee = revenue * feeRate / PRECISION + feeDebt;
+        uint expectedFee = revenue * feeRate / PRECISION + feeDebt_;
         assertEq(yieldModule.calculateServiceFee(address(yieldToken)), expectedFee);
     }
 
-    function testFuzz_effectiveBalances(uint revenue, uint feeRate, uint feeDebt) public {
+    function testFuzz_effectiveBalances(uint revenue, uint feeRate, uint feeDebt_) public {
         TangemAaveV3YieldModuleHarness yieldModule =
             _deployEnteredYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
         revenue = bound(revenue, 0, 1_000_000e6);
         feeRate = bound(feeRate, 0, PRECISION);
         // large debts make the fee exceed the protocol balance => clamping branch
-        feeDebt = bound(feeDebt, 0, 2 * SF_INITIAL_OWNER_BALANCE);
+        feeDebt_ = bound(feeDebt_, 0, 2 * SF_INITIAL_OWNER_BALANCE);
 
         yieldModule.exposed_setLatestFeePaymentState(
             address(yieldToken), SF_INITIAL_OWNER_BALANCE, feeRate
         );
-        yieldModule.exposed_setFeeDebt(address(yieldToken), feeDebt);
+        yieldModule.exposed_setFeeDebt(address(yieldToken), feeDebt_);
         _generateRevenue(address(yieldModule), revenue);
 
         uint protocolBalance = SF_INITIAL_OWNER_BALANCE + revenue;
@@ -74,10 +86,8 @@ contract ServiceFeeViewsTest is TangemAaveV3YieldModuleBase {
             yieldToken.balanceOf(owner) + expectedEffective
         );
     }
-}
 
-contract FeeDebtRepaymentTest is TangemAaveV3YieldModuleBase {
-    uint internal feeDebt = FEE_DEBT_SCENARIO_REVENUE * SERVICE_FEE_RATE / PRECISION;
+    /* ==================================================== Fee debt repayment ==================================================== */
 
     function testFuzz_enterProtocolByOwner_PartiallyRepaysFeeDebt(uint reEnterDeposit) public {
         reEnterDeposit = bound(reEnterDeposit, 1, feeDebt - 1);
@@ -103,37 +113,29 @@ contract FeeDebtRepaymentTest is TangemAaveV3YieldModuleBase {
         assertEq(yieldModule.calculateServiceFee(address(yieldToken)), 0);
         assertEq(yieldModule.protocolBalance(address(yieldToken)), reEnterDeposit - feeDebt);
     }
-}
 
-contract FeeDebtAndEffectiveBalancesTest is TangemAaveV3YieldModuleBase {
-    TangemAaveV3YieldModuleHarness internal yieldModule;
-    uint internal remainingFeeDebt;
-
-    function setUp() public override {
-        super.setUp();
-        (yieldModule, remainingFeeDebt) = _createFeeDebtState(otherAccount);
-    }
+    /* ============================================== Fee debt & effective balances ============================================== */
 
     function test_calculateServiceFee_ReturnsPersistedDebtWhenProtocolBalanceIsNotAboveBaseline()
         public
         view
     {
         // partial fee payment during re-enter reduced the debt by the small deposit
-        assertEq(yieldModule.calculateServiceFee(address(yieldToken)), remainingFeeDebt);
+        assertEq(debtModule.calculateServiceFee(address(yieldToken)), remainingFeeDebt);
     }
 
     function test_effectiveProtocolBalance_ClampsToZeroWhenFeeExceedsProtocolBalance() public view {
-        uint protocolBalance = yieldModule.protocolBalance(address(yieldToken));
-        uint fee = yieldModule.calculateServiceFee(address(yieldToken));
+        uint protocolBalance = debtModule.protocolBalance(address(yieldToken));
+        uint fee = debtModule.calculateServiceFee(address(yieldToken));
 
         assertGt(fee, protocolBalance);
-        assertEq(yieldModule.effectiveProtocolBalance(address(yieldToken)), 0);
+        assertEq(debtModule.effectiveProtocolBalance(address(yieldToken)), 0);
     }
 
     function test_effectiveBalance_DoesNotUnderflowWhenFeeExceedsProtocolBalance() public view {
-        uint ownerBalance = yieldToken.balanceOf(otherAccount);
+        uint ownerBalance = yieldToken.balanceOf(debtOwner);
 
         // protocol component is clamped to zero
-        assertEq(yieldModule.effectiveBalance(address(yieldToken)), ownerBalance);
+        assertEq(debtModule.effectiveBalance(address(yieldToken)), ownerBalance);
     }
 }

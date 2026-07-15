@@ -14,11 +14,11 @@ import { AaveV3PoolMock } from "contracts/test/AaveV3PoolMock.sol";
 import { SwapProviderMock } from "contracts/test/SwapProviderMock.sol";
 import { TestERC20 } from "contracts/test/TestERC20.sol";
 
-abstract contract SwapTestBase is TangemAaveV3YieldModuleBase {
+contract SwapTest is TangemAaveV3YieldModuleBase {
     TangemAaveV3YieldModuleHarness internal yieldModule;
     address internal tokenIn;
 
-    function setUp() public virtual override {
+    function setUp() public override {
         super.setUp();
 
         tokenIn = address(yieldToken);
@@ -43,13 +43,25 @@ abstract contract SwapTestBase is TangemAaveV3YieldModuleBase {
             SwapProviderMock.swapExactIn.selector, tokenIn, tokenOut, amountIn, amountOut, backend
         );
     }
-}
 
-contract SwapTest is SwapTestBase {
     function _swap(uint amountIn, bytes memory data) internal {
         vm.prank(owner);
         yieldModule.swap(tokenIn, amountIn, address(swapProvider), address(0), data);
     }
+
+    function _swapAndReceive(
+        address tokenOut,
+        address to,
+        uint amountIn,
+        bytes memory data
+    ) internal {
+        vm.prank(owner);
+        yieldModule.swapAndReceive(
+            tokenIn, tokenOut, to, amountIn, address(swapProvider), address(0), data
+        );
+    }
+
+    /* ============================================================ swap =========================================================== */
 
     function test_swap_RevertsOnlyOwner() public {
         vm.expectRevert(IYieldModule.OnlyOwner.selector);
@@ -247,20 +259,8 @@ contract SwapTest is SwapTestBase {
         vm.expectRevert(IYieldModule.InsufficientFunds.selector);
         _swap(amountIn, _revertEmptyData());
     }
-}
 
-contract SwapAndReceiveTest is SwapTestBase {
-    function _swapAndReceive(
-        address tokenOut,
-        address to,
-        uint amountIn,
-        bytes memory data
-    ) internal {
-        vm.prank(owner);
-        yieldModule.swapAndReceive(
-            tokenIn, tokenOut, to, amountIn, address(swapProvider), address(0), data
-        );
-    }
+    /* ======================================================= swapAndReceive ====================================================== */
 
     function test_swapAndReceive_RevertsOnlyOwner() public {
         TestERC20 outToken = _deployTestToken();
