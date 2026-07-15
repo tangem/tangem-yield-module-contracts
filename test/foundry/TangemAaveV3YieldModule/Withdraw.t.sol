@@ -14,19 +14,31 @@ import { AaveV3PoolMock } from "contracts/test/AaveV3PoolMock.sol";
 
 contract WithdrawTest is TangemAaveV3YieldModuleBase {
     uint internal constant WITHDRAW_AMOUNT = 2_000e6;
+    uint internal constant NATIVE_BALANCE = 0.001 ether;
+    uint internal constant MODULE_BALANCE = 4_000_000e6;
 
     TangemAaveV3YieldModuleHarness internal yieldModule;
+    TangemAaveV3YieldModuleHarness internal nonYieldModule;
+    address internal nonYieldOwner = makeAddr("nonYieldOwner");
+    address internal nonYieldToken;
     uint internal serviceFee;
 
     function setUp() public override {
         super.setUp();
 
+        // Main module: funded, entered, revenue generated (withdraw & withdrawAndDeactivate)
         yieldModule = _deployYieldModuleWithFunds(owner, INITIAL_OWNER_BALANCE);
         _enterViaProcessor(yieldModule, 0);
         _generateRevenue(address(yieldModule), ACCUMULATED_REVENUE);
-
         serviceFee = ACCUMULATED_REVENUE * SERVICE_FEE_RATE / PRECISION;
+
+        // Separate module with no active yield token (withdrawNonYieldToken tests)
+        nonYieldModule = _deployYieldModule(nonYieldOwner, address(0), 0);
+        _mintYieldToken(address(nonYieldModule), MODULE_BALANCE);
+        nonYieldToken = address(yieldToken);
     }
+
+    /* ========================================================== withdraw ========================================================== */
 
     function test_withdraw_WithdrawsSpecifiedAmountFromPoolToOwner() public {
         vm.expectEmit(address(pool));
@@ -125,5 +137,192 @@ contract WithdrawTest is TangemAaveV3YieldModuleBase {
         yieldModule2.withdraw(address(yieldToken), amount);
 
         _assertEventNotEmitted(vm.getRecordedLogs(), FEE_PAYMENT_FAILED_EVENT_SIG);
+    }
+
+    /* =================================================== withdrawAndDeactivate ==================================================== */
+
+    function test_withdrawAndDeactivate_WithdrawsProtocolBalanceMinusFeeToOwner() public {
+        vm.expectEmit(address(pool));
+        emit AaveV3PoolMock.Withdraw(address(yieldToken), PROTOCOL_BALANCE - serviceFee, owner);
+
+        vm.prank(owner);
+        yieldModule.withdrawAndDeactivate(address(yieldToken));
+    }
+
+    function test_withdrawAndDeactivate_DeactivatesYieldToken() public {
+        (, bool active,) = yieldModule.yieldTokensData(address(yieldToken));
+        assertTrue(active);
+
+        vm.prank(owner);
+        yieldModule.withdrawAndDeactivate(address(yieldToken));
+
+        (, active,) = yieldModule.yieldTokensData(address(yieldToken));
+        assertFalse(active);
+    }
+
+    function test_withdrawAndDeactivate_RevertsOnlyOwner() public {
+        vm.expectRevert(IYieldModule.OnlyOwner.selector);
+        vm.prank(otherAccount);
+        yieldModule.withdrawAndDeactivate(address(yieldToken));
+    }
+
+    function test_withdrawAndDeactivate_EmitsWithdrawAndDeactivateProcessed() public {
+        vm.expectEmit(address(yieldModule));
+        emit IYieldModule.WithdrawAndDeactivateProcessed(address(yieldToken), PROTOCOL_BALANCE - serviceFee);
+
+        vm.prank(owner);
+        yieldModule.withdrawAndDeactivate(address(yieldToken));
+    }
+
+    function test_withdrawAndDeactivate_SetsLatestFeePaymentState() public {
+        uint newFeeRate = 300;
+        _setServiceFeeRate(newFeeRate);
+
+        (uint protocolBalance, uint serviceFeeRate) = yieldModule.latestFeePaymentStates(address(yieldToken));
+        assertEq(protocolBalance, INITIAL_OWNER_BALANCE);
+        assertEq(serviceFeeRate, SERVICE_FEE_RATE);
+
+        vm.prank(owner);
+        yieldModule.withdrawAndDeactivate(address(yieldToken));
+
+        (protocolBalance, serviceFeeRate) = yieldModule.latestFeePaymentStates(address(yieldToken));
+        assertEq(protocolBalance, 0);
+        assertEq(serviceFeeRate, newFeeRate);
+    }
+
+    function test_withdrawAndDeactivate_TransfersServiceFeeToFeeReceiver() public {
+        vm.expectEmit(address(protocolToken));
+        emit IERC20.Transfer(address(yieldModule), feeReceiver, serviceFee);
+
+        vm.prank(owner);
+        yieldModule.withdrawAndDeactivate(address(yieldToken));
+    }
+
+    function test_withdrawAndDeactivate_EmitsFeePaymentProcessed() public {
+        vm.expectEmit(address(yieldModule));
+        emit IYieldModule.FeePaymentProcessed(address(yieldToken), serviceFee, feeReceiver);
+
+        vm.prank(owner);
+        yieldModule.withdrawAndDeactivate(address(yieldToken));
+    }
+
+    function test_withdrawAndDeactivate_SyncsLatestFeePaymentStateWithoutFeeWhenFeeIsZero() public {
+        uint deposit = 5_000e6;
+
+        TangemAaveV3YieldModuleHarness yieldModule2 = _deployYieldModuleWithFunds(otherAccount, deposit);
+        // first enter, no revenue => baseline set, fee == 0
+        _enterViaProcessor(yieldModule2, 0);
+
+        vm.expectEmit(address(yieldModule2));
+        emit IYieldModule.LatestFeePaymentStateUpdated(address(yieldToken), 0, SERVICE_FEE_RATE);
+        vm.expectEmit(address(yieldModule2));
+        emit IYieldModule.FeePaymentProcessed(address(yieldToken), 0, feeReceiver);
+
+        vm.recordLogs();
+        vm.prank(otherAccount);
+        yieldModule2.withdrawAndDeactivate(address(yieldToken));
+
+        _assertEventNotEmitted(vm.getRecordedLogs(), FEE_PAYMENT_FAILED_EVENT_SIG);
+    }
+
+    function test_withdrawAndDeactivate_SucceedsWhenPersistedFeeDebtExceedsProtocolBalance() public {
+        (TangemAaveV3YieldModuleHarness yieldModule2, uint remainingFeeDebt) = _createFeeDebtState(otherAccount);
+
+        // partial fee payment during re-enter reduced the debt by the small deposit
+        assertEq(yieldModule2.feeDebts(address(yieldToken)), remainingFeeDebt);
+
+        vm.prank(otherAccount);
+        yieldModule2.withdrawAndDeactivate(address(yieldToken));
+
+        (, bool active,) = yieldModule2.yieldTokensData(address(yieldToken));
+        assertFalse(active);
+    }
+
+    /* ================================================== withdrawNonYieldToken ==================================================== */
+
+    function test_withdrawNonYieldToken_TransfersTotalModuleBalanceToOwner() public {
+        vm.expectEmit(nonYieldToken);
+        emit IERC20.Transfer(address(nonYieldModule), nonYieldOwner, MODULE_BALANCE);
+
+        vm.prank(nonYieldOwner);
+        nonYieldModule.withdrawNonYieldToken(nonYieldToken);
+    }
+
+    function test_withdrawNonYieldToken_RevertsWithdrawingYieldToken() public {
+        vm.prank(nonYieldOwner);
+        nonYieldModule.initYieldToken(address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
+
+        vm.expectRevert(IYieldModule.WithdrawingYieldToken.selector);
+        vm.prank(nonYieldOwner);
+        nonYieldModule.withdrawNonYieldToken(address(yieldToken));
+    }
+
+    function test_withdrawNonYieldToken_RevertsWithdrawingProtocolToken() public {
+        vm.prank(nonYieldOwner);
+        nonYieldModule.initYieldToken(address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
+
+        vm.expectRevert(IYieldModule.WithdrawingProtocolToken.selector);
+        vm.prank(nonYieldOwner);
+        nonYieldModule.withdrawNonYieldToken(address(protocolToken));
+    }
+
+    function test_withdrawNonYieldToken_RevertsOnlyOwner() public {
+        vm.expectRevert(IYieldModule.OnlyOwner.selector);
+        vm.prank(owner);
+        nonYieldModule.withdrawNonYieldToken(nonYieldToken);
+    }
+
+    function test_withdrawNonYieldToken_EmitsWithdrawNonYieldProcessed() public {
+        vm.expectEmit(address(nonYieldModule));
+        emit IYieldModule.WithdrawNonYieldProcessed(nonYieldToken, MODULE_BALANCE);
+
+        vm.prank(nonYieldOwner);
+        nonYieldModule.withdrawNonYieldToken(nonYieldToken);
+    }
+
+    /* ===================================================== withdrawNativeAll ===================================================== */
+
+    function test_withdrawNativeAll_EmitsWithdrawNativeProcessedWithZeroAmountWhenBalanceIsZero() public {
+        vm.expectEmit(address(yieldModule));
+        emit IYieldModule.WithdrawNativeProcessed(backend, 0);
+
+        vm.prank(owner);
+        yieldModule.withdrawNativeAll(backend);
+    }
+
+    function test_withdrawNativeAll_TransfersNativeBalanceAndEmitsWithdrawNativeProcessed() public {
+        vm.deal(address(yieldModule), NATIVE_BALANCE);
+        uint receiverBalanceBefore = backend.balance;
+
+        vm.expectEmit(address(yieldModule));
+        emit IYieldModule.WithdrawNativeProcessed(backend, NATIVE_BALANCE);
+
+        vm.prank(owner);
+        yieldModule.withdrawNativeAll(backend);
+
+        assertEq(address(yieldModule).balance, 0);
+        assertEq(backend.balance, receiverBalanceBefore + NATIVE_BALANCE);
+    }
+
+    function test_withdrawNativeAll_RevertsNativeTransferFailed() public {
+        vm.deal(address(yieldModule), NATIVE_BALANCE);
+        // contract without receive/fallback
+        address badReceiver = address(swapExecutionRegistry);
+
+        vm.expectRevert(IYieldModule.NativeTransferFailed.selector);
+        vm.prank(owner);
+        yieldModule.withdrawNativeAll(badReceiver);
+    }
+
+    function test_withdrawNativeAll_RevertsZeroAddress() public {
+        vm.expectRevert(Requires.ZeroAddress.selector);
+        vm.prank(owner);
+        yieldModule.withdrawNativeAll(address(0));
+    }
+
+    function test_withdrawNativeAll_RevertsOnlyOwner() public {
+        vm.expectRevert(IYieldModule.OnlyOwner.selector);
+        vm.prank(otherAccount);
+        yieldModule.withdrawNativeAll(backend);
     }
 }
