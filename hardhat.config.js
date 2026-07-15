@@ -9,12 +9,14 @@ const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
 
 task("deploy-base", "Deploys contracts for testing")
   .addParam("pool", "The address of the Aave pool")
+  .addParam("distributor", "The address of the Merkl distributor")
   .setAction(async (taskArgs) => {
     await hre.run('compile');
 
     const msgSender = (await hre.ethers.getSigners())[0].address
 
     const pool = taskArgs.pool;
+    const distributor = taskArgs.distributor;
 
     const TangemERC2771Forwarder = await ethers.getContractFactory("TangemERC2771Forwarder");
     const forwarder = await TangemERC2771Forwarder.deploy();
@@ -37,7 +39,7 @@ task("deploy-base", "Deploys contracts for testing")
     console.log("SwapExecutionRegistry deployed to: ", await swapExecutionRegistry.getAddress());
 
     const AaveV3YieldModule = await ethers.getContractFactory("TangemAaveV3YieldModule");
-    const moduleImplementation = await AaveV3YieldModule.deploy(pool, processor, factory, forwarder, swapExecutionRegistry);
+    const moduleImplementation = await AaveV3YieldModule.deploy(pool, distributor, processor, factory, forwarder, swapExecutionRegistry);
     await moduleImplementation.waitForDeployment();
 
     const implementationSetterRole = ethers.id("IMPLEMENTATION_SETTER_ROLE")
@@ -199,6 +201,7 @@ task("deploy-registry", "Deploys a new SwapExecutionRegistry")
 
 task("deploy-module-implementation", "Deploys new module implementation and sets it to factory")
   .addParam("pool", "The address of the Aave pool")
+  .addParam("distributor", "The address of the Merkl distributor")
   .addParam("processor", "The address of the yield processor")
   .addParam("factory", "The address of the yield module factory")
   .addParam("forwarder", "The address of the Tangem forwarder")
@@ -209,6 +212,7 @@ task("deploy-module-implementation", "Deploys new module implementation and sets
     const msgSender = (await hre.ethers.getSigners())[0].address;
 
     const poolAddress = taskArgs.pool;
+    const distributorAddress = taskArgs.distributor;
     const processorAddress = taskArgs.processor;
     const factoryAddress = taskArgs.factory;
     const forwarderAddress = taskArgs.forwarder;
@@ -216,7 +220,7 @@ task("deploy-module-implementation", "Deploys new module implementation and sets
 
     const AaveV3YieldModule = await ethers.getContractFactory("TangemAaveV3YieldModule");
     const moduleImplementation =
-      await AaveV3YieldModule.deploy(poolAddress, processorAddress, factoryAddress, forwarderAddress, registryAddress);
+      await AaveV3YieldModule.deploy(poolAddress, distributorAddress, processorAddress, factoryAddress, forwarderAddress, registryAddress);
     await moduleImplementation.waitForDeployment();
 
     console.log("New implementation deployed to: ", await moduleImplementation.getAddress());

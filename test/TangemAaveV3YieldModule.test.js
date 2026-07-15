@@ -4,7 +4,7 @@ const { deployTestSetup } = require("../scripts/TestDeploy");
 
 describe("TangemBridgeProcessor", function () {
   const PRECISION = 10000;
-  let yieldToken, factory, processor, pool, forwarder, protocolToken, swapExecutionRegistry, backend, owner, otherAccount;
+  let yieldToken, factory, processor, pool, forwarder, protocolToken, swapExecutionRegistry, merklDistributor, backend, owner, otherAccount;
 
   async function deployYieldModuleFor(moduleOwnerSigner, initialYieldTokenAddress = ethers.ZeroAddress, maxNetworkFee = 0) {
     const moduleOwnerAddress = await moduleOwnerSigner.getAddress();
@@ -27,7 +27,7 @@ describe("TangemBridgeProcessor", function () {
   });
 
   beforeEach(async function () {
-    ( { yieldToken, factory, processor, pool, forwarder, swapExecutionRegistry } = await deployTestSetup() );
+    ( { yieldToken, factory, processor, pool, forwarder, swapExecutionRegistry, merklDistributor } = await deployTestSetup() );
 
     const protocolTokenAddress = await pool.aToken();
     const TestERC20 = await ethers.getContractFactory("TestERC20");
@@ -1328,7 +1328,7 @@ describe("TangemBridgeProcessor", function () {
       const yieldModuleAddress = await factory.calculateYieldModuleAddress(owner);
       yieldModule = TangemAaveV3YieldModule.attach(yieldModuleAddress)
 
-      newImplementation = await TangemAaveV3YieldModule.deploy(pool, processor, factory, newForwarder, swapExecutionRegistry);
+      newImplementation = await TangemAaveV3YieldModule.deploy(pool, merklDistributor, processor, factory, newForwarder, swapExecutionRegistry);
       await newImplementation.waitForDeployment();
 
       const pauseTx = await factory.pause();
