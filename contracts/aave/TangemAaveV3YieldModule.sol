@@ -13,19 +13,17 @@ contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable, MerklIncentive
     using SafeERC20 for IERC20;
 
     IPool public immutable pool;
-
-    // TODO: move to constructor
-    address distributorRegistryMock;
     
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor(
         address pool_,
+        address distributor_,
         address yieldProcessor_,
         address factory_,
         address trustedForwarder_,
         address swapExecutionRegistry_
     )
-        MerklIncentives(distributorRegistryMock)
+        MerklIncentives(distributor_)
         YieldModuleLiquidUpgradeable(
             yieldProcessor_,
             factory_,
