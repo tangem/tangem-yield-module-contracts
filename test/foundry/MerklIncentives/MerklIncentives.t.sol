@@ -2,18 +2,12 @@
 /* solhint-disable func-name-mixedcase */
 pragma solidity ^0.8.29;
 
-import {
-    MerklIncentivesBase,
-    TangemAaveV3YieldModuleHarness,
-    TestERC20
-} from "./MerklIncentivesBase.sol";
+import { MerklIncentivesBase, TestERC20 } from "./MerklIncentivesBase.sol";
 import { Requires } from "contracts/common/Requires.sol";
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
 contract MerklIncentivesTest is MerklIncentivesBase {
-    TangemAaveV3YieldModuleHarness ym;
-
     function setUp() public override {
         super.setUp();
 
@@ -26,14 +20,7 @@ contract MerklIncentivesTest is MerklIncentivesBase {
         TestERC20 rewardToken = _createRewardToken();
         _fundMerklDistributor(address(rewardToken), AMOUNT);
 
-        address[] memory rewardTokens = new address[](1);
-        rewardTokens[0] = address(rewardToken);
-        uint[] memory cumulativeAmounts = new uint[](1);
-        cumulativeAmounts[0] = AMOUNT;
-        bytes32[][] memory proofs = new bytes32[][](1);
-
-        vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        _claimSingleAsOwner(address(rewardToken), AMOUNT);
 
         assertEq(rewardToken.balanceOf(owner), AMOUNT);
         assertEq(rewardToken.balanceOf(address(ym)), 0);
@@ -43,14 +30,7 @@ contract MerklIncentivesTest is MerklIncentivesBase {
         TestERC20 rewardToken = _createRewardToken();
         _fundMerklDistributor(address(rewardToken), AMOUNT);
 
-        address[] memory rewardTokens = new address[](1);
-        rewardTokens[0] = address(rewardToken);
-        uint[] memory cumulativeAmounts = new uint[](1);
-        cumulativeAmounts[0] = AMOUNT;
-        bytes32[][] memory proofs = new bytes32[][](1);
-
-        vm.prank(address(processor));
-        ym.claimMerklRewardsBE(rewardTokens, cumulativeAmounts, proofs);
+        _claimSingleAsBE(address(rewardToken), AMOUNT);
 
         assertEq(rewardToken.balanceOf(owner), AMOUNT);
         assertEq(rewardToken.balanceOf(address(ym)), 0);

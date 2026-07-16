@@ -22,7 +22,4 @@ abstract contract YieldModuleHarness is MerklIncentives {
             LatestFeePaymentState(protocolBalance_, serviceFeeRate_);
     }
 
-    function exposed_setYieldTokenActive(address yieldToken, bool active) public {
-        yieldTokensData[yieldToken].active = active;
-    }
 }

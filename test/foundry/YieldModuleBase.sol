@@ -166,12 +166,6 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         YieldModuleGeneralHarness(payable(proxy)).generateRevenue(yieldTokenAddr, proxy, amount);
     }
 
-    /// Returns the protocol token address for the default yieldToken.
-    /// Default: address(0) — override in module-specific bases.
-    function _protocolToken() internal view virtual returns (address) {
-        return address(0);
-    }
-
     /* GENERIC FIXTURE HELPERS (operate on YieldModuleGeneralHarness) */
 
     /// Registers the general implementation in the factory and unpauses.
