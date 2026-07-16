@@ -5,12 +5,12 @@ pragma solidity ^0.8.29;
 import { IERC1967 } from "@openzeppelin/contracts/interfaces/IERC1967.sol";
 
 import { TangemAaveV3YieldModuleHarness } from "../harnesses/TangemAaveV3YieldModuleHarness.sol";
-import { TangemAaveV3YieldModuleBase } from "./base/TangemAaveV3YieldModuleBase.sol";
+import { AaveV3YieldModuleBase } from "../AaveV3YieldModuleBase.sol";
 
 import { TangemAaveV3YieldModule } from "contracts/aave/TangemAaveV3YieldModule.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
-contract UpgradeTest is TangemAaveV3YieldModuleBase {
+contract UpgradeTest is AaveV3YieldModuleBase {
     address internal constant NEW_FORWARDER = address(0);
 
     TangemAaveV3YieldModuleHarness internal yieldModule;

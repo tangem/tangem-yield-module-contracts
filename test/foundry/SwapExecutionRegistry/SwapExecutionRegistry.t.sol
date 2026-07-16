@@ -7,11 +7,19 @@ import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.so
 import { SwapExecutionRegistry } from "contracts/core/SwapExecutionRegistry.sol";
 import { ISwapExecutionRegistry } from "contracts/interfaces/ISwapExecutionRegistry.sol";
 
-import { SwapExecutionRegistryBase } from "./base/SwapExecutionRegistryBase.sol";
+import { BaseTest } from "../BaseTest.sol";
 
-contract SwapExecutionRegistryTest is SwapExecutionRegistryBase {
+contract SwapExecutionRegistryTest is BaseTest {
     address internal target = makeAddr("target");
     address internal spender = makeAddr("spender");
+
+    SwapExecutionRegistry public registry;
+
+    function setUp() public virtual {
+        vm.prank(backend);
+        registry = new SwapExecutionRegistry(backend);
+        vm.label(address(registry), "swapExecutionRegistry");
+    }
 
     function _expectUnauthorized(address account) internal {
         bytes32 role = registry.ALLOWLIST_ADMIN_ROLE();

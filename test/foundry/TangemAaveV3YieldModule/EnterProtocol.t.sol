@@ -5,14 +5,14 @@ pragma solidity ^0.8.29;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import { TangemAaveV3YieldModuleHarness } from "../harnesses/TangemAaveV3YieldModuleHarness.sol";
-import { TangemAaveV3YieldModuleBase } from "./base/TangemAaveV3YieldModuleBase.sol";
+import { AaveV3YieldModuleBase } from "../AaveV3YieldModuleBase.sol";
 
 import { Requires } from "contracts/common/Requires.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 import { PRECISION } from "contracts/resources/Constants.sol";
 import { AaveV3PoolMock } from "contracts/test/AaveV3PoolMock.sol";
 
-contract EnterProtocolTest is TangemAaveV3YieldModuleBase {
+contract EnterProtocolTest is AaveV3YieldModuleBase {
     uint internal constant ENTER_AMOUNT = 150_000e6;
     uint internal constant SECOND_ENTER_AMOUNT = 100_000e6;
 

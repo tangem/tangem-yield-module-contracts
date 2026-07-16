@@ -3,11 +3,11 @@
 pragma solidity ^0.8.29;
 
 import { TangemAaveV3YieldModuleHarness } from "../harnesses/TangemAaveV3YieldModuleHarness.sol";
-import { TangemAaveV3YieldModuleBase } from "./base/TangemAaveV3YieldModuleBase.sol";
+import { AaveV3YieldModuleBase } from "../AaveV3YieldModuleBase.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
-contract NetworkFeeTest is TangemAaveV3YieldModuleBase {
+contract NetworkFeeTest is AaveV3YieldModuleBase {
     uint240 internal constant NEW_MAX_NETWORK_FEE = 5e6;
 
     TangemAaveV3YieldModuleHarness internal yieldModule;
