@@ -20,6 +20,66 @@ contract MerklIncentivesTest is MerklIncentivesBase {
         ym = _deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
     }
 
+    /* Success */
+
+    function test_claimMerklRewardsOwner_Success() public {
+        TestERC20 rewardToken = _createRewardToken();
+        _fundMerklDistributor(address(rewardToken), AMOUNT);
+
+        address[] memory rewardTokens = new address[](1);
+        rewardTokens[0] = address(rewardToken);
+        uint[] memory cumulativeAmounts = new uint[](1);
+        cumulativeAmounts[0] = AMOUNT;
+        bytes32[][] memory proofs = new bytes32[][](1);
+
+        vm.prank(owner);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+
+        assertEq(rewardToken.balanceOf(owner), AMOUNT);
+        assertEq(rewardToken.balanceOf(address(ym)), 0);
+    }
+
+    function test_claimMerklRewardsBE_Success() public {
+        TestERC20 rewardToken = _createRewardToken();
+        _fundMerklDistributor(address(rewardToken), AMOUNT);
+
+        address[] memory rewardTokens = new address[](1);
+        rewardTokens[0] = address(rewardToken);
+        uint[] memory cumulativeAmounts = new uint[](1);
+        cumulativeAmounts[0] = AMOUNT;
+        bytes32[][] memory proofs = new bytes32[][](1);
+
+        vm.prank(address(processor));
+        ym.claimMerklRewardsBE(rewardTokens, cumulativeAmounts, proofs);
+
+        assertEq(rewardToken.balanceOf(owner), AMOUNT);
+        assertEq(rewardToken.balanceOf(address(ym)), 0);
+    }
+
+    /* Gas */
+
+    function test_claimMerklRewardsOwner_gas() public {
+        vm.pauseGasMetering();
+
+        _mintYieldToken(owner, INITIAL_OWNER_BALANCE);
+        vm.startPrank(owner);
+        yieldToken.approve(address(ym), type(uint).max);
+        ym.enterProtocolByOwner(address(yieldToken));
+        vm.stopPrank();
+
+        _fundMerklDistributor(address(yieldToken), AMOUNT);
+
+        address[] memory rewardTokens = new address[](1);
+        rewardTokens[0] = address(yieldToken);
+        uint[] memory cumulativeAmounts = new uint[](1);
+        cumulativeAmounts[0] = AMOUNT;
+        bytes32[][] memory proofs = new bytes32[][](1);
+
+        vm.prank(owner);
+        vm.resumeGasMetering();
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+    }
+
     /* Access control */
 
     function test_claimMerklRewardsOwner_Reverts_WhenNotOwner() public {
