@@ -44,7 +44,7 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
     MerklDistributorMock public merklDistributor;
     SwapProviderMock public swapProvider;
     TestERC20 public yieldToken;
-    YieldModuleGeneralHarness public ymGeneral;
+    YieldModuleGeneralHarness public ymGeneralImpl;
 
     function setUp() public virtual {
         vm.startPrank(backend);
@@ -64,7 +64,7 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         swapProvider = new SwapProviderMock();
         yieldToken = new TestERC20();
 
-        ymGeneral = new YieldModuleGeneralHarness(
+        ymGeneralImpl = new YieldModuleGeneralHarness(
             address(merklDistributor),
             address(processor),
             address(factory),
@@ -88,7 +88,7 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         vm.label(address(merklDistributor), "merklDistributor");
         vm.label(address(swapProvider), "swapProvider");
         vm.label(address(yieldToken), "yieldToken");
-        vm.label(address(ymGeneral), "ymGeneral");
+        vm.label(address(ymGeneralImpl), "ymGeneralImpl");
     }
 
     /* GENERIC ACTOR HELPERS (operate via the processor on IYieldModule) */
@@ -178,7 +178,7 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
     /// Called by YieldModuleBase.setUp or by module-specific setUp if they use a different impl.
     function _registerGeneralImplementation() internal {
         vm.prank(backend);
-        factory.setImplementation(address(ymGeneral));
+        factory.setImplementation(address(ymGeneralImpl));
         vm.prank(backend);
         factory.unpause();
     }
