@@ -21,23 +21,23 @@ contract YieldTokenByProtocolTokenTest is MerklIncentivesBase {
 
     function test_claim_RestoresMapping_WhenNotSet() public {
         _mockUnderlyingAsset(address(yieldToken));
-        _fundMerklDistributor(address(protocolToken), AMOUNT);
+        _fundMerklDistributor(address(protocolToken), YIELD_AMOUNT);
 
         vm.expectEmit(address(ym));
         emit IYieldModule.YieldTokensByProtocolTokensSet(address(yieldToken));
 
-        _claimSingleAsOwner(address(protocolToken), AMOUNT);
+        _claimSingleAsOwner(address(protocolToken), YIELD_AMOUNT);
 
         // the mapping is cached back and the reward still followed KEEP_IN_MODULE
         assertEq(ym.yieldTokenByProtocolToken(address(protocolToken)), address(yieldToken));
-        assertEq(ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + AMOUNT);
+        assertEq(ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + YIELD_AMOUNT);
     }
 
     function test_claim_Reverts_WhenResolvedYieldTokenNotInitialized() public {
         address unknownUnderlying = makeAddr("unknownUnderlying");
 
         _mockUnderlyingAsset(unknownUnderlying);
-        _fundMerklDistributor(address(protocolToken), AMOUNT);
+        _fundMerklDistributor(address(protocolToken), YIELD_AMOUNT);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -45,12 +45,12 @@ contract YieldTokenByProtocolTokenTest is MerklIncentivesBase {
             )
         );
 
-        _claimSingleAsOwner(address(protocolToken), AMOUNT);
+        _claimSingleAsOwner(address(protocolToken), YIELD_AMOUNT);
     }
 
     function test_claim_Reverts_WhenProtocolReportsDifferentProtocolToken() public {
         _mockUnderlyingAsset(address(yieldToken));
-        _fundMerklDistributor(address(protocolToken), AMOUNT);
+        _fundMerklDistributor(address(protocolToken), YIELD_AMOUNT);
 
         // the pool now reports another aToken for the resolved yield token
         DataTypes.ReserveData memory reserveData;
@@ -67,7 +67,7 @@ contract YieldTokenByProtocolTokenTest is MerklIncentivesBase {
             )
         );
 
-        _claimSingleAsOwner(address(protocolToken), AMOUNT);
+        _claimSingleAsOwner(address(protocolToken), YIELD_AMOUNT);
     }
 
     function test_getYieldToken_Reverts_WhenTokenIsNotProtocolToken() public {
