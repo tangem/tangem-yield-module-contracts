@@ -12,7 +12,7 @@ contract AaveV3PoolMock {
     TestERC20 public aToken;
 
     constructor() {
-        aToken = new TestERC20();
+        aToken = new TestERC20("AaveV3MockAToken", "aTST", 18);
     }
 
     function getReserveData(address) external view returns (DataTypes.ReserveData memory) {

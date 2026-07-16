@@ -16,7 +16,7 @@ abstract contract TestHelpers is BaseTest {
 
     function _deployTestToken() internal returns (TestERC20 token) {
         vm.prank(backend);
-        token = new TestERC20();
+        token = new TestERC20("TestToken", "TST", 18);
     }
 
     function _mintToken(TestERC20 token, address to, uint amount) internal {

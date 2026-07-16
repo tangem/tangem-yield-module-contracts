@@ -1615,7 +1615,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should fail with correct error if called not by owner", async function () {
       const TestERC20 = await ethers.getContractFactory("TestERC20");
-      const outToken = await TestERC20.deploy();
+      const outToken = await TestERC20.deploy("TestToken", "TST", 18);
       await outToken.waitForDeployment();
 
       const tokenOut = await outToken.getAddress();
@@ -1693,7 +1693,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should fail with correct error if swap payout is not received", async function () {
       const TestERC20 = await ethers.getContractFactory("TestERC20");
-      const outToken = await TestERC20.deploy();
+      const outToken = await TestERC20.deploy("TestToken", "TST", 18);
       await outToken.waitForDeployment();
 
       const tokenOut = await outToken.getAddress();
@@ -1719,7 +1719,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should revert when tokenOut is not active and receiver is zero address", async function () {
       const TestERC20 = await ethers.getContractFactory("TestERC20");
-      const outToken = await TestERC20.deploy();
+      const outToken = await TestERC20.deploy("TestToken", "TST", 18);
       await outToken.waitForDeployment();
 
       const tokenOut = await outToken.getAddress();
@@ -1747,7 +1747,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should fail with correct error when tokenOut is not active and receiver is this contract", async function () {
       const TestERC20 = await ethers.getContractFactory("TestERC20");
-      const outToken = await TestERC20.deploy();
+      const outToken = await TestERC20.deploy("TestToken", "TST", 18);
       await outToken.waitForDeployment();
 
       const tokenOut = await outToken.getAddress();
@@ -1775,7 +1775,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should execute swap, clear allowance, transfer tokenOut to receiver, and emit SwapAndReceive events when tokenOut is not active", async function () {
       const TestERC20 = await ethers.getContractFactory("TestERC20");
-      const outToken = await TestERC20.deploy();
+      const outToken = await TestERC20.deploy("TestToken", "TST", 18);
       await outToken.waitForDeployment();
 
       const tokenOut = await outToken.getAddress();
@@ -1818,7 +1818,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should deposit tokenOut to protocol and sync latest fee state when tokenOut is active and fee is zero", async function () {
       const TestERC20 = await ethers.getContractFactory("TestERC20");
-      const outToken = await TestERC20.deploy();
+      const outToken = await TestERC20.deploy("TestToken", "TST", 18);
       await outToken.waitForDeployment();
 
       const tokenOut = await outToken.getAddress();
@@ -1856,7 +1856,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should deposit tokenOut to protocol and process service fee when tokenOut is active and revenue exists", async function () {
       const TestERC20 = await ethers.getContractFactory("TestERC20");
-      const outToken = await TestERC20.deploy();
+      const outToken = await TestERC20.deploy("TestToken", "TST", 18);
       await outToken.waitForDeployment();
 
       const tokenOut = await outToken.getAddress();

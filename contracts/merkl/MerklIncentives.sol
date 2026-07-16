@@ -138,6 +138,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             uint protocolBalanceBefore = _protocolBalance(rewardToken);
             _pushToProtocol(rewardToken, route.received);
             uint protocolBalanceAfter = _protocolBalance(rewardToken);
+
             require(
                 protocolBalanceAfter > protocolBalanceBefore, ProtocolDepositFailed(rewardToken)
             );

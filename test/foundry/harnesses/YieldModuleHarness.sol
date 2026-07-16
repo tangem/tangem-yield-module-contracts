@@ -7,12 +7,6 @@ import { MerklIncentives } from "contracts/merkl/MerklIncentives.sol";
 /// pre-seeding. Inherited by all concrete harness variants (general, AAVE, etc.) to avoid
 /// duplicating the exposed_* methods.
 abstract contract YieldModuleHarness is MerklIncentives {
-    /* GETTERS */
-
-    function exposed_protocolBalance(address yieldToken) public view returns (uint) {
-        return _protocolBalance(yieldToken);
-    }
-
     /* SETTERS */
 
     function exposed_setFeeDebt(address yieldToken, uint amount) public {
