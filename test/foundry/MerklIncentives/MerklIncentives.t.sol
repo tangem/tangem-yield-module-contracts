@@ -67,12 +67,12 @@ contract MerklIncentivesTest is MerklIncentivesBase {
         ym.enterProtocolByOwner(address(yieldToken));
         vm.stopPrank();
 
-        _fundMerklDistributor(address(yieldToken), AMOUNT);
+        _fundMerklDistributor(address(yieldToken), YIELD_AMOUNT);
 
         address[] memory rewardTokens = new address[](1);
         rewardTokens[0] = address(yieldToken);
         uint[] memory cumulativeAmounts = new uint[](1);
-        cumulativeAmounts[0] = AMOUNT;
+        cumulativeAmounts[0] = YIELD_AMOUNT;
         bytes32[][] memory proofs = new bytes32[][](1);
 
         vm.prank(owner);

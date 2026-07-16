@@ -14,7 +14,9 @@ contract IncreaseProtocolBalanceWithoutFeeTest is MerklIncentivesBase {
     }
 
     function testFuzz_claim_MovesFeeCheckpoint_OnPushToProtocol(uint amount) public {
-        amount = bound(amount, 1, 1_000_000_000e18);
+        amount = bound(
+            amount, 1, type(uint).max - yieldToken.totalSupply() - protocolToken.totalSupply()
+        );
 
         (uint checkpointBefore,) = ym.latestFeePaymentStates(address(yieldToken));
         uint feeBefore = ym.calculateServiceFee(address(yieldToken));
@@ -31,7 +33,9 @@ contract IncreaseProtocolBalanceWithoutFeeTest is MerklIncentivesBase {
     }
 
     function testFuzz_claim_MovesFeeCheckpoint_OnKeepInModule(uint amount) public {
-        amount = bound(amount, 1, 1_000_000_000e18);
+        amount = bound(
+            amount, 1, type(uint).max - protocolToken.totalSupply() - PROTOCOL_BALANCE
+        );
 
         (uint checkpointBefore,) = ym.latestFeePaymentStates(address(yieldToken));
         uint feeBefore = ym.calculateServiceFee(address(yieldToken));
@@ -53,10 +57,10 @@ contract IncreaseProtocolBalanceWithoutFeeTest is MerklIncentivesBase {
             address(yieldToken), protocolBalance + 1, SERVICE_FEE_RATE
         );
 
-        _fundMerklDistributor(address(protocolToken), AMOUNT);
+        _fundMerklDistributor(address(protocolToken), YIELD_AMOUNT);
 
         vm.expectRevert(IYieldModule.FeeCheckpointExceedsBalance.selector);
 
-        _claimSingleAsOwner(address(protocolToken), AMOUNT);
+        _claimSingleAsOwner(address(protocolToken), YIELD_AMOUNT);
     }
 }
