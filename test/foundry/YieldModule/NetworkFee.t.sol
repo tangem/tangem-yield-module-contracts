@@ -3,19 +3,19 @@
 pragma solidity ^0.8.29;
 
 import { YieldModuleBase } from "../YieldModuleBase.sol";
-import { YieldModuleGenericHarness } from "../harnesses/YieldModuleGenericHarness.sol";
+import { YieldModuleGeneralHarness } from "../harnesses/YieldModuleGeneralHarness.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
 contract NetworkFeeTest is YieldModuleBase {
     uint240 internal constant NEW_MAX_NETWORK_FEE = 5e6;
 
-    YieldModuleGenericHarness internal yieldModule;
+    YieldModuleGeneralHarness internal yieldModule;
 
     function setUp() public override {
         super.setUp();
-        _registerGenericImplementation();
-        yieldModule = _deployGenericYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
+        _registerGeneralImplementation();
+        yieldModule = _deployGeneralYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
     }
 
     function test_setYieldTokenMaxNetworkFee_SetsNewMaxNetworkFee() public {

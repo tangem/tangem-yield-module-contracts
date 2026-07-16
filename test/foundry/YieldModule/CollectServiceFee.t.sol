@@ -5,20 +5,20 @@ pragma solidity ^0.8.29;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import { YieldModuleBase } from "../YieldModuleBase.sol";
-import { YieldModuleGenericHarness } from "../harnesses/YieldModuleGenericHarness.sol";
+import { YieldModuleGeneralHarness } from "../harnesses/YieldModuleGeneralHarness.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 import { PRECISION } from "contracts/resources/Constants.sol";
 
 contract CollectServiceFeeTest is YieldModuleBase {
-    YieldModuleGenericHarness internal yieldModule;
+    YieldModuleGeneralHarness internal yieldModule;
     uint internal serviceFee;
 
     function setUp() public override {
         super.setUp();
-        _registerGenericImplementation();
+        _registerGeneralImplementation();
 
-        yieldModule = _deployEnteredRevenueGenericModule(owner);
+        yieldModule = _deployEnteredRevenueGeneralModule(owner);
         serviceFee = ACCUMULATED_SERVICE_FEE;
     }
 
@@ -63,8 +63,8 @@ contract CollectServiceFeeTest is YieldModuleBase {
     }
 
     function test_collectServiceFee_RevertsNothingToCollect() public {
-        YieldModuleGenericHarness yieldModule2 =
-            _deployGenericYieldModuleWithFunds(otherAccount, 10_000e6);
+        YieldModuleGeneralHarness yieldModule2 =
+            _deployGeneralYieldModuleWithFunds(otherAccount, 10_000e6);
 
         // first enter with zero network fee and no revenue => baseline sync only, nothing to collect
         _enterViaProcessor(yieldModule2, 0);
@@ -77,8 +77,8 @@ contract CollectServiceFeeTest is YieldModuleBase {
     function test_collectServiceFee_RevertsFeeProcessingFailedWhenDebtExistsAndProtocolBalanceIsZero()
         public
     {
-        YieldModuleGenericHarness yieldModule2 =
-            _deployGenericYieldModuleWithFunds(otherAccount, 100_000e6);
+        YieldModuleGeneralHarness yieldModule2 =
+            _deployGeneralYieldModuleWithFunds(otherAccount, 100_000e6);
         uint revenue = 10_000e6;
 
         _enterViaProcessor(yieldModule2, 0);

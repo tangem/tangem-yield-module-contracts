@@ -2,8 +2,8 @@
 pragma solidity ^0.8.29;
 
 import { BaseTest } from "test/foundry/BaseTest.sol";
+import { YieldModuleGeneralHarness } from "test/foundry/harnesses/YieldModuleGeneralHarness.sol";
 import { TestHelpers } from "test/foundry/utils/TestHelpers.sol";
-import { YieldModuleGenericHarness } from "test/foundry/harnesses/YieldModuleGenericHarness.sol";
 
 import { SwapExecutionRegistry } from "contracts/core/SwapExecutionRegistry.sol";
 import { TangemYieldModuleFactory } from "contracts/core/TangemYieldModuleFactory.sol";
@@ -15,8 +15,8 @@ import { MerklDistributorMock } from "contracts/test/MerklDistributorMock.sol";
 import { SwapProviderMock } from "contracts/test/SwapProviderMock.sol";
 import { TestERC20 } from "contracts/test/TestERC20.sol";
 
-/// Generic yield-module test base: deploys shared infra (processor, factory, forwarder,
-/// swap registry) and exposes generic actor helpers that operate on `IYieldModule` + address.
+/// General yield-module test base: deploys shared infra (processor, factory, forwarder,
+/// swap registry) and exposes general actor helpers that operate on `IYieldModule` + address.
 /// Module-specific bases extend this and add pool/token-specific fixtures returning their
 /// harness type.
 abstract contract YieldModuleBase is BaseTest, TestHelpers {
@@ -29,7 +29,8 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
     uint internal constant NETWORK_FEE = 1e6;
     uint internal constant NEW_FEE_RATE = 2_000;
     // service fee derived from ACCUMULATED_REVENUE at the default SERVICE_FEE_RATE
-    uint internal constant ACCUMULATED_SERVICE_FEE = ACCUMULATED_REVENUE * SERVICE_FEE_RATE / PRECISION;
+    uint internal constant ACCUMULATED_SERVICE_FEE =
+        ACCUMULATED_REVENUE * SERVICE_FEE_RATE / PRECISION;
     // protocol balance after entering INITIAL_OWNER_BALANCE and generating ACCUMULATED_REVENUE
     uint internal constant PROTOCOL_BALANCE = INITIAL_OWNER_BALANCE + ACCUMULATED_REVENUE;
 
@@ -43,7 +44,7 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
     MerklDistributorMock public merklDistributor;
     SwapProviderMock public swapProvider;
     TestERC20 public yieldToken;
-    YieldModuleGenericHarness public genericImplementation;
+    YieldModuleGeneralHarness public ymGeneral;
 
     function setUp() public virtual {
         vm.startPrank(backend);
@@ -63,7 +64,7 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         swapProvider = new SwapProviderMock();
         yieldToken = new TestERC20();
 
-        genericImplementation = new YieldModuleGenericHarness(
+        ymGeneral = new YieldModuleGeneralHarness(
             address(merklDistributor),
             address(processor),
             address(factory),
@@ -87,21 +88,25 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         vm.label(address(merklDistributor), "merklDistributor");
         vm.label(address(swapProvider), "swapProvider");
         vm.label(address(yieldToken), "yieldToken");
-        vm.label(address(genericImplementation), "genericImplementation");
+        vm.label(address(ymGeneral), "ymGeneral");
     }
 
     /* GENERIC ACTOR HELPERS (operate via the processor on IYieldModule) */
 
-    function _enterViaProcessor(IYieldModule yieldModule, address yieldTokenAddr, uint networkFee)
-        internal
-    {
+    function _enterViaProcessor(
+        IYieldModule yieldModule,
+        address yieldTokenAddr,
+        uint networkFee
+    ) internal {
         vm.prank(backend);
         processor.enterProtocol(address(yieldModule), yieldTokenAddr, networkFee);
     }
 
-    function _exitViaProcessor(IYieldModule yieldModule, address yieldTokenAddr, uint networkFee)
-        internal
-    {
+    function _exitViaProcessor(
+        IYieldModule yieldModule,
+        address yieldTokenAddr,
+        uint networkFee
+    ) internal {
         vm.prank(backend);
         processor.exitProtocol(address(yieldModule), yieldTokenAddr, networkFee);
     }
@@ -111,16 +116,21 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         processor.collectServiceFee(address(yieldModule), yieldTokenAddr);
     }
 
-    function _withdraw(IYieldModule yieldModule, address moduleOwner, address token, uint amount)
-        internal
-    {
+    function _withdraw(
+        IYieldModule yieldModule,
+        address moduleOwner,
+        address token,
+        uint amount
+    ) internal {
         vm.prank(moduleOwner);
         yieldModule.withdraw(token, amount);
     }
 
-    function _withdrawAndDeactivate(IYieldModule yieldModule, address moduleOwner, address token)
-        internal
-    {
+    function _withdrawAndDeactivate(
+        IYieldModule yieldModule,
+        address moduleOwner,
+        address token
+    ) internal {
         vm.prank(moduleOwner);
         yieldModule.withdrawAndDeactivate(token);
     }
@@ -147,13 +157,13 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
     /* PROTOCOL HOOKS (overridden by module-specific bases) */
 
     /// Simulates protocol yield by minting protocol tokens to the account.
-    /// Default: uses the generic harness fake pool via the proxy. Override for AAVE/Morpho.
+    /// Default: uses the general harness fake pool via the proxy. Override for AAVE/Morpho.
     function _generateRevenue(address yieldTokenAddr, address proxy, uint amount) internal virtual {
         // Mint yieldToken to the proxy so it can be returned on withdraw (revenue = extra yield).
         vm.prank(backend);
         TestERC20(yieldTokenAddr).mint(proxy, amount);
         // Mint protocolToken via the proxy to track _protocolBalance.
-        YieldModuleGenericHarness(payable(proxy)).generateRevenue(yieldTokenAddr, proxy, amount);
+        YieldModuleGeneralHarness(payable(proxy)).generateRevenue(yieldTokenAddr, proxy, amount);
     }
 
     /// Returns the protocol token address for the default yieldToken.
@@ -162,36 +172,37 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         return address(0);
     }
 
-    /* GENERIC FIXTURE HELPERS (operate on YieldModuleGenericHarness) */
+    /* GENERIC FIXTURE HELPERS (operate on YieldModuleGeneralHarness) */
 
-    /// Registers the generic implementation in the factory and unpauses.
+    /// Registers the general implementation in the factory and unpauses.
     /// Called by YieldModuleBase.setUp or by module-specific setUp if they use a different impl.
-    function _registerGenericImplementation() internal {
+    function _registerGeneralImplementation() internal {
         vm.prank(backend);
-        factory.setImplementation(address(genericImplementation));
+        factory.setImplementation(address(ymGeneral));
         vm.prank(backend);
         factory.unpause();
     }
 
-    function _deployGenericYieldModule(
+    function _deployGeneralYieldModule(
         address moduleOwner,
         address yieldTokenAddr,
         uint240 maxNetworkFee
-    ) internal returns (YieldModuleGenericHarness yieldModule) {
+    ) internal returns (YieldModuleGeneralHarness yieldModule) {
         vm.prank(moduleOwner);
         factory.deployYieldModule(moduleOwner, yieldTokenAddr, maxNetworkFee);
 
-        yieldModule = YieldModuleGenericHarness(
-            payable(factory.calculateYieldModuleAddress(moduleOwner))
-        );
+        yieldModule =
+            YieldModuleGeneralHarness(payable(factory.calculateYieldModuleAddress(moduleOwner)));
         vm.label(address(yieldModule), "yieldModule");
     }
 
-    function _deployGenericYieldModuleWithFunds(
+    function _deployGeneralYieldModuleWithFunds(
         address moduleOwner,
         uint ownerBalance
-    ) internal returns (YieldModuleGenericHarness yieldModule) {
-        yieldModule = _deployGenericYieldModule(moduleOwner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
+    ) internal returns (YieldModuleGeneralHarness yieldModule) {
+        yieldModule = _deployGeneralYieldModule(
+            moduleOwner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE
+        );
 
         _mintYieldToken(moduleOwner, ownerBalance);
 
@@ -199,63 +210,63 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         yieldToken.approve(address(yieldModule), type(uint).max);
     }
 
-    function _deployEnteredGenericYieldModule(
+    function _deployEnteredGeneralYieldModule(
         address moduleOwner,
         uint enterAmount
-    ) internal returns (YieldModuleGenericHarness yieldModule) {
-        yieldModule = _deployGenericYieldModuleWithFunds(moduleOwner, enterAmount);
+    ) internal returns (YieldModuleGeneralHarness yieldModule) {
+        yieldModule = _deployGeneralYieldModuleWithFunds(moduleOwner, enterAmount);
 
         vm.prank(moduleOwner);
         yieldModule.enterProtocolByOwner(address(yieldToken));
     }
 
     /// Full scenario: deployed, entered and revenue generated (standard ACCUMULATED_REVENUE).
-    function _deployEnteredRevenueGenericModule(address moduleOwner)
+    function _deployEnteredRevenueGeneralModule(address moduleOwner)
         internal
-        returns (YieldModuleGenericHarness yieldModule)
+        returns (YieldModuleGeneralHarness yieldModule)
     {
-        yieldModule = _deployGenericYieldModuleWithFunds(moduleOwner, INITIAL_OWNER_BALANCE);
+        yieldModule = _deployGeneralYieldModuleWithFunds(moduleOwner, INITIAL_OWNER_BALANCE);
         _enterViaProcessor(yieldModule, 0);
         _generateRevenue(address(yieldToken), address(yieldModule), ACCUMULATED_REVENUE);
     }
 
     /* GENERIC HARNESS ACTOR WRAPPERS (bind yieldToken) */
 
-    function _enterViaProcessor(YieldModuleGenericHarness yieldModule, uint networkFee) internal {
+    function _enterViaProcessor(YieldModuleGeneralHarness yieldModule, uint networkFee) internal {
         _enterViaProcessor(IYieldModule(address(yieldModule)), address(yieldToken), networkFee);
     }
 
-    function _exitViaProcessor(YieldModuleGenericHarness yieldModule, uint networkFee) internal {
+    function _exitViaProcessor(YieldModuleGeneralHarness yieldModule, uint networkFee) internal {
         _exitViaProcessor(IYieldModule(address(yieldModule)), address(yieldToken), networkFee);
     }
 
-    function _collectViaProcessor(YieldModuleGenericHarness yieldModule) internal {
+    function _collectViaProcessor(YieldModuleGeneralHarness yieldModule) internal {
         _collectViaProcessor(IYieldModule(address(yieldModule)), address(yieldToken));
     }
 
-    /* FEE-DEBT SCENARIO (generic, operates on YieldModuleGenericHarness) */
+    /* FEE-DEBT SCENARIO (general, operates on YieldModuleGeneralHarness) */
 
     /// Scenario: fee debt persisted after failed fee payment, protocol balance below the debt.
     /// Returns the debt remaining after the partial payment (smallDeposit = 1e6).
-    function _createGenericFeeDebtState(address moduleOwner)
+    function _createGeneralFeeDebtState(address moduleOwner)
         internal
-        returns (YieldModuleGenericHarness yieldModule, uint remainingFeeDebt)
+        returns (YieldModuleGeneralHarness yieldModule, uint remainingFeeDebt)
     {
         uint smallDeposit = 1e6;
         uint feeDebt;
-        (yieldModule, feeDebt) = _createGenericFeeDebtState(moduleOwner, smallDeposit);
+        (yieldModule, feeDebt) = _createGeneralFeeDebtState(moduleOwner, smallDeposit);
         remainingFeeDebt = feeDebt - smallDeposit;
     }
 
     /// Same scenario with a configurable re-enter deposit (paid toward the debt).
     /// Returns the full debt as it was before the re-enter payment.
-    function _createGenericFeeDebtState(
+    function _createGeneralFeeDebtState(
         address moduleOwner,
         uint reEnterDeposit
-    ) internal returns (YieldModuleGenericHarness yieldModule, uint feeDebt) {
+    ) internal returns (YieldModuleGeneralHarness yieldModule, uint feeDebt) {
         feeDebt = FEE_DEBT_SCENARIO_REVENUE * SERVICE_FEE_RATE / PRECISION;
 
-        yieldModule = _deployGenericYieldModuleWithFunds(moduleOwner, FEE_DEBT_SCENARIO_DEPOSIT);
+        yieldModule = _deployGeneralYieldModuleWithFunds(moduleOwner, FEE_DEBT_SCENARIO_DEPOSIT);
 
         _enterViaProcessor(yieldModule, 0);
         _generateRevenue(address(yieldToken), address(yieldModule), FEE_DEBT_SCENARIO_REVENUE);

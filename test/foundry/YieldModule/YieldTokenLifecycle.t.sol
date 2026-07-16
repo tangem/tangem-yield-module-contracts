@@ -3,7 +3,7 @@
 pragma solidity ^0.8.29;
 
 import { YieldModuleBase } from "../YieldModuleBase.sol";
-import { YieldModuleGenericHarness } from "../harnesses/YieldModuleGenericHarness.sol";
+import { YieldModuleGeneralHarness } from "../harnesses/YieldModuleGeneralHarness.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
@@ -11,22 +11,22 @@ contract YieldTokenLifecycleTest is YieldModuleBase {
     uint240 internal constant MAX_NETWORK_FEE = 20e6;
     uint240 internal constant NEW_MAX_NETWORK_FEE = 30e6;
 
-    YieldModuleGenericHarness internal yieldModule;
-    YieldModuleGenericHarness internal initModule;
+    YieldModuleGeneralHarness internal yieldModule;
+    YieldModuleGeneralHarness internal initModule;
     address internal initOwner = makeAddr("initOwner");
 
     function setUp() public override {
         super.setUp();
-        _registerGenericImplementation();
+        _registerGeneralImplementation();
 
         // Main module: yield token active then deactivated (reactivateToken tests)
-        yieldModule = _deployGenericYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
+        yieldModule = _deployGeneralYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
 
         vm.prank(owner);
         yieldModule.withdrawAndDeactivate(address(yieldToken));
 
         // Separate module with no active yield token (initYieldToken tests)
-        initModule = _deployGenericYieldModule(initOwner, address(0), 0);
+        initModule = _deployGeneralYieldModule(initOwner, address(0), 0);
     }
 
     /* ======================================================== initYieldToken ===================================================== */
@@ -54,8 +54,7 @@ contract YieldTokenLifecycleTest is YieldModuleBase {
 
     function test_initYieldToken_EmitsYieldTokenInitialized() public {
         address freshOwner = makeAddr("freshOwner");
-        YieldModuleGenericHarness freshModule =
-            _deployGenericYieldModule(freshOwner, address(0), 0);
+        YieldModuleGeneralHarness freshModule = _deployGeneralYieldModule(freshOwner, address(0), 0);
 
         // protocolToken is created inside initYieldToken, so we can't know its address before
         // the call. Match only the event signature + emitter (no data check), then verify
