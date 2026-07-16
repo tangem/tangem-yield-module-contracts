@@ -13,6 +13,7 @@ contract MerklDistributorMock is IMerklDistributor {
     using SafeERC20 for IERC20;
 
     error ArraysLengthsMismatch();
+    error InvalidProof();
 
     mapping(address user => mapping(address token => uint)) public claimed;
 

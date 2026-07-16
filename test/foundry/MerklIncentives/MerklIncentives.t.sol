@@ -2,16 +2,36 @@
 /* solhint-disable func-name-mixedcase */
 pragma solidity ^0.8.29;
 
-import { MerklIncentivesBase, TestERC20 } from "./MerklIncentivesBase.sol";
+import {
+    MerklIncentivesBase,
+    TangemAaveV3YieldModuleHarness,
+    TestERC20
+} from "./MerklIncentivesBase.sol";
 import { Requires } from "contracts/common/Requires.sol";
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
+import { MerklDistributorMock } from "contracts/test/MerklDistributorMock.sol";
 
 contract MerklIncentivesTest is MerklIncentivesBase {
     function setUp() public override {
         super.setUp();
 
         ym = _deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
+    }
+
+    /* Constructor */
+
+    function test_constructor_Reverts_WhenDistributorIsZero() public {
+        vm.expectRevert(Requires.ZeroAddress.selector);
+
+        new TangemAaveV3YieldModuleHarness(
+            address(pool),
+            address(0),
+            address(processor),
+            address(factory),
+            address(forwarder),
+            address(swapExecutionRegistry)
+        );
     }
 
     /* Success */
@@ -121,6 +141,21 @@ contract MerklIncentivesTest is MerklIncentivesBase {
 
         vm.prank(owner);
         ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+    }
+
+    function test_claimMerklRewardsOwner_Reverts_WhenDistributorRejectsProof() public {
+        TestERC20 rewardToken = _createRewardToken();
+        _fundMerklDistributor(address(rewardToken), AMOUNT);
+
+        vm.mockCallRevert(
+            address(merklDistributor),
+            abi.encodeWithSelector(merklDistributor.claimWithRecipient.selector),
+            abi.encodeWithSelector(MerklDistributorMock.InvalidProof.selector)
+        );
+
+        vm.expectRevert(MerklDistributorMock.InvalidProof.selector);
+
+        _claimSingleAsOwner(address(rewardToken), AMOUNT);
     }
 
     function test_claimMerklRewardsOwner_Reverts_WhenDuplicateRewardToken() public {
