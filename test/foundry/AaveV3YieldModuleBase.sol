@@ -1,43 +1,30 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import { Vm } from "forge-std/src/Test.sol";
-
 import { TangemAaveV3YieldModuleHarness } from "test/foundry/harnesses/TangemAaveV3YieldModuleHarness.sol";
-import { TangemBaseTest } from "test/foundry/helpers/TangemBaseTest.sol";
+import { YieldModuleBase } from "test/foundry/YieldModuleBase.sol";
 
-import { SwapExecutionRegistry } from "contracts/core/SwapExecutionRegistry.sol";
-import { TangemYieldModuleFactory } from "contracts/core/TangemYieldModuleFactory.sol";
-import { TangemYieldProcessor } from "contracts/core/TangemYieldProcessor.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
-import { TangemERC2771Forwarder } from "contracts/metatx/TangemERC2771Forwarder.sol";
 import { PRECISION } from "contracts/resources/Constants.sol";
 import { AaveV3PoolMock } from "contracts/test/AaveV3PoolMock.sol";
 import { MerklDistributorMock } from "contracts/test/MerklDistributorMock.sol";
 import { SwapProviderMock } from "contracts/test/SwapProviderMock.sol";
 import { TestERC20 } from "contracts/test/TestERC20.sol";
 
-abstract contract TangemAaveV3YieldModuleBase is TangemBaseTest {
+abstract contract AaveV3YieldModuleBase is YieldModuleBase {
     bytes32 internal constant POOL_WITHDRAW_EVENT_SIG =
         keccak256("Withdraw(address,uint256,address)");
-    bytes32 internal constant FEE_PAYMENT_PROCESSED_EVENT_SIG =
-        keccak256("FeePaymentProcessed(address,uint256,address)");
-    bytes32 internal constant FEE_PAYMENT_FAILED_EVENT_SIG =
-        keccak256("FeePaymentFailed(address,uint256)");
 
-    /* Common scenario amounts shared by the feature suites */
-    uint internal constant INITIAL_OWNER_BALANCE = 400_000e6;
+    uint internal constant POOL_LIQUIDITY = 1_000_000e6;
+
+    /* Aave scenario amounts */
     uint internal constant INITIAL_MODULE_BALANCE = 50_000e6;
     uint internal constant TOTAL_ENTER_AMOUNT = INITIAL_OWNER_BALANCE + INITIAL_MODULE_BALANCE;
-    uint internal constant ACCUMULATED_REVENUE = 10_000e6;
     // service fee derived from ACCUMULATED_REVENUE at the default SERVICE_FEE_RATE
     uint internal constant ACCUMULATED_SERVICE_FEE = ACCUMULATED_REVENUE * SERVICE_FEE_RATE / PRECISION;
     // protocol balance after entering INITIAL_OWNER_BALANCE and generating ACCUMULATED_REVENUE
     uint internal constant PROTOCOL_BALANCE = INITIAL_OWNER_BALANCE + ACCUMULATED_REVENUE;
     uint internal constant FRESH_OWNER_BALANCE = 50_000e6;
-    uint internal constant NEW_FEE_RATE = 2_000;
-    // must stay below DEFAULT_MAX_NETWORK_FEE
-    uint internal constant NETWORK_FEE = 1e6;
 
     uint internal constant FEE_DEBT_SCENARIO_DEPOSIT = 100_000e6;
     uint internal constant FEE_DEBT_SCENARIO_REVENUE = 10_000e6;
@@ -46,34 +33,22 @@ abstract contract TangemAaveV3YieldModuleBase is TangemBaseTest {
 
     TestERC20 public yieldToken;
     TestERC20 public protocolToken;
-    TangemERC2771Forwarder public forwarder;
     AaveV3PoolMock public pool;
-    TangemYieldProcessor public processor;
-    TangemYieldModuleFactory public factory;
-    SwapExecutionRegistry public swapExecutionRegistry;
     MerklDistributorMock public merklDistributor;
     SwapProviderMock public swapProvider;
     TangemAaveV3YieldModuleHarness public implementation;
 
-    function setUp() public virtual {
+    function setUp() public virtual override {
+        super.setUp();
+
         vm.startPrank(backend);
 
-        yieldToken = new TestERC20();
-        forwarder = new TangemERC2771Forwarder();
         pool = new AaveV3PoolMock();
-        yieldToken.mint(address(pool), POOL_LIQUIDITY);
-
-        processor = new TangemYieldProcessor(feeReceiver, SERVICE_FEE_RATE);
-        processor.grantRole(processor.PROTOCOL_ENTERER_ROLE(), backend);
-        processor.grantRole(processor.PROTOCOL_EXITER_ROLE(), backend);
-        processor.grantRole(processor.SERVICE_FEE_COLLECTOR_ROLE(), backend);
-        processor.grantRole(processor.PROPERTY_SETTER_ROLE(), backend);
-        processor.grantRole(processor.PAUSER_ROLE(), backend);
-
-        factory = new TangemYieldModuleFactory();
-        swapExecutionRegistry = new SwapExecutionRegistry(backend);
         merklDistributor = new MerklDistributorMock();
         swapProvider = new SwapProviderMock();
+
+        yieldToken = new TestERC20();
+        yieldToken.mint(address(pool), POOL_LIQUIDITY);
 
         implementation = new TangemAaveV3YieldModuleHarness(
             address(pool),
@@ -84,8 +59,6 @@ abstract contract TangemAaveV3YieldModuleBase is TangemBaseTest {
             address(swapExecutionRegistry)
         );
 
-        factory.grantRole(factory.IMPLEMENTATION_SETTER_ROLE(), backend);
-        factory.grantRole(factory.PAUSER_ROLE(), backend);
         factory.setImplementation(address(implementation));
         factory.unpause();
 
@@ -93,10 +66,19 @@ abstract contract TangemAaveV3YieldModuleBase is TangemBaseTest {
 
         protocolToken = pool.aToken();
 
-        _labelAddresses();
+        _labelAaveAddresses();
     }
 
-    /* FIXTURE HELPERS */
+    function _labelAaveAddresses() internal {
+        vm.label(address(yieldToken), "yieldToken");
+        vm.label(address(protocolToken), "protocolToken");
+        vm.label(address(pool), "aavePoolMock");
+        vm.label(address(merklDistributor), "merklDistributor");
+        vm.label(address(swapProvider), "swapProvider");
+        vm.label(address(implementation), "implementation");
+    }
+
+    /* FIXTURE HELPERS (return the Aave harness type) */
 
     function _deployYieldModule(
         address moduleOwner,
@@ -145,6 +127,26 @@ abstract contract TangemAaveV3YieldModuleBase is TangemBaseTest {
         _enterViaProcessor(yieldModule, 0);
         _generateRevenue(address(yieldModule), ACCUMULATED_REVENUE);
     }
+
+    /* AAVE-SPECIFIC ACTOR WRAPPERS (bind yieldToken) */
+
+    function _enterViaProcessor(TangemAaveV3YieldModuleHarness yieldModule, uint networkFee)
+        internal
+    {
+        _enterViaProcessor(IYieldModule(address(yieldModule)), address(yieldToken), networkFee);
+    }
+
+    function _exitViaProcessor(TangemAaveV3YieldModuleHarness yieldModule, uint networkFee)
+        internal
+    {
+        _exitViaProcessor(IYieldModule(address(yieldModule)), address(yieldToken), networkFee);
+    }
+
+    function _collectViaProcessor(TangemAaveV3YieldModuleHarness yieldModule) internal {
+        _collectViaProcessor(IYieldModule(address(yieldModule)), address(yieldToken));
+    }
+
+    /* FEE-DEBT SCENARIO */
 
     /// Scenario: fee debt persisted after failed fee payment, protocol balance below the debt.
     /// Mirrors the hardhat "Fee debt persistence" setup: enter, generate revenue, force fee
@@ -196,94 +198,15 @@ abstract contract TangemAaveV3YieldModuleBase is TangemBaseTest {
         vm.stopPrank();
     }
 
-    function _enterViaProcessor(
-        TangemAaveV3YieldModuleHarness yieldModule,
-        uint networkFee
-    ) internal {
-        vm.prank(backend);
-        processor.enterProtocol(address(yieldModule), address(yieldToken), networkFee);
-    }
-
-    function _exitViaProcessor(
-        TangemAaveV3YieldModuleHarness yieldModule,
-        uint networkFee
-    ) internal {
-        vm.prank(backend);
-        processor.exitProtocol(address(yieldModule), address(yieldToken), networkFee);
-    }
-
-    function _collectViaProcessor(TangemAaveV3YieldModuleHarness yieldModule) internal {
-        vm.prank(backend);
-        processor.collectServiceFee(address(yieldModule), address(yieldToken));
-    }
-
-    function _withdraw(
-        TangemAaveV3YieldModuleHarness yieldModule,
-        address moduleOwner,
-        address token,
-        uint amount
-    ) internal {
-        vm.prank(moduleOwner);
-        yieldModule.withdraw(token, amount);
-    }
-
-    function _withdrawAndDeactivate(
-        TangemAaveV3YieldModuleHarness yieldModule,
-        address moduleOwner,
-        address token
-    ) internal {
-        vm.prank(moduleOwner);
-        yieldModule.withdrawAndDeactivate(token);
-    }
-
-    function _setServiceFeeRate(uint feeRate) internal {
-        vm.prank(backend);
-        processor.setServiceFeeRate(feeRate);
-    }
-
-    function _allowSwapProvider(address provider) internal {
-        vm.startPrank(backend);
-        swapExecutionRegistry.setTargetAllowed(provider, true);
-        swapExecutionRegistry.setSpenderAllowed(provider, true);
-        vm.stopPrank();
-    }
-
-    function _deployTestToken() internal returns (TestERC20 token) {
-        vm.prank(backend);
-        token = new TestERC20();
-    }
-
-    function _mintYieldToken(address to, uint amount) internal {
-        vm.prank(backend);
-        yieldToken.mint(to, amount);
-    }
-
-    function _mintToken(TestERC20 token, address to, uint amount) internal {
-        vm.prank(backend);
-        token.mint(to, amount);
-    }
+    /* AAVE-SPECIFIC HELPERS */
 
     /// Simulates protocol yield by minting protocol (aave) tokens to the account.
     function _generateRevenue(address account, uint amount) internal {
         pool.generateRevenue(account, amount);
     }
 
-    function _assertEventNotEmitted(Vm.Log[] memory entries, bytes32 eventSig) internal pure {
-        for (uint i; i < entries.length; i++) {
-            require(entries[i].topics[0] != eventSig, "expected event not to be emitted");
-        }
-    }
-
-    function _labelAddresses() internal {
-        vm.label(address(yieldToken), "yieldToken");
-        vm.label(address(protocolToken), "protocolToken");
-        vm.label(address(pool), "aavePoolMock");
-        vm.label(address(processor), "processor");
-        vm.label(address(factory), "factory");
-        vm.label(address(swapExecutionRegistry), "swapExecutionRegistry");
-        vm.label(address(merklDistributor), "merklDistributor");
-        vm.label(address(swapProvider), "swapProvider");
-        vm.label(address(forwarder), "forwarder");
-        vm.label(address(implementation), "implementation");
+    function _mintYieldToken(address to, uint amount) internal override {
+        vm.prank(backend);
+        yieldToken.mint(to, amount);
     }
 }

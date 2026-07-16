@@ -5,14 +5,14 @@ pragma solidity ^0.8.29;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import { TangemAaveV3YieldModuleHarness } from "../harnesses/TangemAaveV3YieldModuleHarness.sol";
-import { TangemAaveV3YieldModuleBase } from "./base/TangemAaveV3YieldModuleBase.sol";
+import { AaveV3YieldModuleBase } from "../AaveV3YieldModuleBase.sol";
 
 import { Requires } from "contracts/common/Requires.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 import { PRECISION } from "contracts/resources/Constants.sol";
 import { AaveV3PoolMock } from "contracts/test/AaveV3PoolMock.sol";
 
-contract WithdrawTest is TangemAaveV3YieldModuleBase {
+contract WithdrawTest is AaveV3YieldModuleBase {
     uint internal constant WITHDRAW_AMOUNT = 2_000e6;
     uint internal constant NATIVE_BALANCE = 0.001 ether;
     uint internal constant MODULE_BALANCE = 4_000_000e6;

@@ -5,13 +5,13 @@ pragma solidity ^0.8.29;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import { TangemAaveV3YieldModuleHarness } from "../harnesses/TangemAaveV3YieldModuleHarness.sol";
-import { TangemAaveV3YieldModuleBase } from "./base/TangemAaveV3YieldModuleBase.sol";
+import { AaveV3YieldModuleBase } from "../AaveV3YieldModuleBase.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 import { PRECISION } from "contracts/resources/Constants.sol";
 import { AaveV3PoolMock } from "contracts/test/AaveV3PoolMock.sol";
 
-contract ExitProtocolTest is TangemAaveV3YieldModuleBase {
+contract ExitProtocolTest is AaveV3YieldModuleBase {
     TangemAaveV3YieldModuleHarness internal yieldModule;
     uint internal serviceFee;
 

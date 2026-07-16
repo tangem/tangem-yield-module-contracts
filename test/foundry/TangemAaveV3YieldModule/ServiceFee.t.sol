@@ -3,11 +3,11 @@
 pragma solidity ^0.8.29;
 
 import { TangemAaveV3YieldModuleHarness } from "../harnesses/TangemAaveV3YieldModuleHarness.sol";
-import { TangemAaveV3YieldModuleBase } from "./base/TangemAaveV3YieldModuleBase.sol";
+import { AaveV3YieldModuleBase } from "../AaveV3YieldModuleBase.sol";
 
 import { PRECISION } from "contracts/resources/Constants.sol";
 
-contract ServiceFeeTest is TangemAaveV3YieldModuleBase {
+contract ServiceFeeTest is AaveV3YieldModuleBase {
     uint internal constant SF_INITIAL_OWNER_BALANCE = 200_000e6;
     uint internal feeDebt = FEE_DEBT_SCENARIO_REVENUE * SERVICE_FEE_RATE / PRECISION;
 
