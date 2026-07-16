@@ -2,19 +2,20 @@
 /* solhint-disable func-name-mixedcase */
 pragma solidity ^0.8.29;
 
-import { TangemAaveV3YieldModuleHarness } from "../harnesses/TangemAaveV3YieldModuleHarness.sol";
-import { AaveV3YieldModuleBase } from "../AaveV3YieldModuleBase.sol";
+import { YieldModuleBase } from "../YieldModuleBase.sol";
+import { YieldModuleGenericHarness } from "../harnesses/YieldModuleGenericHarness.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
-contract NetworkFeeTest is AaveV3YieldModuleBase {
+contract NetworkFeeTest is YieldModuleBase {
     uint240 internal constant NEW_MAX_NETWORK_FEE = 5e6;
 
-    TangemAaveV3YieldModuleHarness internal yieldModule;
+    YieldModuleGenericHarness internal yieldModule;
 
     function setUp() public override {
         super.setUp();
-        yieldModule = _deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
+        _registerGenericImplementation();
+        yieldModule = _deployGenericYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
     }
 
     function test_setYieldTokenMaxNetworkFee_SetsNewMaxNetworkFee() public {

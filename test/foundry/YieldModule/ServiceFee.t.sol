@@ -2,32 +2,33 @@
 /* solhint-disable func-name-mixedcase */
 pragma solidity ^0.8.29;
 
-import { TangemAaveV3YieldModuleHarness } from "../harnesses/TangemAaveV3YieldModuleHarness.sol";
-import { AaveV3YieldModuleBase } from "../AaveV3YieldModuleBase.sol";
+import { YieldModuleBase } from "../YieldModuleBase.sol";
+import { YieldModuleGenericHarness } from "../harnesses/YieldModuleGenericHarness.sol";
 
 import { PRECISION } from "contracts/resources/Constants.sol";
 
-contract ServiceFeeTest is AaveV3YieldModuleBase {
+contract ServiceFeeTest is YieldModuleBase {
     uint internal constant SF_INITIAL_OWNER_BALANCE = 200_000e6;
     uint internal feeDebt = FEE_DEBT_SCENARIO_REVENUE * SERVICE_FEE_RATE / PRECISION;
 
-    TangemAaveV3YieldModuleHarness internal debtModule;
+    YieldModuleGenericHarness internal debtModule;
     uint internal remainingFeeDebt;
     address internal debtOwner = makeAddr("debtOwner");
 
     function setUp() public override {
         super.setUp();
-        (debtModule, remainingFeeDebt) = _createFeeDebtState(debtOwner);
+        _registerGenericImplementation();
+        (debtModule, remainingFeeDebt) = _createGenericFeeDebtState(debtOwner);
     }
 
     /* ==================================================== calculateServiceFee ==================================================== */
 
     function test_calculateServiceFee_AfterRevenue() public {
-        TangemAaveV3YieldModuleHarness yieldModule =
-            _deployEnteredYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
+        YieldModuleGenericHarness yieldModule =
+            _deployEnteredGenericYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
         uint revenue = 10_000e6;
 
-        _generateRevenue(address(yieldModule), revenue);
+        _generateRevenue(address(yieldToken), address(yieldModule), revenue);
 
         uint expectedFee = revenue * SERVICE_FEE_RATE / PRECISION;
         assertEq(yieldModule.calculateServiceFee(address(yieldToken)), expectedFee);
@@ -35,8 +36,8 @@ contract ServiceFeeTest is AaveV3YieldModuleBase {
 
     // example of pre-seeding internal state through the harness
     function test_calculateServiceFee_IncludesPreseededFeeDebt() public {
-        TangemAaveV3YieldModuleHarness yieldModule =
-            _deployEnteredYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
+        YieldModuleGenericHarness yieldModule =
+            _deployEnteredGenericYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
         uint feeDebt_ = 700e6;
 
         yieldModule.exposed_setFeeDebt(address(yieldToken), feeDebt_);
@@ -45,8 +46,8 @@ contract ServiceFeeTest is AaveV3YieldModuleBase {
     }
 
     function testFuzz_calculateServiceFee(uint revenue, uint feeRate, uint feeDebt_) public {
-        TangemAaveV3YieldModuleHarness yieldModule =
-            _deployEnteredYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
+        YieldModuleGenericHarness yieldModule =
+            _deployEnteredGenericYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
         revenue = bound(revenue, 0, 1_000_000_000e6);
         feeRate = bound(feeRate, 0, PRECISION);
         feeDebt_ = bound(feeDebt_, 0, 1_000_000e6);
@@ -56,15 +57,15 @@ contract ServiceFeeTest is AaveV3YieldModuleBase {
             address(yieldToken), SF_INITIAL_OWNER_BALANCE, feeRate
         );
         yieldModule.exposed_setFeeDebt(address(yieldToken), feeDebt_);
-        _generateRevenue(address(yieldModule), revenue);
+        _generateRevenue(address(yieldToken), address(yieldModule), revenue);
 
         uint expectedFee = revenue * feeRate / PRECISION + feeDebt_;
         assertEq(yieldModule.calculateServiceFee(address(yieldToken)), expectedFee);
     }
 
     function testFuzz_effectiveBalances(uint revenue, uint feeRate, uint feeDebt_) public {
-        TangemAaveV3YieldModuleHarness yieldModule =
-            _deployEnteredYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
+        YieldModuleGenericHarness yieldModule =
+            _deployEnteredGenericYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
         revenue = bound(revenue, 0, 1_000_000e6);
         feeRate = bound(feeRate, 0, PRECISION);
         // large debts make the fee exceed the protocol balance => clamping branch
@@ -74,7 +75,7 @@ contract ServiceFeeTest is AaveV3YieldModuleBase {
             address(yieldToken), SF_INITIAL_OWNER_BALANCE, feeRate
         );
         yieldModule.exposed_setFeeDebt(address(yieldToken), feeDebt_);
-        _generateRevenue(address(yieldModule), revenue);
+        _generateRevenue(address(yieldToken), address(yieldModule), revenue);
 
         uint protocolBalance = SF_INITIAL_OWNER_BALANCE + revenue;
         uint fee = yieldModule.calculateServiceFee(address(yieldToken));
@@ -92,8 +93,8 @@ contract ServiceFeeTest is AaveV3YieldModuleBase {
     function testFuzz_enterProtocolByOwner_PartiallyRepaysFeeDebt(uint reEnterDeposit) public {
         reEnterDeposit = bound(reEnterDeposit, 1, feeDebt - 1);
 
-        (TangemAaveV3YieldModuleHarness yieldModule,) =
-            _createFeeDebtState(otherAccount, reEnterDeposit);
+        (YieldModuleGenericHarness yieldModule,) =
+            _createGenericFeeDebtState(otherAccount, reEnterDeposit);
 
         // the whole deposit goes toward the debt (FeePaymentPartial path)
         assertEq(yieldModule.feeDebts(address(yieldToken)), feeDebt - reEnterDeposit);
@@ -106,8 +107,8 @@ contract ServiceFeeTest is AaveV3YieldModuleBase {
     ) public {
         reEnterDeposit = bound(reEnterDeposit, feeDebt, FEE_DEBT_SCENARIO_DEPOSIT);
 
-        (TangemAaveV3YieldModuleHarness yieldModule,) =
-            _createFeeDebtState(otherAccount, reEnterDeposit);
+        (YieldModuleGenericHarness yieldModule,) =
+            _createGenericFeeDebtState(otherAccount, reEnterDeposit);
 
         assertEq(yieldModule.feeDebts(address(yieldToken)), 0);
         assertEq(yieldModule.calculateServiceFee(address(yieldToken)), 0);

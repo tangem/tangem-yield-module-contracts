@@ -4,20 +4,21 @@ pragma solidity ^0.8.29;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import { TangemAaveV3YieldModuleHarness } from "../harnesses/TangemAaveV3YieldModuleHarness.sol";
-import { AaveV3YieldModuleBase } from "../AaveV3YieldModuleBase.sol";
+import { YieldModuleBase } from "../YieldModuleBase.sol";
+import { YieldModuleGenericHarness } from "../harnesses/YieldModuleGenericHarness.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 import { PRECISION } from "contracts/resources/Constants.sol";
 
-contract CollectServiceFeeTest is AaveV3YieldModuleBase {
-    TangemAaveV3YieldModuleHarness internal yieldModule;
+contract CollectServiceFeeTest is YieldModuleBase {
+    YieldModuleGenericHarness internal yieldModule;
     uint internal serviceFee;
 
     function setUp() public override {
         super.setUp();
+        _registerGenericImplementation();
 
-        yieldModule = _deployEnteredRevenueModule(owner);
+        yieldModule = _deployEnteredRevenueGenericModule(owner);
         serviceFee = ACCUMULATED_SERVICE_FEE;
     }
 
@@ -40,7 +41,9 @@ contract CollectServiceFeeTest is AaveV3YieldModuleBase {
     }
 
     function test_collectServiceFee_TransfersServiceFeeToFeeReceiver() public {
-        vm.expectEmit(address(protocolToken));
+        address protocolTokenAddr = address(yieldModule.protocolTokens(address(yieldToken)));
+
+        vm.expectEmit(protocolTokenAddr);
         emit IERC20.Transfer(address(yieldModule), feeReceiver, serviceFee);
 
         _collectViaProcessor(yieldModule);
@@ -60,8 +63,8 @@ contract CollectServiceFeeTest is AaveV3YieldModuleBase {
     }
 
     function test_collectServiceFee_RevertsNothingToCollect() public {
-        TangemAaveV3YieldModuleHarness yieldModule2 =
-            _deployYieldModuleWithFunds(otherAccount, 10_000e6);
+        YieldModuleGenericHarness yieldModule2 =
+            _deployGenericYieldModuleWithFunds(otherAccount, 10_000e6);
 
         // first enter with zero network fee and no revenue => baseline sync only, nothing to collect
         _enterViaProcessor(yieldModule2, 0);
@@ -74,12 +77,12 @@ contract CollectServiceFeeTest is AaveV3YieldModuleBase {
     function test_collectServiceFee_RevertsFeeProcessingFailedWhenDebtExistsAndProtocolBalanceIsZero()
         public
     {
-        TangemAaveV3YieldModuleHarness yieldModule2 =
-            _deployYieldModuleWithFunds(otherAccount, 100_000e6);
+        YieldModuleGenericHarness yieldModule2 =
+            _deployGenericYieldModuleWithFunds(otherAccount, 100_000e6);
         uint revenue = 10_000e6;
 
         _enterViaProcessor(yieldModule2, 0);
-        _generateRevenue(address(yieldModule2), revenue);
+        _generateRevenue(address(yieldToken), address(yieldModule2), revenue);
 
         uint expectedFee = revenue * SERVICE_FEE_RATE / PRECISION;
 

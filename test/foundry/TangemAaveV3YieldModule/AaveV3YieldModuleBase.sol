@@ -13,14 +13,7 @@ abstract contract AaveV3YieldModuleBase is YieldModuleBase {
     /* Aave scenario amounts */
     uint internal constant INITIAL_MODULE_BALANCE = 50_000e6;
     uint internal constant TOTAL_ENTER_AMOUNT = INITIAL_OWNER_BALANCE + INITIAL_MODULE_BALANCE;
-    // service fee derived from ACCUMULATED_REVENUE at the default SERVICE_FEE_RATE
-    uint internal constant ACCUMULATED_SERVICE_FEE = ACCUMULATED_REVENUE * SERVICE_FEE_RATE / PRECISION;
-    // protocol balance after entering INITIAL_OWNER_BALANCE and generating ACCUMULATED_REVENUE
-    uint internal constant PROTOCOL_BALANCE = INITIAL_OWNER_BALANCE + ACCUMULATED_REVENUE;
     uint internal constant FRESH_OWNER_BALANCE = 50_000e6;
-
-    uint internal constant FEE_DEBT_SCENARIO_DEPOSIT = 100_000e6;
-    uint internal constant FEE_DEBT_SCENARIO_REVENUE = 10_000e6;
 
     TestERC20 public protocolToken;
     AaveV3PoolMock public pool;
@@ -184,5 +177,15 @@ abstract contract AaveV3YieldModuleBase is YieldModuleBase {
     /// Simulates protocol yield by minting protocol (aave) tokens to the account.
     function _generateRevenue(address account, uint amount) internal {
         pool.generateRevenue(account, amount);
+    }
+
+    /// Override of the generic 3-arg hook — delegates to the AAVE pool.
+    function _generateRevenue(address, address account, uint amount) internal override {
+        pool.generateRevenue(account, amount);
+    }
+
+    /// Returns the AAVE aToken address for the default yieldToken.
+    function _protocolToken() internal view override returns (address) {
+        return address(protocolToken);
     }
 }
