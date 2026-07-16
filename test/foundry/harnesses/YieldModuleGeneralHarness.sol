@@ -38,11 +38,8 @@ contract YieldModuleGeneralHarness is YieldModuleHarness {
     /* HOOK IMPLEMENTATIONS — fake pool via TestERC20 mint/burn */
 
     function _initProtocolToken(address yieldToken) internal override returns (address) {
-        TestERC20 pt = new TestERC20();
-        // Burn the initial 1M supply from the constructor — protocolToken balance should only
-        // reflect actual deposits via _pushToProtocol.
+        TestERC20 pt = new TestERC20("TestProtocolToken", "ptTST", 18);
         pt.forceBurn(address(this), pt.balanceOf(address(this)));
-        pt.transferOwnership(address(this));
         _protocolTokens[yieldToken] = pt;
         _yieldTokensByProtocol[address(pt)] = yieldToken;
         return address(pt);
@@ -62,7 +59,6 @@ contract YieldModuleGeneralHarness is YieldModuleHarness {
     }
 
     function _pushToProtocol(address yieldToken, uint amount) internal override {
-        // YieldToken stays on module balance (locked). ProtocolToken minted to track _protocolBalance.
         _protocolTokens[yieldToken].mint(address(this), amount);
     }
 

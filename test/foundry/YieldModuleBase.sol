@@ -62,7 +62,7 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         swapExecutionRegistry = new SwapExecutionRegistry(backend);
         merklDistributor = new MerklDistributorMock();
         swapProvider = new SwapProviderMock();
-        yieldToken = new TestERC20();
+        yieldToken = new TestERC20("TestYieldToken", "TYT", 18);
 
         ymGeneralImpl = new YieldModuleGeneralHarness(
             address(merklDistributor),

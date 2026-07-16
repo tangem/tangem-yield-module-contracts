@@ -4,20 +4,20 @@ pragma solidity ^0.8.29;
 
 import {
     MerklIncentivesBase,
-    TestERC20,
-    YieldModuleGeneralHarness
+    TangemAaveV3YieldModuleHarness,
+    TestERC20
 } from "./MerklIncentivesBase.sol";
 import { Requires } from "contracts/common/Requires.sol";
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
 contract MerklIncentivesTest is MerklIncentivesBase {
-    YieldModuleGeneralHarness ym;
+    TangemAaveV3YieldModuleHarness ym;
 
     function setUp() public override {
         super.setUp();
 
-        ym = _deployModuleWithMerkl(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
+        ym = _deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
     }
 
     /* Access control */
