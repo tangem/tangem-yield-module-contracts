@@ -44,6 +44,23 @@ contract RewardRouteTest is MerklIncentivesBase {
         _claimSingleAsOwner(address(rewardToken), AMOUNT);
     }
 
+    function test_claim_SendsToOwner_WhenYieldTokenIsDeactivated() public {
+        _withdrawAndDeactivate(ym, owner, address(yieldToken));
+
+        uint ownerBalanceBefore = yieldToken.balanceOf(owner);
+        uint poolBalanceBefore = yieldToken.balanceOf(address(pool));
+        uint protocolBalanceBefore = ym.protocolBalance(address(yieldToken));
+
+        _fundMerklDistributor(address(yieldToken), AMOUNT);
+
+        _claimSingleAsOwner(address(yieldToken), AMOUNT);
+
+        // a deactivated yieldToken is not pushed back to the protocol — it goes to the owner
+        assertEq(yieldToken.balanceOf(owner), ownerBalanceBefore + AMOUNT);
+        assertEq(yieldToken.balanceOf(address(pool)), poolBalanceBefore);
+        assertEq(ym.protocolBalance(address(yieldToken)), protocolBalanceBefore);
+    }
+
     function testFuzz_claim_SendsToOwner_ManyUnknownTokens(
         uint numTokens,
         uint[10] memory rawAmounts
@@ -75,17 +92,23 @@ contract RewardRouteTest is MerklIncentivesBase {
 
     /* PUSH_TO_PROTOCOL — reward token is an active yield token */
 
-    function test_claim_PushesToProtocol_WhenRewardTokenIsActiveYieldToken() public {
+    function testFuzz_claim_PushesToProtocol_WhenRewardTokenIsActiveYieldToken(
+        uint amount
+    ) public {
+        amount = bound(amount, 1, 1_000_000_000e18);
+
         uint poolBalanceBefore = yieldToken.balanceOf(address(pool));
 
-        _fundMerklDistributor(address(yieldToken), AMOUNT);
+        _fundMerklDistributor(address(yieldToken), amount);
 
-        _claimSingleAsOwner(address(yieldToken), AMOUNT);
+        _claimSingleAsOwner(address(yieldToken), amount);
 
-        assertEq(ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + AMOUNT);
-        assertEq(yieldToken.balanceOf(address(pool)), poolBalanceBefore + AMOUNT);
+        assertEq(ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + amount);
+        assertEq(yieldToken.balanceOf(address(pool)), poolBalanceBefore + amount);
         assertEq(yieldToken.balanceOf(address(ym)), 0);
         assertEq(yieldToken.balanceOf(owner), 0);
+        // the reward itself is fee-free at any size
+        assertEq(ym.calculateServiceFee(address(yieldToken)), ACCUMULATED_SERVICE_FEE);
     }
 
     function test_claim_PushesToProtocol_EmitsMerklClaimed() public {
@@ -124,15 +147,19 @@ contract RewardRouteTest is MerklIncentivesBase {
 
     /* KEEP_IN_MODULE — reward token is a protocol token of an active yield token */
 
-    function test_claim_KeepsInModule_WhenRewardTokenIsProtocolTokenOfActiveYieldToken() public {
+    function testFuzz_claim_KeepsInModule_WhenRewardTokenIsProtocolTokenOfActiveYieldToken(
+        uint amount
+    ) public {
+        amount = bound(amount, 1, 1_000_000_000e18);
+
         uint poolBalanceBefore = yieldToken.balanceOf(address(pool));
 
-        _fundMerklDistributor(address(protocolToken), AMOUNT);
+        _fundMerklDistributor(address(protocolToken), amount);
 
-        _claimSingleAsOwner(address(protocolToken), AMOUNT);
+        _claimSingleAsOwner(address(protocolToken), amount);
 
-        assertEq(ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + AMOUNT);
-        assertEq(protocolToken.balanceOf(address(ym)), PROTOCOL_BALANCE + AMOUNT);
+        assertEq(ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + amount);
+        assertEq(protocolToken.balanceOf(address(ym)), PROTOCOL_BALANCE + amount);
         assertEq(protocolToken.balanceOf(owner), 0);
         assertEq(yieldToken.balanceOf(address(pool)), poolBalanceBefore);
         assertEq(ym.calculateServiceFee(address(yieldToken)), ACCUMULATED_SERVICE_FEE);
@@ -158,18 +185,21 @@ contract RewardRouteTest is MerklIncentivesBase {
 
     /* UNWRAP_TO_OWNER — reward token is a protocol token of an inactive yield token */
 
-    function test_claim_UnwrapsToOwner_WhenYieldTokenIsInactive() public {
+    function testFuzz_claim_UnwrapsToOwner_WhenYieldTokenIsInactive(uint amount) public {
         _withdrawAndDeactivate(ym, owner, address(yieldToken));
 
         uint ownerBalanceBefore = yieldToken.balanceOf(owner);
         uint poolBalanceBefore = yieldToken.balanceOf(address(pool));
 
-        _fundMerklDistributor(address(protocolToken), AMOUNT);
+        // unwrap pays the underlying out of the pool, so it is capped by pool liquidity
+        amount = bound(amount, 1, poolBalanceBefore);
 
-        _claimSingleAsOwner(address(protocolToken), AMOUNT);
+        _fundMerklDistributor(address(protocolToken), amount);
 
-        assertEq(yieldToken.balanceOf(owner), ownerBalanceBefore + AMOUNT);
-        assertEq(yieldToken.balanceOf(address(pool)), poolBalanceBefore - AMOUNT);
+        _claimSingleAsOwner(address(protocolToken), amount);
+
+        assertEq(yieldToken.balanceOf(owner), ownerBalanceBefore + amount);
+        assertEq(yieldToken.balanceOf(address(pool)), poolBalanceBefore - amount);
     }
 
     function test_claim_UnwrapsToOwner_ConsumesClaimedProtocolToken() public {
@@ -225,15 +255,33 @@ contract RewardRouteTest is MerklIncentivesBase {
         _claimSingleAsOwner(address(rewardToken), AMOUNT);
     }
 
+    function test_claim_Reverts_WhenDistributorPaysNothingToModule() public {
+        _fundMerklDistributor(address(yieldToken), AMOUNT);
+
+        _claimSingleAsOwner(address(yieldToken), AMOUNT);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IMerklIncentives.MerklClaimedNoReward.selector, address(yieldToken), address(ym)
+            )
+        );
+
+        _claimSingleAsOwner(address(yieldToken), AMOUNT);
+    }
+
     /* Mixed routes — multiple reward tokens in one claim */
 
-    function test_claim_RoutesEachToken_WhenMixedRoutes() public {
+    function testFuzz_claim_RoutesEachToken_WhenMixedRoutes(
+        uint sendAmount,
+        uint pushAmount,
+        uint keepAmount
+    ) public {
         uint poolBalanceBefore = yieldToken.balanceOf(address(pool));
 
-        // distinct amounts per route to catch any cross-wiring between them
-        uint sendAmount = AMOUNT;
-        uint pushAmount = 2 * AMOUNT;
-        uint keepAmount = 3 * AMOUNT;
+        // independent amounts per route to catch any cross-wiring between them
+        sendAmount = bound(sendAmount, 1, 1_000_000_000e18);
+        pushAmount = bound(pushAmount, 1, 1_000_000_000e18);
+        keepAmount = bound(keepAmount, 1, 1_000_000_000e18);
 
         TestERC20 unknownToken = _createRewardToken();
         _fundMerklDistributor(address(unknownToken), sendAmount);
