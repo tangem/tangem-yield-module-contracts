@@ -22,4 +22,16 @@ abstract contract YieldModuleHarness is MerklIncentives {
             LatestFeePaymentState(protocolBalance_, serviceFeeRate_);
     }
 
+    function exposed_setYieldTokenByProtocolToken(
+        address protocolToken,
+        address yieldToken
+    ) public {
+        yieldTokenByProtocolToken[protocolToken] = yieldToken;
+    }
+
+    /* WRAPPERS */
+
+    function exposed_getYieldToken(address protocolToken) public returns (address) {
+        return _getYieldToken(protocolToken);
+    }
 }
