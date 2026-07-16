@@ -7,16 +7,9 @@ import { YieldModuleBase } from "test/foundry/YieldModuleBase.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 import { PRECISION } from "contracts/resources/Constants.sol";
 import { AaveV3PoolMock } from "contracts/test/AaveV3PoolMock.sol";
-import { MerklDistributorMock } from "contracts/test/MerklDistributorMock.sol";
-import { SwapProviderMock } from "contracts/test/SwapProviderMock.sol";
 import { TestERC20 } from "contracts/test/TestERC20.sol";
 
 abstract contract AaveV3YieldModuleBase is YieldModuleBase {
-    bytes32 internal constant POOL_WITHDRAW_EVENT_SIG =
-        keccak256("Withdraw(address,uint256,address)");
-
-    uint internal constant POOL_LIQUIDITY = 1_000_000e6;
-
     /* Aave scenario amounts */
     uint internal constant INITIAL_MODULE_BALANCE = 50_000e6;
     uint internal constant TOTAL_ENTER_AMOUNT = INITIAL_OWNER_BALANCE + INITIAL_MODULE_BALANCE;
@@ -28,14 +21,9 @@ abstract contract AaveV3YieldModuleBase is YieldModuleBase {
 
     uint internal constant FEE_DEBT_SCENARIO_DEPOSIT = 100_000e6;
     uint internal constant FEE_DEBT_SCENARIO_REVENUE = 10_000e6;
-    uint internal constant FEE_DEBT_SCENARIO_DEBT =
-        FEE_DEBT_SCENARIO_REVENUE * SERVICE_FEE_RATE / PRECISION;
 
-    TestERC20 public yieldToken;
     TestERC20 public protocolToken;
     AaveV3PoolMock public pool;
-    MerklDistributorMock public merklDistributor;
-    SwapProviderMock public swapProvider;
     TangemAaveV3YieldModuleHarness public implementation;
 
     function setUp() public virtual override {
@@ -44,10 +32,6 @@ abstract contract AaveV3YieldModuleBase is YieldModuleBase {
         vm.startPrank(backend);
 
         pool = new AaveV3PoolMock();
-        merklDistributor = new MerklDistributorMock();
-        swapProvider = new SwapProviderMock();
-
-        yieldToken = new TestERC20();
         yieldToken.mint(address(pool), POOL_LIQUIDITY);
 
         implementation = new TangemAaveV3YieldModuleHarness(
@@ -70,11 +54,8 @@ abstract contract AaveV3YieldModuleBase is YieldModuleBase {
     }
 
     function _labelAaveAddresses() internal {
-        vm.label(address(yieldToken), "yieldToken");
         vm.label(address(protocolToken), "protocolToken");
         vm.label(address(pool), "aavePoolMock");
-        vm.label(address(merklDistributor), "merklDistributor");
-        vm.label(address(swapProvider), "swapProvider");
         vm.label(address(implementation), "implementation");
     }
 
@@ -203,10 +184,5 @@ abstract contract AaveV3YieldModuleBase is YieldModuleBase {
     /// Simulates protocol yield by minting protocol (aave) tokens to the account.
     function _generateRevenue(address account, uint amount) internal {
         pool.generateRevenue(account, amount);
-    }
-
-    function _mintYieldToken(address to, uint amount) internal override {
-        vm.prank(backend);
-        yieldToken.mint(to, amount);
     }
 }

@@ -51,7 +51,7 @@ contract SendTest is AaveV3YieldModuleBase {
         vm.recordLogs();
         _send(SEND_AMOUNT);
 
-        _assertEventNotEmitted(vm.getRecordedLogs(), POOL_WITHDRAW_EVENT_SIG);
+        _assertEventNotEmitted(vm.getRecordedLogs(), keccak256("Withdraw(address,uint256,address)"));
     }
 
     function test_send_TransfersAmountFromOwnerToReceiver() public {
@@ -113,7 +113,7 @@ contract SendTest is AaveV3YieldModuleBase {
 
         vm.recordLogs();
         _send(SEND_AMOUNT);
-        _assertEventNotEmitted(vm.getRecordedLogs(), FEE_PAYMENT_PROCESSED_EVENT_SIG);
+        _assertEventNotEmitted(vm.getRecordedLogs(), keccak256("FeePaymentProcessed(address,uint256,address)"));
 
         _mintYieldToken(owner, SEND_AMOUNT);
 
