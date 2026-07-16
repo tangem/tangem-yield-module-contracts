@@ -44,6 +44,30 @@ contract RewardRouteTest is MerklIncentivesBase {
         _claimSingleAsOwner(address(rewardToken), AMOUNT);
     }
 
+    function test_claim_SendsToOwner_UsesReceivedDelta_WhenRewardTokenHasTransferTax() public {
+        uint tax = AMOUNT / 10;
+
+        TestERC20 rewardToken = _createRewardToken();
+        rewardToken.setFixedTax(tax);
+        _fundMerklDistributor(address(rewardToken), AMOUNT);
+
+        // routing and the event carry the actually received delta, not the claimed amount
+        vm.expectEmit(address(ym));
+        emit IMerklIncentives.MerklClaimed(
+            address(merklDistributor),
+            address(rewardToken),
+            AMOUNT - tax,
+            owner,
+            address(rewardToken),
+            AMOUNT - tax,
+            owner
+        );
+
+        _claimSingleAsOwner(address(rewardToken), AMOUNT);
+
+        assertEq(rewardToken.balanceOf(owner), AMOUNT - tax);
+    }
+
     function test_claim_SendsToOwner_WhenYieldTokenIsDeactivated() public {
         _withdrawAndDeactivate(ym, owner, address(yieldToken));
 
@@ -319,5 +343,27 @@ contract RewardRouteTest is MerklIncentivesBase {
 
         // rewards are fee-free regardless of the route
         assertEq(ym.calculateServiceFee(address(yieldToken)), ACCUMULATED_SERVICE_FEE);
+    }
+
+    /* Withdrawal pre-claim flow */
+
+    function test_claim_ThenWithdrawAndDeactivate_TransfersEverythingToOwner() public {
+        // pre-claim: the yieldToken reward is supplied into the position
+        _fundMerklDistributor(address(yieldToken), AMOUNT);
+        _claimSingleAsOwner(address(yieldToken), AMOUNT);
+
+        uint protocolBalance = ym.protocolBalance(address(yieldToken));
+        uint fee = ym.calculateServiceFee(address(yieldToken));
+        assertEq(protocolBalance, PROTOCOL_BALANCE + AMOUNT);
+
+        _withdrawAndDeactivate(ym, owner, address(yieldToken));
+
+        // the owner exits with principal + revenue + claimed reward minus the service fee
+        assertEq(yieldToken.balanceOf(owner), protocolBalance - fee);
+        assertEq(protocolToken.balanceOf(feeReceiver), fee);
+        assertEq(ym.protocolBalance(address(yieldToken)), 0);
+
+        (, bool active,) = ym.yieldTokensData(address(yieldToken));
+        assertFalse(active);
     }
 }
