@@ -9,6 +9,8 @@ import { TangemAaveV3YieldModuleHarness } from "test/foundry/harnesses/TangemAav
 /// yield flow is explicit: supply moves the underlying to the pool and mints aToken 1:1,
 /// revenue mints extra aToken, withdraw burns aToken and returns the underlying.
 abstract contract MerklIncentivesBase is AaveV3YieldModuleBase {
+    TangemAaveV3YieldModuleHarness ym;
+
     address[] rewardTokens;
     uint[] cumulativeAmounts;
     bytes32[][] proofs;
@@ -27,5 +29,44 @@ abstract contract MerklIncentivesBase is AaveV3YieldModuleBase {
 
     function _fundMerklDistributor(address token, uint amount) internal {
         deal(token, address(merklDistributor), amount, true);
+    }
+
+    /* SINGLE-TOKEN CLAIM WRAPPERS (operate on `ym`) */
+
+    function _claimSingleAsOwner(address rewardToken, uint amount) internal {
+        (
+            address[] memory tokens,
+            uint[] memory amounts,
+            bytes32[][] memory proofs_
+        ) = _singleClaimArgs(rewardToken, amount);
+
+        vm.prank(owner);
+        ym.claimMerklRewardsOwner(tokens, amounts, proofs_);
+    }
+
+    function _claimSingleAsBE(address rewardToken, uint amount) internal {
+        (
+            address[] memory tokens,
+            uint[] memory amounts,
+            bytes32[][] memory proofs_
+        ) = _singleClaimArgs(rewardToken, amount);
+
+        vm.prank(address(processor));
+        ym.claimMerklRewardsBE(tokens, amounts, proofs_);
+    }
+
+    function _singleClaimArgs(
+        address rewardToken,
+        uint amount
+    )
+        private
+        pure
+        returns (address[] memory tokens, uint[] memory amounts, bytes32[][] memory proofs_)
+    {
+        tokens = new address[](1);
+        tokens[0] = rewardToken;
+        amounts = new uint[](1);
+        amounts[0] = amount;
+        proofs_ = new bytes32[][](1);
     }
 }

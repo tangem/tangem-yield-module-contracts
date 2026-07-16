@@ -2,17 +2,11 @@
 /* solhint-disable func-name-mixedcase */
 pragma solidity ^0.8.29;
 
-import {
-    MerklIncentivesBase,
-    TangemAaveV3YieldModuleHarness,
-    TestERC20
-} from "./MerklIncentivesBase.sol";
+import { MerklIncentivesBase, TestERC20 } from "./MerklIncentivesBase.sol";
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 
 /// Reward routing tests: how claimed Merkl rewards are classified and processed
 contract RewardRouteTest is MerklIncentivesBase {
-    TangemAaveV3YieldModuleHarness ym;
-
     function setUp() public override {
         super.setUp();
 
@@ -25,14 +19,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         TestERC20 rewardToken = _createRewardToken();
         _fundMerklDistributor(address(rewardToken), AMOUNT);
 
-        address[] memory rewardTokens = new address[](1);
-        rewardTokens[0] = address(rewardToken);
-        uint[] memory cumulativeAmounts = new uint[](1);
-        cumulativeAmounts[0] = AMOUNT;
-        bytes32[][] memory proofs = new bytes32[][](1);
-
-        vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        _claimSingleAsOwner(address(rewardToken), AMOUNT);
 
         assertEq(rewardToken.balanceOf(owner), AMOUNT);
         assertEq(rewardToken.balanceOf(address(ym)), 0);
@@ -42,12 +29,6 @@ contract RewardRouteTest is MerklIncentivesBase {
     function test_claim_SendsToOwner_EmitsMerklClaimed() public {
         TestERC20 rewardToken = _createRewardToken();
         _fundMerklDistributor(address(rewardToken), AMOUNT);
-
-        address[] memory rewardTokens = new address[](1);
-        rewardTokens[0] = address(rewardToken);
-        uint[] memory cumulativeAmounts = new uint[](1);
-        cumulativeAmounts[0] = AMOUNT;
-        bytes32[][] memory proofs = new bytes32[][](1);
 
         vm.expectEmit(address(ym));
         emit IMerklIncentives.MerklClaimed(
@@ -60,8 +41,36 @@ contract RewardRouteTest is MerklIncentivesBase {
             owner
         );
 
+        _claimSingleAsOwner(address(rewardToken), AMOUNT);
+    }
+
+    function testFuzz_claim_SendsToOwner_ManyUnknownTokens(
+        uint numTokens,
+        uint[10] memory rawAmounts
+    ) public {
+        numTokens = bound(numTokens, 1, 10);
+
+        TestERC20[] memory tokens = _createRewardTokens(numTokens);
+
+        address[] memory rewardTokens = new address[](numTokens);
+        uint[] memory cumulativeAmounts = new uint[](numTokens);
+        bytes32[][] memory proofs = new bytes32[][](numTokens);
+
+        for (uint i; i < numTokens; ++i) {
+            rewardTokens[i] = address(tokens[i]);
+            cumulativeAmounts[i] = bound(rawAmounts[i], 1, 1_000_000_000e18);
+            _fundMerklDistributor(rewardTokens[i], cumulativeAmounts[i]);
+        }
+
         vm.prank(owner);
         ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+
+        // every unknown token is routed to the owner in full
+        for (uint i; i < numTokens; ++i) {
+            assertEq(tokens[i].balanceOf(owner), cumulativeAmounts[i]);
+            assertEq(tokens[i].balanceOf(address(ym)), 0);
+            assertEq(tokens[i].balanceOf(address(merklDistributor)), 0);
+        }
     }
 
     /* PUSH_TO_PROTOCOL — reward token is an active yield token */
@@ -71,14 +80,7 @@ contract RewardRouteTest is MerklIncentivesBase {
 
         _fundMerklDistributor(address(yieldToken), AMOUNT);
 
-        address[] memory rewardTokens = new address[](1);
-        rewardTokens[0] = address(yieldToken);
-        uint[] memory cumulativeAmounts = new uint[](1);
-        cumulativeAmounts[0] = AMOUNT;
-        bytes32[][] memory proofs = new bytes32[][](1);
-
-        vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        _claimSingleAsOwner(address(yieldToken), AMOUNT);
 
         assertEq(ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + AMOUNT);
         assertEq(yieldToken.balanceOf(address(pool)), poolBalanceBefore + AMOUNT);
@@ -88,12 +90,6 @@ contract RewardRouteTest is MerklIncentivesBase {
 
     function test_claim_PushesToProtocol_EmitsMerklClaimed() public {
         _fundMerklDistributor(address(yieldToken), AMOUNT);
-
-        address[] memory rewardTokens = new address[](1);
-        rewardTokens[0] = address(yieldToken);
-        uint[] memory cumulativeAmounts = new uint[](1);
-        cumulativeAmounts[0] = AMOUNT;
-        bytes32[][] memory proofs = new bytes32[][](1);
 
         // the reward becomes a protocol position: finalToken is the aToken, kept by the module
         vm.expectEmit(address(ym));
@@ -107,8 +103,7 @@ contract RewardRouteTest is MerklIncentivesBase {
             owner
         );
 
-        vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        _claimSingleAsOwner(address(yieldToken), AMOUNT);
     }
 
     function test_claim_Reverts_WhenProtocolDepositFailed() public {
@@ -118,20 +113,13 @@ contract RewardRouteTest is MerklIncentivesBase {
         // so the supply has zero effect on the protocol balance
         protocolToken.setFixedTax(AMOUNT);
 
-        address[] memory rewardTokens = new address[](1);
-        rewardTokens[0] = address(yieldToken);
-        uint[] memory cumulativeAmounts = new uint[](1);
-        cumulativeAmounts[0] = AMOUNT;
-        bytes32[][] memory proofs = new bytes32[][](1);
-
         vm.expectRevert(
             abi.encodeWithSelector(
                 IMerklIncentives.ProtocolDepositFailed.selector, address(yieldToken)
             )
         );
 
-        vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        _claimSingleAsOwner(address(yieldToken), AMOUNT);
     }
 
     /* KEEP_IN_MODULE — reward token is a protocol token of an active yield token */
@@ -141,14 +129,7 @@ contract RewardRouteTest is MerklIncentivesBase {
 
         _fundMerklDistributor(address(protocolToken), AMOUNT);
 
-        address[] memory rewardTokens = new address[](1);
-        rewardTokens[0] = address(protocolToken);
-        uint[] memory cumulativeAmounts = new uint[](1);
-        cumulativeAmounts[0] = AMOUNT;
-        bytes32[][] memory proofs = new bytes32[][](1);
-
-        vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        _claimSingleAsOwner(address(protocolToken), AMOUNT);
 
         assertEq(ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + AMOUNT);
         assertEq(protocolToken.balanceOf(address(ym)), PROTOCOL_BALANCE + AMOUNT);
@@ -159,12 +140,6 @@ contract RewardRouteTest is MerklIncentivesBase {
 
     function test_claim_KeepsInModule_EmitsMerklClaimed() public {
         _fundMerklDistributor(address(protocolToken), AMOUNT);
-
-        address[] memory rewardTokens = new address[](1);
-        rewardTokens[0] = address(protocolToken);
-        uint[] memory cumulativeAmounts = new uint[](1);
-        cumulativeAmounts[0] = AMOUNT;
-        bytes32[][] memory proofs = new bytes32[][](1);
 
         // the aToken reward stays as-is on the module: final fields mirror the claim
         vm.expectEmit(address(ym));
@@ -178,13 +153,12 @@ contract RewardRouteTest is MerklIncentivesBase {
             owner
         );
 
-        vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        _claimSingleAsOwner(address(protocolToken), AMOUNT);
     }
 
     /* UNWRAP_TO_OWNER — reward token is a protocol token of an inactive yield token */
 
-    function test_claim_UnwrapsToOwner_WhenRewardTokenIsProtocolTokenOfInactiveYieldToken() public {
+    function test_claim_UnwrapsToOwner_WhenYieldTokenIsInactive() public {
         _withdrawAndDeactivate(ym, owner, address(yieldToken));
 
         uint ownerBalanceBefore = yieldToken.balanceOf(owner);
@@ -192,32 +166,30 @@ contract RewardRouteTest is MerklIncentivesBase {
 
         _fundMerklDistributor(address(protocolToken), AMOUNT);
 
-        address[] memory rewardTokens = new address[](1);
-        rewardTokens[0] = address(protocolToken);
-        uint[] memory cumulativeAmounts = new uint[](1);
-        cumulativeAmounts[0] = AMOUNT;
-        bytes32[][] memory proofs = new bytes32[][](1);
-
-        vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        _claimSingleAsOwner(address(protocolToken), AMOUNT);
 
         assertEq(yieldToken.balanceOf(owner), ownerBalanceBefore + AMOUNT);
         assertEq(yieldToken.balanceOf(address(pool)), poolBalanceBefore - AMOUNT);
+    }
 
+    function test_claim_UnwrapsToOwner_ConsumesClaimedProtocolToken() public {
+        _withdrawAndDeactivate(ym, owner, address(yieldToken));
+
+        _fundMerklDistributor(address(protocolToken), AMOUNT);
+        uint yieldTokenBefore = yieldToken.balanceOf(owner);
+
+        _claimSingleAsOwner(address(protocolToken), AMOUNT);
+
+        assertEq(protocolToken.balanceOf(address(merklDistributor)), 0);
         assertEq(protocolToken.balanceOf(address(ym)), 0);
         assertEq(protocolToken.balanceOf(owner), 0);
+        assertEq(yieldToken.balanceOf(owner), yieldTokenBefore + AMOUNT);
     }
 
     function test_claim_UnwrapsToOwner_EmitsMerklClaimed() public {
         _withdrawAndDeactivate(ym, owner, address(yieldToken));
 
         _fundMerklDistributor(address(protocolToken), AMOUNT);
-
-        address[] memory rewardTokens = new address[](1);
-        rewardTokens[0] = address(protocolToken);
-        uint[] memory cumulativeAmounts = new uint[](1);
-        cumulativeAmounts[0] = AMOUNT;
-        bytes32[][] memory proofs = new bytes32[][](1);
 
         // the aToken reward is unwrapped: the owner receives the underlying yieldToken
         vm.expectEmit(address(ym));
@@ -231,8 +203,7 @@ contract RewardRouteTest is MerklIncentivesBase {
             owner
         );
 
-        vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        _claimSingleAsOwner(address(protocolToken), AMOUNT);
     }
 
     /* Post-claim errors */
@@ -241,14 +212,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         TestERC20 rewardToken = _createRewardToken();
         _fundMerklDistributor(address(rewardToken), AMOUNT);
 
-        address[] memory rewardTokens = new address[](1);
-        rewardTokens[0] = address(rewardToken);
-        uint[] memory cumulativeAmounts = new uint[](1);
-        cumulativeAmounts[0] = AMOUNT;
-        bytes32[][] memory proofs = new bytes32[][](1);
-
-        vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        _claimSingleAsOwner(address(rewardToken), AMOUNT);
 
         // repeat the claim with the same cumulative amount: the distributor pays the delta
         // over what was already claimed, i.e. nothing
@@ -258,8 +222,7 @@ contract RewardRouteTest is MerklIncentivesBase {
             )
         );
 
-        vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        _claimSingleAsOwner(address(rewardToken), AMOUNT);
     }
 
     /* Mixed routes — multiple reward tokens in one claim */
@@ -308,31 +271,5 @@ contract RewardRouteTest is MerklIncentivesBase {
 
         // rewards are fee-free regardless of the route
         assertEq(ym.calculateServiceFee(address(yieldToken)), ACCUMULATED_SERVICE_FEE);
-    }
-
-    function testFuzz_claim_RoutesEachToken(uint numTokens, uint[10] memory rawAmounts) public {
-        numTokens = bound(numTokens, 1, 10);
-
-        TestERC20[] memory tokens = _createRewardTokens(numTokens);
-
-        address[] memory rewardTokens = new address[](numTokens);
-        uint[] memory cumulativeAmounts = new uint[](numTokens);
-        bytes32[][] memory proofs = new bytes32[][](numTokens);
-
-        for (uint i; i < numTokens; ++i) {
-            rewardTokens[i] = address(tokens[i]);
-            cumulativeAmounts[i] = bound(rawAmounts[i], 1, 1_000_000_000e18);
-            _fundMerklDistributor(rewardTokens[i], cumulativeAmounts[i]);
-        }
-
-        vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
-
-        // every unknown token is routed to the owner in full
-        for (uint i; i < numTokens; ++i) {
-            assertEq(tokens[i].balanceOf(owner), cumulativeAmounts[i]);
-            assertEq(tokens[i].balanceOf(address(ym)), 0);
-            assertEq(tokens[i].balanceOf(address(merklDistributor)), 0);
-        }
     }
 }

@@ -81,17 +81,6 @@ abstract contract AaveV3YieldModuleBase is YieldModuleBase {
         yieldToken.approve(address(yieldModule), type(uint).max);
     }
 
-    /// Full scenario: deployed module with funds already supplied to the protocol.
-    function _deployEnteredYieldModule(
-        address moduleOwner,
-        uint enterAmount
-    ) internal returns (TangemAaveV3YieldModuleHarness yieldModule) {
-        yieldModule = _deployYieldModuleWithFunds(moduleOwner, enterAmount);
-
-        vm.prank(moduleOwner);
-        yieldModule.enterProtocolByOwner(address(yieldToken));
-    }
-
     /// Full scenario: deployed, entered and revenue generated (standard ACCUMULATED_REVENUE).
     function _deployEnteredRevenueModule(address moduleOwner)
         internal
@@ -186,8 +175,4 @@ abstract contract AaveV3YieldModuleBase is YieldModuleBase {
         pool.generateRevenue(account, amount);
     }
 
-    /// Returns the AAVE aToken address for the default yieldToken.
-    function _protocolToken() internal view override returns (address) {
-        return address(protocolToken);
-    }
 }
