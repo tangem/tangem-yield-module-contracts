@@ -16,6 +16,9 @@ contract MerklIncentivesTest is MerklIncentivesBase {
 
     function test_claimMerklRewardsOwner_RevertsRewardTokensEmpty() public {
         // vm.expectRevert(IMerklIncentives.RewardTokensEmpty.selector);
+
+        vm.prank(owner);
+
     }
 
     function test_claimMerklRewardsOwner_RevertsLengthsMismatch() public {

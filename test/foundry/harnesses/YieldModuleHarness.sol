@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 import { MerklIncentives } from "contracts/merkl/MerklIncentives.sol";
 
 /// Abstract harness mixin exposing internal state of the yield module for assertions and
-/// pre-seeding. Inherited by all concrete harness variants (generic, AAVE, etc.) to avoid
+/// pre-seeding. Inherited by all concrete harness variants (general, AAVE, etc.) to avoid
 /// duplicating the exposed_* methods.
 abstract contract YieldModuleHarness is MerklIncentives {
     /* GETTERS */

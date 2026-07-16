@@ -3,7 +3,7 @@
 pragma solidity ^0.8.29;
 
 import { YieldModuleBase } from "../YieldModuleBase.sol";
-import { YieldModuleGenericHarness } from "../harnesses/YieldModuleGenericHarness.sol";
+import { YieldModuleGeneralHarness } from "../harnesses/YieldModuleGeneralHarness.sol";
 
 import { PRECISION } from "contracts/resources/Constants.sol";
 
@@ -11,21 +11,21 @@ contract ServiceFeeTest is YieldModuleBase {
     uint internal constant SF_INITIAL_OWNER_BALANCE = 200_000e6;
     uint internal feeDebt = FEE_DEBT_SCENARIO_REVENUE * SERVICE_FEE_RATE / PRECISION;
 
-    YieldModuleGenericHarness internal debtModule;
+    YieldModuleGeneralHarness internal debtModule;
     uint internal remainingFeeDebt;
     address internal debtOwner = makeAddr("debtOwner");
 
     function setUp() public override {
         super.setUp();
-        _registerGenericImplementation();
-        (debtModule, remainingFeeDebt) = _createGenericFeeDebtState(debtOwner);
+        _registerGeneralImplementation();
+        (debtModule, remainingFeeDebt) = _createGeneralFeeDebtState(debtOwner);
     }
 
     /* ==================================================== calculateServiceFee ==================================================== */
 
     function test_calculateServiceFee_AfterRevenue() public {
-        YieldModuleGenericHarness yieldModule =
-            _deployEnteredGenericYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
+        YieldModuleGeneralHarness yieldModule =
+            _deployEnteredGeneralYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
         uint revenue = 10_000e6;
 
         _generateRevenue(address(yieldToken), address(yieldModule), revenue);
@@ -36,8 +36,8 @@ contract ServiceFeeTest is YieldModuleBase {
 
     // example of pre-seeding internal state through the harness
     function test_calculateServiceFee_IncludesPreseededFeeDebt() public {
-        YieldModuleGenericHarness yieldModule =
-            _deployEnteredGenericYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
+        YieldModuleGeneralHarness yieldModule =
+            _deployEnteredGeneralYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
         uint feeDebt_ = 700e6;
 
         yieldModule.exposed_setFeeDebt(address(yieldToken), feeDebt_);
@@ -46,8 +46,8 @@ contract ServiceFeeTest is YieldModuleBase {
     }
 
     function testFuzz_calculateServiceFee(uint revenue, uint feeRate, uint feeDebt_) public {
-        YieldModuleGenericHarness yieldModule =
-            _deployEnteredGenericYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
+        YieldModuleGeneralHarness yieldModule =
+            _deployEnteredGeneralYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
         revenue = bound(revenue, 0, 1_000_000_000e6);
         feeRate = bound(feeRate, 0, PRECISION);
         feeDebt_ = bound(feeDebt_, 0, 1_000_000e6);
@@ -64,8 +64,8 @@ contract ServiceFeeTest is YieldModuleBase {
     }
 
     function testFuzz_effectiveBalances(uint revenue, uint feeRate, uint feeDebt_) public {
-        YieldModuleGenericHarness yieldModule =
-            _deployEnteredGenericYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
+        YieldModuleGeneralHarness yieldModule =
+            _deployEnteredGeneralYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
         revenue = bound(revenue, 0, 1_000_000e6);
         feeRate = bound(feeRate, 0, PRECISION);
         // large debts make the fee exceed the protocol balance => clamping branch
@@ -93,8 +93,8 @@ contract ServiceFeeTest is YieldModuleBase {
     function testFuzz_enterProtocolByOwner_PartiallyRepaysFeeDebt(uint reEnterDeposit) public {
         reEnterDeposit = bound(reEnterDeposit, 1, feeDebt - 1);
 
-        (YieldModuleGenericHarness yieldModule,) =
-            _createGenericFeeDebtState(otherAccount, reEnterDeposit);
+        (YieldModuleGeneralHarness yieldModule,) =
+            _createGeneralFeeDebtState(otherAccount, reEnterDeposit);
 
         // the whole deposit goes toward the debt (FeePaymentPartial path)
         assertEq(yieldModule.feeDebts(address(yieldToken)), feeDebt - reEnterDeposit);
@@ -102,13 +102,13 @@ contract ServiceFeeTest is YieldModuleBase {
         assertEq(yieldModule.protocolBalance(address(yieldToken)), 0);
     }
 
-    function testFuzz_enterProtocolByOwner_FullyRepaysFeeDebtWhenDepositCoversIt(
-        uint reEnterDeposit
-    ) public {
+    function testFuzz_enterProtocolByOwner_FullyRepaysFeeDebtWhenDepositCoversIt(uint reEnterDeposit)
+        public
+    {
         reEnterDeposit = bound(reEnterDeposit, feeDebt, FEE_DEBT_SCENARIO_DEPOSIT);
 
-        (YieldModuleGenericHarness yieldModule,) =
-            _createGenericFeeDebtState(otherAccount, reEnterDeposit);
+        (YieldModuleGeneralHarness yieldModule,) =
+            _createGeneralFeeDebtState(otherAccount, reEnterDeposit);
 
         assertEq(yieldModule.feeDebts(address(yieldToken)), 0);
         assertEq(yieldModule.calculateServiceFee(address(yieldToken)), 0);

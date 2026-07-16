@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import { TangemAaveV3YieldModuleHarness } from "test/foundry/harnesses/TangemAaveV3YieldModuleHarness.sol";
 import { YieldModuleBase } from "test/foundry/YieldModuleBase.sol";
+import { TangemAaveV3YieldModuleHarness } from "test/foundry/harnesses/TangemAaveV3YieldModuleHarness.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 import { PRECISION } from "contracts/resources/Constants.sol";
@@ -104,15 +104,17 @@ abstract contract AaveV3YieldModuleBase is YieldModuleBase {
 
     /* AAVE-SPECIFIC ACTOR WRAPPERS (bind yieldToken) */
 
-    function _enterViaProcessor(TangemAaveV3YieldModuleHarness yieldModule, uint networkFee)
-        internal
-    {
+    function _enterViaProcessor(
+        TangemAaveV3YieldModuleHarness yieldModule,
+        uint networkFee
+    ) internal {
         _enterViaProcessor(IYieldModule(address(yieldModule)), address(yieldToken), networkFee);
     }
 
-    function _exitViaProcessor(TangemAaveV3YieldModuleHarness yieldModule, uint networkFee)
-        internal
-    {
+    function _exitViaProcessor(
+        TangemAaveV3YieldModuleHarness yieldModule,
+        uint networkFee
+    ) internal {
         _exitViaProcessor(IYieldModule(address(yieldModule)), address(yieldToken), networkFee);
     }
 
@@ -179,7 +181,7 @@ abstract contract AaveV3YieldModuleBase is YieldModuleBase {
         pool.generateRevenue(account, amount);
     }
 
-    /// Override of the generic 3-arg hook — delegates to the AAVE pool.
+    /// Override of the general 3-arg hook — delegates to the AAVE pool.
     function _generateRevenue(address, address account, uint amount) internal override {
         pool.generateRevenue(account, amount);
     }

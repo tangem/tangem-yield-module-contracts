@@ -11,7 +11,7 @@ import { TestERC20 } from "contracts/test/TestERC20.sol";
 /// Concrete protocol-agnostic harness. Uses TestERC20 as a fake "pool": each yieldToken gets
 /// its own TestERC20 protocolToken (mint/burn instead of real deposit/withdraw).
 /// Used by MerklIncentives and other protocol-agnostic test suites.
-contract YieldModuleGenericHarness is YieldModuleHarness {
+contract YieldModuleGeneralHarness is YieldModuleHarness {
     mapping(address => TestERC20) internal _protocolTokens;
     mapping(address => address) internal _yieldTokensByProtocol;
 
