@@ -9,14 +9,15 @@ import { TangemYieldModuleFactory } from "contracts/core/TangemYieldModuleFactor
 import { TangemYieldProcessor } from "contracts/core/TangemYieldProcessor.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 import { TangemERC2771Forwarder } from "contracts/metatx/TangemERC2771Forwarder.sol";
+import { MerklDistributorMock } from "contracts/test/MerklDistributorMock.sol";
+import { SwapProviderMock } from "contracts/test/SwapProviderMock.sol";
+import { TestERC20 } from "contracts/test/TestERC20.sol";
 
 /// Generic yield-module test base: deploys shared infra (processor, factory, forwarder,
 /// swap registry) and exposes generic actor helpers that operate on `IYieldModule` + address.
 /// Module-specific bases extend this and add pool/token-specific fixtures returning their
 /// harness type.
 abstract contract YieldModuleBase is BaseTest, TestHelpers {
-    bytes32 internal constant FEE_PAYMENT_PROCESSED_EVENT_SIG =
-        keccak256("FeePaymentProcessed(address,uint256,address)");
     bytes32 internal constant FEE_PAYMENT_FAILED_EVENT_SIG =
         keccak256("FeePaymentFailed(address,uint256)");
 
@@ -30,6 +31,9 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
     TangemYieldProcessor public processor;
     TangemYieldModuleFactory public factory;
     SwapExecutionRegistry public swapExecutionRegistry;
+    MerklDistributorMock public merklDistributor;
+    SwapProviderMock public swapProvider;
+    TestERC20 public yieldToken;
 
     function setUp() public virtual {
         vm.startPrank(backend);
@@ -45,6 +49,9 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
 
         factory = new TangemYieldModuleFactory();
         swapExecutionRegistry = new SwapExecutionRegistry(backend);
+        merklDistributor = new MerklDistributorMock();
+        swapProvider = new SwapProviderMock();
+        yieldToken = new TestERC20();
 
         factory.grantRole(factory.IMPLEMENTATION_SETTER_ROLE(), backend);
         factory.grantRole(factory.PAUSER_ROLE(), backend);
@@ -59,6 +66,9 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         vm.label(address(factory), "factory");
         vm.label(address(swapExecutionRegistry), "swapExecutionRegistry");
         vm.label(address(forwarder), "forwarder");
+        vm.label(address(merklDistributor), "merklDistributor");
+        vm.label(address(swapProvider), "swapProvider");
+        vm.label(address(yieldToken), "yieldToken");
     }
 
     /* GENERIC ACTOR HELPERS (operate via the processor on IYieldModule) */
@@ -108,9 +118,10 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         vm.stopPrank();
     }
 
-    /* MINT HOOK (overridden by module-specific bases for their token type) */
+    /* MINT HOOK (overridden by module-specific bases that need custom minting) */
 
     function _mintYieldToken(address to, uint amount) internal virtual {
-        // no-op: overridden by module-specific base
+        vm.prank(backend);
+        yieldToken.mint(to, amount);
     }
 }
