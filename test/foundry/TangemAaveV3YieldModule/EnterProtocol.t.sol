@@ -5,7 +5,7 @@ pragma solidity ^0.8.29;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import { TangemAaveV3YieldModuleHarness } from "../harnesses/TangemAaveV3YieldModuleHarness.sol";
-import { AaveV3YieldModuleBase } from "../AaveV3YieldModuleBase.sol";
+import { AaveV3YieldModuleBase } from "./AaveV3YieldModuleBase.sol";
 
 import { Requires } from "contracts/common/Requires.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";

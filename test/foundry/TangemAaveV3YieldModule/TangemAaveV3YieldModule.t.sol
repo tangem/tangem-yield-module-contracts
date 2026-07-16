@@ -3,7 +3,7 @@
 pragma solidity ^0.8.29;
 
 import { TangemAaveV3YieldModuleHarness } from "../harnesses/TangemAaveV3YieldModuleHarness.sol";
-import { AaveV3YieldModuleBase } from "../AaveV3YieldModuleBase.sol";
+import { AaveV3YieldModuleBase } from "./AaveV3YieldModuleBase.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 

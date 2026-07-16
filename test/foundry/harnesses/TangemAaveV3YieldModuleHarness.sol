@@ -2,10 +2,12 @@
 pragma solidity ^0.8.29;
 
 import { TangemAaveV3YieldModule } from "contracts/aave/TangemAaveV3YieldModule.sol";
+import { YieldModuleHarness } from "./YieldModuleHarness.sol";
 
-/// Thin wrapper exposing internal state of the yield module for assertions and pre-seeding.
-/// Deployed as the factory implementation in tests instead of the production contract.
-contract TangemAaveV3YieldModuleHarness is TangemAaveV3YieldModule {
+/// Thin wrapper exposing internal state of the yield module for assertions and pre-seeding
+/// (via YieldModuleHarness mixin). Deployed as the factory implementation in tests instead of
+/// the production contract.
+contract TangemAaveV3YieldModuleHarness is TangemAaveV3YieldModule, YieldModuleHarness {
     constructor(
         address pool_,
         address distributor_,
@@ -23,29 +25,4 @@ contract TangemAaveV3YieldModuleHarness is TangemAaveV3YieldModule {
             swapExecutionRegistry_
         )
     { }
-
-    /* GETTERS */
-
-    function exposed_protocolBalance(address yieldToken) public view returns (uint) {
-        return _protocolBalance(yieldToken);
-    }
-
-    /* SETTERS */
-
-    function exposed_setFeeDebt(address yieldToken, uint amount) public {
-        feeDebts[yieldToken] = amount;
-    }
-
-    function exposed_setLatestFeePaymentState(
-        address yieldToken,
-        uint protocolBalance_,
-        uint serviceFeeRate_
-    ) public {
-        latestFeePaymentStates[yieldToken] =
-            LatestFeePaymentState(protocolBalance_, serviceFeeRate_);
-    }
-
-    function exposed_setYieldTokenActive(address yieldToken, bool active) public {
-        yieldTokensData[yieldToken].active = active;
-    }
 }

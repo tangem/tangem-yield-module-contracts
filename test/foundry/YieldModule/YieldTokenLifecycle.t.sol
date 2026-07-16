@@ -2,30 +2,31 @@
 /* solhint-disable func-name-mixedcase */
 pragma solidity ^0.8.29;
 
-import { TangemAaveV3YieldModuleHarness } from "../harnesses/TangemAaveV3YieldModuleHarness.sol";
-import { AaveV3YieldModuleBase } from "../AaveV3YieldModuleBase.sol";
+import { YieldModuleBase } from "../YieldModuleBase.sol";
+import { YieldModuleGenericHarness } from "../harnesses/YieldModuleGenericHarness.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
-contract YieldTokenLifecycleTest is AaveV3YieldModuleBase {
+contract YieldTokenLifecycleTest is YieldModuleBase {
     uint240 internal constant MAX_NETWORK_FEE = 20e6;
     uint240 internal constant NEW_MAX_NETWORK_FEE = 30e6;
 
-    TangemAaveV3YieldModuleHarness internal yieldModule;
-    TangemAaveV3YieldModuleHarness internal initModule;
+    YieldModuleGenericHarness internal yieldModule;
+    YieldModuleGenericHarness internal initModule;
     address internal initOwner = makeAddr("initOwner");
 
     function setUp() public override {
         super.setUp();
+        _registerGenericImplementation();
 
         // Main module: yield token active then deactivated (reactivateToken tests)
-        yieldModule = _deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
+        yieldModule = _deployGenericYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
 
         vm.prank(owner);
         yieldModule.withdrawAndDeactivate(address(yieldToken));
 
         // Separate module with no active yield token (initYieldToken tests)
-        initModule = _deployYieldModule(initOwner, address(0), 0);
+        initModule = _deployGenericYieldModule(initOwner, address(0), 0);
     }
 
     /* ======================================================== initYieldToken ===================================================== */
@@ -40,8 +41,9 @@ contract YieldTokenLifecycleTest is AaveV3YieldModuleBase {
         assertTrue(active);
         assertEq(maxNetworkFee, MAX_NETWORK_FEE);
 
-        assertEq(address(initModule.protocolTokens(address(yieldToken))), address(protocolToken));
-        assertTrue(initModule.isProtocolToken(address(protocolToken)));
+        address pt = address(initModule.protocolTokens(address(yieldToken)));
+        assertNotEq(pt, address(0));
+        assertTrue(initModule.isProtocolToken(pt));
     }
 
     function test_initYieldToken_RevertsOnlyOwnerOrFactory() public {
@@ -51,15 +53,21 @@ contract YieldTokenLifecycleTest is AaveV3YieldModuleBase {
     }
 
     function test_initYieldToken_EmitsYieldTokenInitialized() public {
-        vm.expectEmit(address(initModule));
-        emit IYieldModule.YieldTokenInitialized(
-            address(yieldToken),
-            address(protocolToken),
-            MAX_NETWORK_FEE
-        );
+        address freshOwner = makeAddr("freshOwner");
+        YieldModuleGenericHarness freshModule =
+            _deployGenericYieldModule(freshOwner, address(0), 0);
 
-        vm.prank(initOwner);
-        initModule.initYieldToken(address(yieldToken), MAX_NETWORK_FEE);
+        // protocolToken is created inside initYieldToken, so we can't know its address before
+        // the call. Match only the event signature + emitter (no data check), then verify
+        // protocolToken was set correctly afterwards.
+        vm.expectEmit(false, false, false, false, address(freshModule));
+        emit IYieldModule.YieldTokenInitialized(address(yieldToken), address(0), MAX_NETWORK_FEE);
+
+        vm.prank(freshOwner);
+        freshModule.initYieldToken(address(yieldToken), MAX_NETWORK_FEE);
+
+        // Verify protocolToken was set correctly after the call.
+        assertNotEq(address(freshModule.protocolTokens(address(yieldToken))), address(0));
     }
 
     /* ====================================================== reactivateToken ===================================================== */
