@@ -1,0 +1,44 @@
+// SPDX-License-Identifier: MIT
+/* solhint-disable func-name-mixedcase */
+pragma solidity ^0.8.29;
+
+import { ReentrancyGuardUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+
+import { MerklIncentivesBase, TangemAaveV3YieldModuleHarness } from "./MerklIncentivesBase.sol";
+import { ReentrantERC20 } from "contracts/test/ReentrantERC20.sol";
+
+contract WeirdRewardTokensTest is MerklIncentivesBase {
+    function setUp() public override {
+        super.setUp();
+
+        ym = _deployEnteredRevenueModule(owner);
+    }
+
+    /*  reentrancy guard  */
+
+    function test_claim_Reverts_WhenRewardTokenReentersClaim() public {
+        ReentrantERC20 token = new ReentrantERC20("ReentrantRewardToken", "RRT", 18);
+        token.mint(address(merklDistributor), AMOUNT);
+
+        TangemAaveV3YieldModuleHarness attackedModule =
+            _deployYieldModule(address(token), address(0), 0);
+
+        bytes memory claimCall = _claimCalldata(address(token));
+        token.setHook(address(attackedModule), claimCall);
+
+        vm.expectRevert(ReentrancyGuardUpgradeable.ReentrancyGuardReentrantCall.selector);
+        token.execute(address(attackedModule), claimCall);
+    }
+
+    /*  helpers  */
+
+    function _claimCalldata(address rewardToken) internal view returns (bytes memory) {
+        address[] memory tokens = new address[](1);
+        tokens[0] = rewardToken;
+        uint[] memory amounts = new uint[](1);
+        amounts[0] = AMOUNT;
+        bytes32[][] memory proofs_ = new bytes32[][](1);
+
+        return abi.encodeCall(ym.claimMerklRewardsOwner, (tokens, amounts, proofs_));
+    }
+}

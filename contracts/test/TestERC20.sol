@@ -71,7 +71,7 @@ contract TestERC20 is ERC20 {
         _isBlacklisted[account] = false;
     }
 
-    function _update(address from, address to, uint value) internal override {
+    function _update(address from, address to, uint value) internal virtual override {
         super._update(from, to, value - fixedTax);
 
         if (fixedTax > 0) {
