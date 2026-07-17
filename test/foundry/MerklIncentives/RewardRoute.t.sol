@@ -24,6 +24,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         assertEq(rewardToken.balanceOf(owner), AMOUNT);
         assertEq(rewardToken.balanceOf(address(ym)), 0);
         assertEq(rewardToken.balanceOf(address(merklDistributor)), 0);
+        assertEq(merklDistributor.claimed(address(ym), address(rewardToken)), AMOUNT);
     }
 
     function test_claim_SendsToOwner_EmitsMerklClaimed() public {
@@ -136,6 +137,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         assertEq(yieldToken.balanceOf(owner), 0);
         // the reward itself is fee-free at any size
         assertEq(ym.calculateServiceFee(address(yieldToken)), ACCUMULATED_SERVICE_FEE);
+        assertEq(merklDistributor.claimed(address(ym), address(yieldToken)), amount);
     }
 
     function test_claim_PushesToProtocol_EmitsMerklClaimed() public {
@@ -192,6 +194,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         assertEq(protocolToken.balanceOf(owner), 0);
         assertEq(yieldToken.balanceOf(address(pool)), poolBalanceBefore);
         assertEq(ym.calculateServiceFee(address(yieldToken)), ACCUMULATED_SERVICE_FEE);
+        assertEq(merklDistributor.claimed(address(ym), address(protocolToken)), amount);
     }
 
     function test_claim_KeepsInModule_EmitsMerklClaimed() public {
@@ -229,6 +232,7 @@ contract RewardRouteTest is MerklIncentivesBase {
 
         assertEq(yieldToken.balanceOf(owner), ownerBalanceBefore + amount);
         assertEq(yieldToken.balanceOf(address(pool)), poolBalanceBefore - amount);
+        assertEq(merklDistributor.claimed(address(ym), address(protocolToken)), amount);
     }
 
     function test_claim_UnwrapsToOwner_ConsumesClaimedProtocolToken() public {
