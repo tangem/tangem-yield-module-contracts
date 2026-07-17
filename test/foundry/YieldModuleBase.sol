@@ -266,10 +266,11 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         yieldToken.mint(to, amount);
     }
 
-    function _generateRevenue(address yieldTokenAddr, address account, uint amount)
-        internal
-        virtual
-    {
+    function _generateRevenue(
+        address yieldTokenAddr,
+        address account,
+        uint amount
+    ) internal virtual {
         generalPool.generateRevenue(yieldTokenAddr, account, amount);
     }
 

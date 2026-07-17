@@ -1,0 +1,170 @@
+// SPDX-License-Identifier: MIT
+/* solhint-disable func-name-mixedcase */
+pragma solidity ^0.8.29;
+
+import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
+
+import { YieldModuleBase } from "../YieldModuleBase.sol";
+import { YieldModuleGeneralHarness } from "../harnesses/YieldModuleGeneralHarness.sol";
+
+import { TangemYieldProcessor } from "contracts/core/TangemYieldProcessor.sol";
+import { PRECISION } from "contracts/resources/Constants.sol";
+
+contract TangemYieldProcessorTest is YieldModuleBase {
+    address internal newFeeReceiver = makeAddr("newFeeReceiver");
+
+    /*  setFeeReceiver  */
+
+    function test_setFeeReceiver_SetsNewFeeReceiver() public {
+        assertEq(processor.feeReceiver(), feeReceiver);
+
+        vm.prank(backend);
+        processor.setFeeReceiver(newFeeReceiver);
+
+        assertEq(processor.feeReceiver(), newFeeReceiver);
+    }
+
+    function test_setFeeReceiver_EmitsFeeReceiverSet() public {
+        vm.expectEmit(address(processor));
+        emit TangemYieldProcessor.FeeReceiverSet(newFeeReceiver);
+
+        vm.prank(backend);
+        processor.setFeeReceiver(newFeeReceiver);
+    }
+
+    function test_setFeeReceiver_RevertsWithoutPropertySetterRole() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                otherAccount,
+                processor.PROPERTY_SETTER_ROLE()
+            )
+        );
+        vm.prank(otherAccount);
+        processor.setFeeReceiver(newFeeReceiver);
+    }
+
+    /*  setServiceFeeRate  */
+
+    function test_setServiceFeeRate_RevertsInvalidFeeRate() public {
+        vm.expectRevert(TangemYieldProcessor.InvalidFeeRate.selector);
+        vm.prank(backend);
+        processor.setServiceFeeRate(PRECISION + 1);
+    }
+
+    function test_setServiceFeeRate_AllowsFeeRateEqualToPrecision() public {
+        vm.prank(backend);
+        processor.setServiceFeeRate(PRECISION);
+
+        assertEq(processor.serviceFeeRate(), PRECISION);
+    }
+
+    function test_constructor_RevertsInvalidFeeRate() public {
+        vm.expectRevert(TangemYieldProcessor.InvalidFeeRate.selector);
+        new TangemYieldProcessor(feeReceiver, PRECISION + 1);
+    }
+
+    /*  pause  */
+
+    function test_pause_PausesProcessor() public {
+        assertFalse(processor.paused());
+
+        vm.prank(backend);
+        processor.pause();
+
+        assertTrue(processor.paused());
+    }
+
+    function test_pause_EmitsPaused() public {
+        vm.expectEmit(address(processor));
+        emit Pausable.Paused(backend);
+
+        vm.prank(backend);
+        processor.pause();
+    }
+
+    function test_pause_RevertsWithoutPauserRole() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                otherAccount,
+                processor.PAUSER_ROLE()
+            )
+        );
+        vm.prank(otherAccount);
+        processor.pause();
+    }
+
+    function test_pause_BlocksProtocolOperations() public {
+        vm.prank(backend);
+        processor.pause();
+
+        vm.startPrank(backend);
+
+        vm.expectRevert(Pausable.EnforcedPause.selector);
+        processor.enterProtocol(address(1), address(yieldToken), 0);
+
+        vm.expectRevert(Pausable.EnforcedPause.selector);
+        processor.exitProtocol(address(1), address(yieldToken), 0);
+
+        vm.expectRevert(Pausable.EnforcedPause.selector);
+        processor.collectServiceFee(address(1), address(yieldToken));
+
+        vm.stopPrank();
+    }
+
+    /*  unpause  */
+
+    function test_unpause_UnpausesProcessor() public {
+        vm.prank(backend);
+        processor.pause();
+        assertTrue(processor.paused());
+
+        vm.prank(backend);
+        processor.unpause();
+
+        assertFalse(processor.paused());
+    }
+
+    function test_unpause_RestoresProtocolOperations() public {
+        _registerGeneralImplementation();
+        YieldModuleGeneralHarness yieldModule =
+            _deployGeneralYieldModuleWithFunds(owner, INITIAL_OWNER_BALANCE);
+
+        vm.startPrank(backend);
+        processor.pause();
+        processor.unpause();
+        vm.stopPrank();
+
+        _enterViaProcessor(yieldModule, 0);
+
+        assertEq(yieldModule.protocolBalance(address(yieldToken)), INITIAL_OWNER_BALANCE);
+    }
+
+    function test_unpause_EmitsUnpaused() public {
+        vm.prank(backend);
+        processor.pause();
+
+        vm.expectEmit(address(processor));
+        emit Pausable.Unpaused(backend);
+
+        vm.prank(backend);
+        processor.unpause();
+    }
+
+    function test_unpause_RevertsWithoutPauserRole() public {
+        vm.prank(backend);
+        processor.pause();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                otherAccount,
+                processor.PAUSER_ROLE()
+            )
+        );
+        vm.prank(otherAccount);
+        processor.unpause();
+    }
+}

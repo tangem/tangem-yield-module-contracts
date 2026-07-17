@@ -36,7 +36,7 @@ contract EnterProtocolTest is AaveV3YieldModuleBase {
         amountModule = _deployYieldModuleWithFunds(amountOwner, INITIAL_OWNER_BALANCE);
     }
 
-    /* ================================================ enterProtocol (processor) ================================================ */
+    /*  enterProtocol (processor)  */
 
     function test_enterProtocol_TransfersAllOwnerFundsToModule() public {
         vm.expectEmit(address(yieldToken));
@@ -104,7 +104,8 @@ contract EnterProtocolTest is AaveV3YieldModuleBase {
     /* Fee processing: first enter */
 
     function test_enterProtocol_FirstEnter_SetsLatestFeePaymentState() public {
-        (uint protocolBalance, uint serviceFeeRate) = yieldModule.latestFeePaymentStates(address(yieldToken));
+        (uint protocolBalance, uint serviceFeeRate) =
+            yieldModule.latestFeePaymentStates(address(yieldToken));
         assertEq(protocolBalance, 0);
         assertEq(serviceFeeRate, 0);
 
@@ -145,10 +146,11 @@ contract EnterProtocolTest is AaveV3YieldModuleBase {
 
     function test_enterProtocol_ConsecutiveEnter_UpdatesLatestFeePaymentState() public {
         uint serviceFee = _setupConsecutiveEnter();
-        uint expectedProtocolBalance =
-            TOTAL_ENTER_AMOUNT + ACCUMULATED_REVENUE + FRESH_OWNER_BALANCE - serviceFee - NETWORK_FEE;
+        uint expectedProtocolBalance = TOTAL_ENTER_AMOUNT + ACCUMULATED_REVENUE
+            + FRESH_OWNER_BALANCE - serviceFee - NETWORK_FEE;
 
-        (uint protocolBalance, uint serviceFeeRate) = yieldModule.latestFeePaymentStates(address(yieldToken));
+        (uint protocolBalance, uint serviceFeeRate) =
+            yieldModule.latestFeePaymentStates(address(yieldToken));
         assertEq(protocolBalance, TOTAL_ENTER_AMOUNT);
         assertEq(serviceFeeRate, SERVICE_FEE_RATE);
 
@@ -159,7 +161,9 @@ contract EnterProtocolTest is AaveV3YieldModuleBase {
         assertEq(serviceFeeRate, NEW_FEE_RATE);
     }
 
-    function test_enterProtocol_ConsecutiveEnter_TransfersServiceAndNetworkFeeToFeeReceiver() public {
+    function test_enterProtocol_ConsecutiveEnter_TransfersServiceAndNetworkFeeToFeeReceiver()
+        public
+    {
         uint serviceFee = _setupConsecutiveEnter();
 
         vm.expectEmit(address(protocolToken));
@@ -172,7 +176,11 @@ contract EnterProtocolTest is AaveV3YieldModuleBase {
         uint serviceFee = _setupConsecutiveEnter();
 
         vm.expectEmit(address(yieldModule));
-        emit IYieldModule.FeePaymentProcessed(address(yieldToken), serviceFee + NETWORK_FEE, feeReceiver);
+        emit IYieldModule.FeePaymentProcessed(
+            address(yieldToken),
+            serviceFee + NETWORK_FEE,
+            feeReceiver
+        );
 
         _enterViaProcessor(yieldModule, NETWORK_FEE);
     }
@@ -193,13 +201,17 @@ contract EnterProtocolTest is AaveV3YieldModuleBase {
 
         _enterViaProcessor(yieldModule, NETWORK_FEE);
 
-        (uint protocolBalance, uint storedFeeRate) = yieldModule.latestFeePaymentStates(address(yieldToken));
-        assertEq(protocolBalance, TOTAL_ENTER_AMOUNT + revenue + FRESH_OWNER_BALANCE - serviceFee - NETWORK_FEE);
+        (uint protocolBalance, uint storedFeeRate) =
+            yieldModule.latestFeePaymentStates(address(yieldToken));
+        assertEq(
+            protocolBalance,
+            TOTAL_ENTER_AMOUNT + revenue + FRESH_OWNER_BALANCE - serviceFee - NETWORK_FEE
+        );
         assertEq(storedFeeRate, newFeeRate);
         assertEq(protocolToken.balanceOf(feeReceiver), serviceFee + NETWORK_FEE);
     }
 
-    /* ============================================ enterProtocolByOwner (full balance) =========================================== */
+    /*  enterProtocolByOwner (full balance)  */
 
     function _enterByOwner() internal {
         vm.prank(owner);
@@ -243,7 +255,8 @@ contract EnterProtocolTest is AaveV3YieldModuleBase {
     /* Fee processing: first enter */
 
     function test_enterProtocolByOwner_FirstEnter_SetsLatestFeePaymentState() public {
-        (uint protocolBalance, uint serviceFeeRate) = yieldModule.latestFeePaymentStates(address(yieldToken));
+        (uint protocolBalance, uint serviceFeeRate) =
+            yieldModule.latestFeePaymentStates(address(yieldToken));
         assertEq(protocolBalance, 0);
         assertEq(serviceFeeRate, 0);
 
@@ -256,7 +269,11 @@ contract EnterProtocolTest is AaveV3YieldModuleBase {
 
     function test_enterProtocolByOwner_FirstEnter_EmitsFeePaymentProcessedWithZeroFee() public {
         vm.expectEmit(address(yieldModule));
-        emit IYieldModule.LatestFeePaymentStateUpdated(address(yieldToken), TOTAL_ENTER_AMOUNT, SERVICE_FEE_RATE);
+        emit IYieldModule.LatestFeePaymentStateUpdated(
+            address(yieldToken),
+            TOTAL_ENTER_AMOUNT,
+            SERVICE_FEE_RATE
+        );
         vm.expectEmit(address(yieldModule));
         emit IYieldModule.FeePaymentProcessed(address(yieldToken), 0, feeReceiver);
 
@@ -280,9 +297,11 @@ contract EnterProtocolTest is AaveV3YieldModuleBase {
 
     function test_enterProtocolByOwner_ConsecutiveEnter_UpdatesLatestFeePaymentState() public {
         uint serviceFee = _setupConsecutiveEnterByOwner();
-        uint expectedProtocolBalance = TOTAL_ENTER_AMOUNT + ACCUMULATED_REVENUE + FRESH_OWNER_BALANCE - serviceFee;
+        uint expectedProtocolBalance =
+            TOTAL_ENTER_AMOUNT + ACCUMULATED_REVENUE + FRESH_OWNER_BALANCE - serviceFee;
 
-        (uint protocolBalance, uint serviceFeeRate) = yieldModule.latestFeePaymentStates(address(yieldToken));
+        (uint protocolBalance, uint serviceFeeRate) =
+            yieldModule.latestFeePaymentStates(address(yieldToken));
         assertEq(protocolBalance, TOTAL_ENTER_AMOUNT);
         assertEq(serviceFeeRate, SERVICE_FEE_RATE);
 
@@ -311,7 +330,7 @@ contract EnterProtocolTest is AaveV3YieldModuleBase {
         _enterByOwner();
     }
 
-    /* ============================================ enterProtocolByOwner (with amount) =========================================== */
+    /*  enterProtocolByOwner (with amount)  */
 
     function _enterByOwnerAmount(uint amount) internal {
         vm.prank(amountOwner);
@@ -384,7 +403,8 @@ contract EnterProtocolTest is AaveV3YieldModuleBase {
     /* Fee processing: first enter */
 
     function test_enterProtocolByOwnerAmount_FirstEnter_SetsLatestFeePaymentState() public {
-        (uint protocolBalance, uint serviceFeeRate) = amountModule.latestFeePaymentStates(address(yieldToken));
+        (uint protocolBalance, uint serviceFeeRate) =
+            amountModule.latestFeePaymentStates(address(yieldToken));
         assertEq(protocolBalance, 0);
         assertEq(serviceFeeRate, 0);
 
@@ -395,9 +415,15 @@ contract EnterProtocolTest is AaveV3YieldModuleBase {
         assertEq(serviceFeeRate, SERVICE_FEE_RATE);
     }
 
-    function test_enterProtocolByOwnerAmount_FirstEnter_EmitsFeePaymentProcessedWithZeroFee() public {
+    function test_enterProtocolByOwnerAmount_FirstEnter_EmitsFeePaymentProcessedWithZeroFee()
+        public
+    {
         vm.expectEmit(address(amountModule));
-        emit IYieldModule.LatestFeePaymentStateUpdated(address(yieldToken), ENTER_AMOUNT, SERVICE_FEE_RATE);
+        emit IYieldModule.LatestFeePaymentStateUpdated(
+            address(yieldToken),
+            ENTER_AMOUNT,
+            SERVICE_FEE_RATE
+        );
         vm.expectEmit(address(amountModule));
         emit IYieldModule.FeePaymentProcessed(address(yieldToken), 0, feeReceiver);
 
@@ -409,11 +435,15 @@ contract EnterProtocolTest is AaveV3YieldModuleBase {
 
     /* Fee processing: consecutive enters */
 
-    function test_enterProtocolByOwnerAmount_ConsecutiveEnter_UpdatesLatestFeePaymentState() public {
+    function test_enterProtocolByOwnerAmount_ConsecutiveEnter_UpdatesLatestFeePaymentState()
+        public
+    {
         uint serviceFee = _setupConsecutiveEnterByOwnerAmount();
-        uint expectedProtocolBalance = ENTER_AMOUNT + ACCUMULATED_REVENUE + SECOND_ENTER_AMOUNT - serviceFee;
+        uint expectedProtocolBalance =
+            ENTER_AMOUNT + ACCUMULATED_REVENUE + SECOND_ENTER_AMOUNT - serviceFee;
 
-        (uint protocolBalance, uint serviceFeeRate) = amountModule.latestFeePaymentStates(address(yieldToken));
+        (uint protocolBalance, uint serviceFeeRate) =
+            amountModule.latestFeePaymentStates(address(yieldToken));
         assertEq(protocolBalance, ENTER_AMOUNT);
         assertEq(serviceFeeRate, SERVICE_FEE_RATE);
 
@@ -424,7 +454,9 @@ contract EnterProtocolTest is AaveV3YieldModuleBase {
         assertEq(serviceFeeRate, NEW_FEE_RATE);
     }
 
-    function test_enterProtocolByOwnerAmount_ConsecutiveEnter_TransfersServiceFeeToFeeReceiver() public {
+    function test_enterProtocolByOwnerAmount_ConsecutiveEnter_TransfersServiceFeeToFeeReceiver()
+        public
+    {
         uint serviceFee = _setupConsecutiveEnterByOwnerAmount();
 
         vm.expectEmit(address(protocolToken));

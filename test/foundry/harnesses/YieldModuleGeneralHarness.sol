@@ -4,9 +4,9 @@ pragma solidity ^0.8.29;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import { MerklIncentives } from "contracts/merkl/MerklIncentives.sol";
 import { YieldModuleHarness } from "./YieldModuleHarness.sol";
 import { YieldModuleLiquidUpgradeable } from "contracts/core/YieldModuleLiquidUpgradeable.sol";
+import { MerklIncentives } from "contracts/merkl/MerklIncentives.sol";
 import { GeneralPoolMock } from "contracts/test/GeneralPoolMock.sol";
 
 contract YieldModuleGeneralHarness is YieldModuleHarness {
@@ -36,8 +36,6 @@ contract YieldModuleGeneralHarness is YieldModuleHarness {
         __YieldModule_init(_owner);
     }
 
-    /* HOOK IMPLEMENTATIONS — delegate to GeneralPoolMock */
-
     function _initProtocolToken(address yieldToken) internal override returns (address) {
         return pool.initProtocolToken(yieldToken);
     }
@@ -60,19 +58,17 @@ contract YieldModuleGeneralHarness is YieldModuleHarness {
         pool.deposit(yieldToken, amount);
     }
 
-    function _pullFromProtocolToOwner(address yieldToken, uint amount)
-        internal
-        override
-        returns (uint)
-    {
+    function _pullFromProtocolToOwner(
+        address yieldToken,
+        uint amount
+    ) internal override returns (uint) {
         return pool.withdraw(yieldToken, amount, owner);
     }
 
-    function _pullFromProtocolToModule(address yieldToken, uint amount)
-        internal
-        override
-        returns (uint)
-    {
+    function _pullFromProtocolToModule(
+        address yieldToken,
+        uint amount
+    ) internal override returns (uint) {
         return pool.withdraw(yieldToken, amount, address(this));
     }
 }

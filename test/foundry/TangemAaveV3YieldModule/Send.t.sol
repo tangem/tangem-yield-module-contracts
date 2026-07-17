@@ -67,6 +67,13 @@ contract SendTest is AaveV3YieldModuleBase {
         yieldModule.send(address(yieldToken), owner, SEND_AMOUNT);
     }
 
+    function test_send_RevertsTokenNotActive() public {
+        _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
+
+        vm.expectRevert(IYieldModule.TokenNotActive.selector);
+        _send(SEND_AMOUNT);
+    }
+
     function test_send_RevertsOnlyOwner() public {
         vm.expectRevert(IYieldModule.OnlyOwner.selector);
         vm.prank(otherAccount);

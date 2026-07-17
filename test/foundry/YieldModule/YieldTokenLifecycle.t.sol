@@ -29,7 +29,7 @@ contract YieldTokenLifecycleTest is YieldModuleBase {
         initModule = _deployGeneralYieldModule(initOwner, address(0), 0);
     }
 
-    /* ======================================================== initYieldToken ===================================================== */
+    /*  initYieldToken  */
 
     function test_initYieldToken_InitializesYieldToken() public {
         vm.prank(initOwner);
@@ -46,6 +46,21 @@ contract YieldTokenLifecycleTest is YieldModuleBase {
         assertTrue(initModule.isProtocolToken(pt));
     }
 
+    function test_initYieldToken_RevertsTokenAlreadyInitialized() public {
+        vm.prank(initOwner);
+        initModule.initYieldToken(address(yieldToken), MAX_NETWORK_FEE);
+
+        vm.expectRevert(IYieldModule.TokenAlreadyInitialized.selector);
+        vm.prank(initOwner);
+        initModule.initYieldToken(address(yieldToken), MAX_NETWORK_FEE);
+    }
+
+    function test_initYieldToken_RevertsTokenAlreadyInitialized_WhenDeactivated() public {
+        vm.expectRevert(IYieldModule.TokenAlreadyInitialized.selector);
+        vm.prank(owner);
+        yieldModule.initYieldToken(address(yieldToken), MAX_NETWORK_FEE);
+    }
+
     function test_initYieldToken_RevertsOnlyOwnerOrFactory() public {
         vm.expectRevert(IYieldModule.OnlyOwnerOrFactory.selector);
         vm.prank(otherAccount);
@@ -56,20 +71,16 @@ contract YieldTokenLifecycleTest is YieldModuleBase {
         address freshOwner = makeAddr("freshOwner");
         YieldModuleGeneralHarness freshModule = _deployGeneralYieldModule(freshOwner, address(0), 0);
 
-        // protocolToken is created inside initYieldToken, so we can't know its address before
-        // the call. Match only the event signature + emitter (no data check), then verify
-        // protocolToken was set correctly afterwards.
         vm.expectEmit(false, false, false, false, address(freshModule));
         emit IYieldModule.YieldTokenInitialized(address(yieldToken), address(0), MAX_NETWORK_FEE);
 
         vm.prank(freshOwner);
         freshModule.initYieldToken(address(yieldToken), MAX_NETWORK_FEE);
 
-        // Verify protocolToken was set correctly after the call.
         assertNotEq(address(freshModule.protocolTokens(address(yieldToken))), address(0));
     }
 
-    /* ====================================================== reactivateToken ===================================================== */
+    /*  reactivateToken  */
 
     function test_reactivateToken_ReactivatesYieldToken() public {
         (, bool active,) = yieldModule.yieldTokensData(address(yieldToken));
@@ -91,6 +102,23 @@ contract YieldTokenLifecycleTest is YieldModuleBase {
 
         (,, maxNetworkFee) = yieldModule.yieldTokensData(address(yieldToken));
         assertEq(maxNetworkFee, NEW_MAX_NETWORK_FEE);
+    }
+
+    function test_reactivateToken_RevertsTokenNotInitialized() public {
+        address uninitializedToken = makeAddr("uninitializedToken");
+
+        vm.expectRevert(IYieldModule.TokenNotInitialized.selector);
+        vm.prank(owner);
+        yieldModule.reactivateToken(uninitializedToken, NEW_MAX_NETWORK_FEE);
+    }
+
+    function test_reactivateToken_RevertsTokenAlreadyActive() public {
+        vm.prank(initOwner);
+        initModule.initYieldToken(address(yieldToken), MAX_NETWORK_FEE); // active after init
+
+        vm.expectRevert(IYieldModule.TokenAlreadyActive.selector);
+        vm.prank(initOwner);
+        initModule.reactivateToken(address(yieldToken), NEW_MAX_NETWORK_FEE);
     }
 
     function test_reactivateToken_RevertsOnlyOwner() public {

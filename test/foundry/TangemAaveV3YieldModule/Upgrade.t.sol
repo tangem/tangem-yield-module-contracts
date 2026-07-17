@@ -51,6 +51,12 @@ contract UpgradeTest is AaveV3YieldModuleBase {
         yieldModule.upgradeToAndCall(address(newImplementation), "");
     }
 
+    function test_upgradeToAndCall_RevertsUnauthorizedImplementation() public {
+        vm.expectRevert(IYieldModule.UnauthorizedImplementation.selector);
+        vm.prank(owner);
+        yieldModule.upgradeToAndCall(address(implementation), "");
+    }
+
     function test_upgradeToAndCall_EmitsUpgraded() public {
         vm.expectEmit(address(yieldModule));
         emit IERC1967.Upgraded(address(newImplementation));
