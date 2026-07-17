@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 
 import { IERC20Errors } from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 
-import { TangemAaveV3YieldModuleHarness } from "../harnesses/TangemAaveV3YieldModuleHarness.sol";
+import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 import { AaveV3YieldModuleBase } from "./AaveV3YieldModuleBase.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
@@ -18,7 +18,7 @@ contract WeirdTokensTest is AaveV3YieldModuleBase {
     uint internal constant BALANCE_DROP = 20_000e6;
     uint internal constant FOT_DEPOSIT = 100_000e6;
 
-    TangemAaveV3YieldModuleHarness internal yieldModule;
+    YieldModuleHarness internal yieldModule;
     address internal receiver;
     uint internal serviceFee;
 
@@ -54,7 +54,7 @@ contract WeirdTokensTest is AaveV3YieldModuleBase {
 
     function test_enterProtocolByOwner_SuppliesPostTaxBalanceWhenYieldTokenHasTransferTax() public {
         address fotOwner = makeAddr("fotOwner");
-        TangemAaveV3YieldModuleHarness fotModule =
+        YieldModuleHarness fotModule =
             _deployYieldModuleWithFunds(fotOwner, FOT_DEPOSIT);
 
         yieldToken.setFixedTax(TAX);

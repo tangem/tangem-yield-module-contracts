@@ -3,7 +3,7 @@
 pragma solidity ^0.8.29;
 
 import { YieldModuleBase } from "../YieldModuleBase.sol";
-import { YieldModuleGeneralHarness } from "../harnesses/YieldModuleGeneralHarness.sol";
+import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 
 import { PRECISION } from "contracts/resources/Constants.sol";
 
@@ -11,21 +11,21 @@ contract ServiceFeeTest is YieldModuleBase {
     uint internal constant SF_INITIAL_OWNER_BALANCE = 200_000e6;
     uint internal feeDebt = FEE_DEBT_SCENARIO_REVENUE * SERVICE_FEE_RATE / PRECISION;
 
-    YieldModuleGeneralHarness internal debtModule;
+    YieldModuleHarness internal debtModule;
     uint internal remainingFeeDebt;
     address internal debtOwner = makeAddr("debtOwner");
 
     function setUp() public override {
         super.setUp();
         _registerGeneralImplementation();
-        (debtModule, remainingFeeDebt) = _createGeneralFeeDebtState(debtOwner);
+        (debtModule, remainingFeeDebt) = _createFeeDebtState(debtOwner);
     }
 
     /*  calculateServiceFee  */
 
     function test_calculateServiceFee_AfterRevenue() public {
-        YieldModuleGeneralHarness yieldModule =
-            _deployEnteredGeneralYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
+        YieldModuleHarness yieldModule =
+            _deployEnteredYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
         uint revenue = 10_000e6;
 
         _generateRevenue(address(yieldToken), address(yieldModule), revenue);
@@ -36,8 +36,8 @@ contract ServiceFeeTest is YieldModuleBase {
 
     // example of pre-seeding internal state through the harness
     function test_calculateServiceFee_IncludesPreseededFeeDebt() public {
-        YieldModuleGeneralHarness yieldModule =
-            _deployEnteredGeneralYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
+        YieldModuleHarness yieldModule =
+            _deployEnteredYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
         uint feeDebt_ = 700e6;
 
         yieldModule.exposed_setFeeDebt(address(yieldToken), feeDebt_);
@@ -46,8 +46,8 @@ contract ServiceFeeTest is YieldModuleBase {
     }
 
     function testFuzz_calculateServiceFee(uint revenue, uint feeRate, uint feeDebt_) public {
-        YieldModuleGeneralHarness yieldModule =
-            _deployEnteredGeneralYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
+        YieldModuleHarness yieldModule =
+            _deployEnteredYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
         revenue = bound(revenue, 0, 1_000_000_000e6);
         feeRate = bound(feeRate, 0, PRECISION);
         feeDebt_ = bound(feeDebt_, 0, 1_000_000e6);
@@ -64,8 +64,8 @@ contract ServiceFeeTest is YieldModuleBase {
     }
 
     function testFuzz_effectiveBalances(uint revenue, uint feeRate, uint feeDebt_) public {
-        YieldModuleGeneralHarness yieldModule =
-            _deployEnteredGeneralYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
+        YieldModuleHarness yieldModule =
+            _deployEnteredYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
         revenue = bound(revenue, 0, 1_000_000e6);
         feeRate = bound(feeRate, 0, PRECISION);
         // large debts make the fee exceed the protocol balance => clamping branch
@@ -93,8 +93,8 @@ contract ServiceFeeTest is YieldModuleBase {
     function testFuzz_enterProtocolByOwner_PartiallyRepaysFeeDebt(uint reEnterDeposit) public {
         reEnterDeposit = bound(reEnterDeposit, 1, feeDebt - 1);
 
-        (YieldModuleGeneralHarness yieldModule,) =
-            _createGeneralFeeDebtState(otherAccount, reEnterDeposit);
+        (YieldModuleHarness yieldModule,) =
+            _createFeeDebtState(otherAccount, reEnterDeposit);
 
         // the whole deposit goes toward the debt (FeePaymentPartial path)
         assertEq(yieldModule.feeDebts(address(yieldToken)), feeDebt - reEnterDeposit);
@@ -107,8 +107,8 @@ contract ServiceFeeTest is YieldModuleBase {
     {
         reEnterDeposit = bound(reEnterDeposit, feeDebt, FEE_DEBT_SCENARIO_DEPOSIT);
 
-        (YieldModuleGeneralHarness yieldModule,) =
-            _createGeneralFeeDebtState(otherAccount, reEnterDeposit);
+        (YieldModuleHarness yieldModule,) =
+            _createFeeDebtState(otherAccount, reEnterDeposit);
 
         assertEq(yieldModule.feeDebts(address(yieldToken)), 0);
         assertEq(yieldModule.calculateServiceFee(address(yieldToken)), 0);

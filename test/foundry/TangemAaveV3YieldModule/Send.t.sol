@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import { TangemAaveV3YieldModuleHarness } from "../harnesses/TangemAaveV3YieldModuleHarness.sol";
+import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 import { AaveV3YieldModuleBase } from "./AaveV3YieldModuleBase.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
@@ -15,7 +15,7 @@ contract SendTest is AaveV3YieldModuleBase {
     uint internal constant SEND_FRESH_OWNER_BALANCE = 5_000e6;
     uint internal constant SEND_AMOUNT = 25_000e6;
 
-    TangemAaveV3YieldModuleHarness internal yieldModule;
+    YieldModuleHarness internal yieldModule;
     address internal receiver;
     uint internal serviceFee;
 
@@ -100,16 +100,11 @@ contract SendTest is AaveV3YieldModuleBase {
         uint expectedProtocolBalance =
             PROTOCOL_BALANCE - SEND_AMOUNT - serviceFee + SEND_FRESH_OWNER_BALANCE;
 
-        (uint protocolBalance, uint serviceFeeRate) =
-            yieldModule.latestFeePaymentStates(address(yieldToken));
-        assertEq(protocolBalance, INITIAL_OWNER_BALANCE);
-        assertEq(serviceFeeRate, SERVICE_FEE_RATE);
+        _assertLatestFeePaymentState(yieldModule, INITIAL_OWNER_BALANCE, SERVICE_FEE_RATE);
 
         _send(SEND_AMOUNT);
 
-        (protocolBalance, serviceFeeRate) = yieldModule.latestFeePaymentStates(address(yieldToken));
-        assertEq(protocolBalance, expectedProtocolBalance);
-        assertEq(serviceFeeRate, newFeeRate);
+        _assertLatestFeePaymentState(yieldModule, expectedProtocolBalance, newFeeRate);
     }
 
     function test_send_TransfersServiceFeeToFeeReceiver() public {

@@ -5,20 +5,20 @@ pragma solidity ^0.8.29;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import { YieldModuleBase } from "../YieldModuleBase.sol";
-import { YieldModuleGeneralHarness } from "../harnesses/YieldModuleGeneralHarness.sol";
+import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 import { PRECISION } from "contracts/resources/Constants.sol";
 
 contract CollectServiceFeeTest is YieldModuleBase {
-    YieldModuleGeneralHarness internal yieldModule;
+    YieldModuleHarness internal yieldModule;
     uint internal serviceFee;
 
     function setUp() public override {
         super.setUp();
         _registerGeneralImplementation();
 
-        yieldModule = _deployEnteredRevenueGeneralModule(owner);
+        yieldModule = _deployEnteredRevenueModule(owner);
         serviceFee = ACCUMULATED_SERVICE_FEE;
     }
 
@@ -28,16 +28,11 @@ contract CollectServiceFeeTest is YieldModuleBase {
 
         uint expectedProtocolBalance = INITIAL_OWNER_BALANCE + ACCUMULATED_REVENUE - serviceFee;
 
-        (uint protocolBalance, uint serviceFeeRate) =
-            yieldModule.latestFeePaymentStates(address(yieldToken));
-        assertEq(protocolBalance, INITIAL_OWNER_BALANCE);
-        assertEq(serviceFeeRate, SERVICE_FEE_RATE);
+        _assertLatestFeePaymentState(yieldModule, INITIAL_OWNER_BALANCE, SERVICE_FEE_RATE);
 
         _collectViaProcessor(yieldModule);
 
-        (protocolBalance, serviceFeeRate) = yieldModule.latestFeePaymentStates(address(yieldToken));
-        assertEq(protocolBalance, expectedProtocolBalance);
-        assertEq(serviceFeeRate, newFeeRate);
+        _assertLatestFeePaymentState(yieldModule, expectedProtocolBalance, newFeeRate);
     }
 
     function test_collectServiceFee_TransfersServiceFeeToFeeReceiver() public {
@@ -63,8 +58,8 @@ contract CollectServiceFeeTest is YieldModuleBase {
     }
 
     function test_collectServiceFee_RevertsNothingToCollect() public {
-        YieldModuleGeneralHarness yieldModule2 =
-            _deployGeneralYieldModuleWithFunds(otherAccount, 10_000e6);
+        YieldModuleHarness yieldModule2 =
+            _deployYieldModuleWithFunds(otherAccount, 10_000e6);
 
         // first enter with zero network fee and no revenue => baseline sync only, nothing to collect
         _enterViaProcessor(yieldModule2, 0);
@@ -77,8 +72,8 @@ contract CollectServiceFeeTest is YieldModuleBase {
     function test_collectServiceFee_RevertsFeeProcessingFailedWhenDebtExistsAndProtocolBalanceIsZero()
         public
     {
-        YieldModuleGeneralHarness yieldModule2 =
-            _deployGeneralYieldModuleWithFunds(otherAccount, 100_000e6);
+        YieldModuleHarness yieldModule2 =
+            _deployYieldModuleWithFunds(otherAccount, 100_000e6);
         uint revenue = 10_000e6;
 
         _enterViaProcessor(yieldModule2, 0);

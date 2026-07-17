@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 
 import { ReentrancyGuardUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
-import { MerklIncentivesBase, TangemAaveV3YieldModuleHarness } from "./MerklIncentivesBase.sol";
+import { MerklIncentivesBase, YieldModuleHarness } from "./MerklIncentivesBase.sol";
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 import { ReentrantERC20 } from "contracts/test/ReentrantERC20.sol";
 
@@ -61,7 +61,7 @@ contract WeirdRewardTokensTest is MerklIncentivesBase {
         ReentrantERC20 token = new ReentrantERC20("ReentrantRewardToken", "RRT", 18);
         token.mint(address(merklDistributor), AMOUNT);
 
-        TangemAaveV3YieldModuleHarness attackedModule =
+        YieldModuleHarness attackedModule =
             _deployYieldModule(address(token), address(0), 0);
 
         bytes memory claimCall = _claimCalldata(address(token));

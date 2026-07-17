@@ -3,6 +3,7 @@ pragma solidity ^0.8.29;
 
 import { BaseTest } from "test/foundry/BaseTest.sol";
 import { YieldModuleGeneralHarness } from "test/foundry/harnesses/YieldModuleGeneralHarness.sol";
+import { YieldModuleHarness } from "test/foundry/harnesses/YieldModuleHarness.sol";
 import { TestHelpers } from "test/foundry/utils/TestHelpers.sol";
 
 import { ERC2771Forwarder } from "@openzeppelin/contracts/metatx/ERC2771Forwarder.sol";
@@ -94,28 +95,26 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         vm.label(address(ymGeneralImpl), "ymGeneralImpl");
     }
 
-    /* DEPLOY */
+    /* DEPLOY (protocol-agnostic — deploys whichever implementation is registered in the factory) */
 
-    function _deployGeneralYieldModule(
+    function _deployYieldModule(
         address moduleOwner,
         address yieldTokenAddr,
         uint240 maxNetworkFee
-    ) internal returns (YieldModuleGeneralHarness yieldModule) {
+    ) internal returns (YieldModuleHarness yieldModule) {
         vm.prank(moduleOwner);
         factory.deployYieldModule(moduleOwner, yieldTokenAddr, maxNetworkFee);
 
-        yieldModule =
-            YieldModuleGeneralHarness(payable(factory.calculateYieldModuleAddress(moduleOwner)));
+        yieldModule = YieldModuleHarness(payable(factory.calculateYieldModuleAddress(moduleOwner)));
         vm.label(address(yieldModule), "yieldModule");
     }
 
-    function _deployGeneralYieldModuleWithFunds(
+    /// Deploys a module with the yield token initialized, owner funded and max approval given.
+    function _deployYieldModuleWithFunds(
         address moduleOwner,
         uint ownerBalance
-    ) internal returns (YieldModuleGeneralHarness yieldModule) {
-        yieldModule = _deployGeneralYieldModule(
-            moduleOwner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE
-        );
+    ) internal returns (YieldModuleHarness yieldModule) {
+        yieldModule = _deployYieldModule(moduleOwner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
 
         _mintYieldToken(moduleOwner, ownerBalance);
 
@@ -123,36 +122,37 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         yieldToken.approve(address(yieldModule), type(uint).max);
     }
 
-    function _deployEnteredGeneralYieldModule(
+    function _deployEnteredYieldModule(
         address moduleOwner,
         uint enterAmount
-    ) internal returns (YieldModuleGeneralHarness yieldModule) {
-        yieldModule = _deployGeneralYieldModuleWithFunds(moduleOwner, enterAmount);
+    ) internal returns (YieldModuleHarness yieldModule) {
+        yieldModule = _deployYieldModuleWithFunds(moduleOwner, enterAmount);
 
         vm.prank(moduleOwner);
         yieldModule.enterProtocolByOwner(address(yieldToken));
     }
 
-    function _deployEnteredRevenueGeneralModule(address moduleOwner)
+    /// Full scenario: deployed, entered and revenue generated (standard ACCUMULATED_REVENUE).
+    function _deployEnteredRevenueModule(address moduleOwner)
         internal
-        returns (YieldModuleGeneralHarness yieldModule)
+        returns (YieldModuleHarness yieldModule)
     {
-        yieldModule = _deployGeneralYieldModuleWithFunds(moduleOwner, INITIAL_OWNER_BALANCE);
+        yieldModule = _deployYieldModuleWithFunds(moduleOwner, INITIAL_OWNER_BALANCE);
         _enterViaProcessor(yieldModule, 0);
         _generateRevenue(address(yieldToken), address(yieldModule), ACCUMULATED_REVENUE);
     }
 
-    /* GENERIC HARNESS ACTOR WRAPPERS */
+    /* HARNESS ACTOR WRAPPERS (bind yieldToken) */
 
-    function _enterViaProcessor(YieldModuleGeneralHarness yieldModule, uint networkFee) internal {
+    function _enterViaProcessor(YieldModuleHarness yieldModule, uint networkFee) internal {
         _enterViaProcessor(IYieldModule(address(yieldModule)), address(yieldToken), networkFee);
     }
 
-    function _exitViaProcessor(YieldModuleGeneralHarness yieldModule, uint networkFee) internal {
+    function _exitViaProcessor(YieldModuleHarness yieldModule, uint networkFee) internal {
         _exitViaProcessor(IYieldModule(address(yieldModule)), address(yieldToken), networkFee);
     }
 
-    function _collectViaProcessor(YieldModuleGeneralHarness yieldModule) internal {
+    function _collectViaProcessor(YieldModuleHarness yieldModule) internal {
         _collectViaProcessor(IYieldModule(address(yieldModule)), address(yieldToken));
     }
 
@@ -281,25 +281,42 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         factory.unpause();
     }
 
+    /// Asserts the latest fee payment checkpoint (protocol balance + fee rate) for yieldToken.
+    function _assertLatestFeePaymentState(
+        YieldModuleHarness yieldModule,
+        uint expectedProtocolBalance,
+        uint expectedServiceFeeRate
+    ) internal view {
+        (uint protocolBalance, uint serviceFeeRate) =
+            yieldModule.latestFeePaymentStates(address(yieldToken));
+        assertEq(protocolBalance, expectedProtocolBalance, "latestFeePaymentState.protocolBalance");
+        assertEq(serviceFeeRate, expectedServiceFeeRate, "latestFeePaymentState.serviceFeeRate");
+    }
+
     /* FEE-DEBT SCENARIO */
 
-    function _createGeneralFeeDebtState(address moduleOwner)
+    /// Scenario: fee debt persisted after failed fee payment, protocol balance below the debt.
+    /// Enter, generate revenue, force fee failure on exit, then reactivate and re-enter with a
+    /// small deposit (paid toward the debt). Returns the debt remaining after that payment.
+    function _createFeeDebtState(address moduleOwner)
         internal
-        returns (YieldModuleGeneralHarness yieldModule, uint remainingFeeDebt)
+        returns (YieldModuleHarness yieldModule, uint remainingFeeDebt)
     {
         uint smallDeposit = 1e6;
         uint feeDebt;
-        (yieldModule, feeDebt) = _createGeneralFeeDebtState(moduleOwner, smallDeposit);
+        (yieldModule, feeDebt) = _createFeeDebtState(moduleOwner, smallDeposit);
         remainingFeeDebt = feeDebt - smallDeposit;
     }
 
-    function _createGeneralFeeDebtState(
+    /// Same scenario with a configurable re-enter deposit (paid toward the debt).
+    /// Returns the full debt as it was before the re-enter payment.
+    function _createFeeDebtState(
         address moduleOwner,
         uint reEnterDeposit
-    ) internal returns (YieldModuleGeneralHarness yieldModule, uint feeDebt) {
+    ) internal returns (YieldModuleHarness yieldModule, uint feeDebt) {
         feeDebt = FEE_DEBT_SCENARIO_REVENUE * SERVICE_FEE_RATE / PRECISION;
 
-        yieldModule = _deployGeneralYieldModuleWithFunds(moduleOwner, FEE_DEBT_SCENARIO_DEPOSIT);
+        yieldModule = _deployYieldModuleWithFunds(moduleOwner, FEE_DEBT_SCENARIO_DEPOSIT);
 
         _enterViaProcessor(yieldModule, 0);
         _generateRevenue(address(yieldToken), address(yieldModule), FEE_DEBT_SCENARIO_REVENUE);

@@ -3,7 +3,7 @@
 pragma solidity ^0.8.29;
 
 import { YieldModuleBase } from "../YieldModuleBase.sol";
-import { YieldModuleGeneralHarness } from "../harnesses/YieldModuleGeneralHarness.sol";
+import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
@@ -11,8 +11,8 @@ contract YieldTokenLifecycleTest is YieldModuleBase {
     uint240 internal constant MAX_NETWORK_FEE = 20e6;
     uint240 internal constant NEW_MAX_NETWORK_FEE = 30e6;
 
-    YieldModuleGeneralHarness internal yieldModule;
-    YieldModuleGeneralHarness internal initModule;
+    YieldModuleHarness internal yieldModule;
+    YieldModuleHarness internal initModule;
     address internal initOwner = makeAddr("initOwner");
 
     function setUp() public override {
@@ -20,13 +20,13 @@ contract YieldTokenLifecycleTest is YieldModuleBase {
         _registerGeneralImplementation();
 
         // Main module: yield token active then deactivated (reactivateToken tests)
-        yieldModule = _deployGeneralYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
+        yieldModule = _deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
 
         vm.prank(owner);
         yieldModule.withdrawAndDeactivate(address(yieldToken));
 
         // Separate module with no active yield token (initYieldToken tests)
-        initModule = _deployGeneralYieldModule(initOwner, address(0), 0);
+        initModule = _deployYieldModule(initOwner, address(0), 0);
     }
 
     /*  initYieldToken  */
@@ -69,7 +69,7 @@ contract YieldTokenLifecycleTest is YieldModuleBase {
 
     function test_initYieldToken_EmitsYieldTokenInitialized() public {
         address freshOwner = makeAddr("freshOwner");
-        YieldModuleGeneralHarness freshModule = _deployGeneralYieldModule(freshOwner, address(0), 0);
+        YieldModuleHarness freshModule = _deployYieldModule(freshOwner, address(0), 0);
 
         vm.expectEmit(false, false, false, false, address(freshModule));
         emit IYieldModule.YieldTokenInitialized(address(yieldToken), address(0), MAX_NETWORK_FEE);
