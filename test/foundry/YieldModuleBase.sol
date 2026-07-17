@@ -12,6 +12,7 @@ import { TangemYieldProcessor } from "contracts/core/TangemYieldProcessor.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 import { TangemERC2771Forwarder } from "contracts/metatx/TangemERC2771Forwarder.sol";
 import { PRECISION } from "contracts/resources/Constants.sol";
+import { GeneralPoolMock } from "contracts/test/GeneralPoolMock.sol";
 import { MerklDistributorMock } from "contracts/test/MerklDistributorMock.sol";
 import { SwapProviderMock } from "contracts/test/SwapProviderMock.sol";
 import { TestERC20 } from "contracts/test/TestERC20.sol";
@@ -38,6 +39,7 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
     MerklDistributorMock public merklDistributor;
     SwapProviderMock public swapProvider;
     TestERC20 public yieldToken;
+    GeneralPoolMock public generalPool;
     YieldModuleGeneralHarness public ymGeneralImpl;
 
     function setUp() public virtual override {
@@ -60,7 +62,11 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         swapProvider = new SwapProviderMock();
         yieldToken = new TestERC20("TestYieldToken", "TYT", 6);
 
+        generalPool = new GeneralPoolMock();
+        yieldToken.mint(address(generalPool), POOL_LIQUIDITY);
+
         ymGeneralImpl = new YieldModuleGeneralHarness(
+            address(generalPool),
             address(merklDistributor),
             address(processor),
             address(factory),
@@ -84,6 +90,7 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         vm.label(address(merklDistributor), "merklDistributor");
         vm.label(address(swapProvider), "swapProvider");
         vm.label(address(yieldToken), "yieldToken");
+        vm.label(address(generalPool), "generalPool");
         vm.label(address(ymGeneralImpl), "ymGeneralImpl");
     }
 
@@ -259,10 +266,11 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         yieldToken.mint(to, amount);
     }
 
-    function _generateRevenue(address yieldTokenAddr, address proxy, uint amount) internal virtual {
-        vm.prank(backend);
-        TestERC20(yieldTokenAddr).mint(proxy, amount);
-        YieldModuleGeneralHarness(payable(proxy)).generateRevenue(yieldTokenAddr, proxy, amount);
+    function _generateRevenue(address yieldTokenAddr, address account, uint amount)
+        internal
+        virtual
+    {
+        generalPool.generateRevenue(yieldTokenAddr, account, amount);
     }
 
     function _registerGeneralImplementation() internal {
