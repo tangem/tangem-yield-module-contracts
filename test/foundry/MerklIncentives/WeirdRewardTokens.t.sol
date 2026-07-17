@@ -5,6 +5,7 @@ pragma solidity ^0.8.29;
 import { ReentrancyGuardUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import { MerklIncentivesBase, TangemAaveV3YieldModuleHarness } from "./MerklIncentivesBase.sol";
+import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 import { ReentrantERC20 } from "contracts/test/ReentrantERC20.sol";
 
 contract WeirdRewardTokensTest is MerklIncentivesBase {
@@ -12,6 +13,46 @@ contract WeirdRewardTokensTest is MerklIncentivesBase {
         super.setUp();
 
         ym = _deployEnteredRevenueModule(owner);
+    }
+
+    /*  protocol token with mint tax  */
+
+    function test_claim_PushesToProtocol_Success_WhenFeeOnTransferToken() public {
+        uint tax = YIELD_AMOUNT / 10;
+        protocolToken.setFixedTax(tax);
+        _fundMerklDistributor(address(yieldToken), YIELD_AMOUNT);
+
+        vm.expectEmit(true, true, true, true, address(ym));
+        emit IMerklIncentives.MerklClaimed(
+            address(merklDistributor),
+            address(yieldToken),
+            YIELD_AMOUNT,
+            address(ym),
+            address(protocolToken),
+            YIELD_AMOUNT - tax,
+            owner
+        );
+
+        _claimSingleAsOwner(address(yieldToken), YIELD_AMOUNT);
+
+        assertEq(ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + YIELD_AMOUNT - tax);
+    }
+
+    function test_claim_PushesToProtocol_MovesFeeCheckpointByProtocolDelta_WhenProtocolTokenHasMintTax()
+        public
+    {
+        uint tax = YIELD_AMOUNT / 10;
+        protocolToken.setFixedTax(tax);
+        _fundMerklDistributor(address(yieldToken), YIELD_AMOUNT);
+
+        (uint checkpointBefore,) = ym.latestFeePaymentStates(address(yieldToken));
+
+        _claimSingleAsOwner(address(yieldToken), YIELD_AMOUNT);
+
+        (uint checkpointAfter,) = ym.latestFeePaymentStates(address(yieldToken));
+        assertEq(checkpointAfter, checkpointBefore + YIELD_AMOUNT - tax);
+        assertEq(ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + YIELD_AMOUNT - tax);
+        assertEq(ym.calculateServiceFee(address(yieldToken)), ACCUMULATED_SERVICE_FEE);
     }
 
     /*  reentrancy guard  */
