@@ -5,6 +5,7 @@ import { BaseTest } from "test/foundry/BaseTest.sol";
 import { YieldModuleGeneralHarness } from "test/foundry/harnesses/YieldModuleGeneralHarness.sol";
 import { TestHelpers } from "test/foundry/utils/TestHelpers.sol";
 
+import { ERC2771Forwarder } from "@openzeppelin/contracts/metatx/ERC2771Forwarder.sol";
 import { SwapExecutionRegistry } from "contracts/core/SwapExecutionRegistry.sol";
 import { TangemYieldModuleFactory } from "contracts/core/TangemYieldModuleFactory.sol";
 import { TangemYieldProcessor } from "contracts/core/TangemYieldProcessor.sol";
@@ -15,23 +16,16 @@ import { MerklDistributorMock } from "contracts/test/MerklDistributorMock.sol";
 import { SwapProviderMock } from "contracts/test/SwapProviderMock.sol";
 import { TestERC20 } from "contracts/test/TestERC20.sol";
 
-/// General yield-module test base: deploys shared infra (processor, factory, forwarder,
-/// swap registry) and exposes general actor helpers that operate on `IYieldModule` + address.
-/// Module-specific bases extend this and add pool/token-specific fixtures returning their
-/// harness type.
 abstract contract YieldModuleBase is BaseTest, TestHelpers {
     bytes32 internal constant FEE_PAYMENT_FAILED_EVENT_SIG =
         keccak256("FeePaymentFailed(address,uint256)");
 
-    /* Common scenario amounts shared by the feature suites */
     uint internal constant INITIAL_OWNER_BALANCE = 400_000e6;
     uint internal constant ACCUMULATED_REVENUE = 10_000e6;
     uint internal constant NETWORK_FEE = 1e6;
     uint internal constant NEW_FEE_RATE = 2_000;
-    // service fee derived from ACCUMULATED_REVENUE at the default SERVICE_FEE_RATE
     uint internal constant ACCUMULATED_SERVICE_FEE =
         ACCUMULATED_REVENUE * SERVICE_FEE_RATE / PRECISION;
-    // protocol balance after entering INITIAL_OWNER_BALANCE and generating ACCUMULATED_REVENUE
     uint internal constant PROTOCOL_BALANCE = INITIAL_OWNER_BALANCE + ACCUMULATED_REVENUE;
 
     uint internal constant FEE_DEBT_SCENARIO_DEPOSIT = 100_000e6;
@@ -46,7 +40,9 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
     TestERC20 public yieldToken;
     YieldModuleGeneralHarness public ymGeneralImpl;
 
-    function setUp() public virtual {
+    function setUp() public virtual override {
+        super.setUp();
+
         vm.startPrank(backend);
 
         forwarder = new TangemERC2771Forwarder();
@@ -91,91 +87,7 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         vm.label(address(ymGeneralImpl), "ymGeneralImpl");
     }
 
-    /* GENERIC ACTOR HELPERS (operate via the processor on IYieldModule) */
-
-    function _enterViaProcessor(
-        IYieldModule yieldModule,
-        address yieldTokenAddr,
-        uint networkFee
-    ) internal {
-        vm.prank(backend);
-        processor.enterProtocol(address(yieldModule), yieldTokenAddr, networkFee);
-    }
-
-    function _exitViaProcessor(
-        IYieldModule yieldModule,
-        address yieldTokenAddr,
-        uint networkFee
-    ) internal {
-        vm.prank(backend);
-        processor.exitProtocol(address(yieldModule), yieldTokenAddr, networkFee);
-    }
-
-    function _collectViaProcessor(IYieldModule yieldModule, address yieldTokenAddr) internal {
-        vm.prank(backend);
-        processor.collectServiceFee(address(yieldModule), yieldTokenAddr);
-    }
-
-    function _withdraw(
-        IYieldModule yieldModule,
-        address moduleOwner,
-        address token,
-        uint amount
-    ) internal {
-        vm.prank(moduleOwner);
-        yieldModule.withdraw(token, amount);
-    }
-
-    function _withdrawAndDeactivate(
-        IYieldModule yieldModule,
-        address moduleOwner,
-        address token
-    ) internal {
-        vm.prank(moduleOwner);
-        yieldModule.withdrawAndDeactivate(token);
-    }
-
-    function _setServiceFeeRate(uint feeRate) internal {
-        vm.prank(backend);
-        processor.setServiceFeeRate(feeRate);
-    }
-
-    function _allowSwapProvider(address provider) internal {
-        vm.startPrank(backend);
-        swapExecutionRegistry.setTargetAllowed(provider, true);
-        swapExecutionRegistry.setSpenderAllowed(provider, true);
-        vm.stopPrank();
-    }
-
-    /* MINT HOOK (overridden by module-specific bases that need custom minting) */
-
-    function _mintYieldToken(address to, uint amount) internal virtual {
-        vm.prank(backend);
-        yieldToken.mint(to, amount);
-    }
-
-    /* PROTOCOL HOOKS (overridden by module-specific bases) */
-
-    /// Simulates protocol yield by minting protocol tokens to the account.
-    /// Default: uses the general harness fake pool via the proxy. Override for AAVE/Morpho.
-    function _generateRevenue(address yieldTokenAddr, address proxy, uint amount) internal virtual {
-        // Mint yieldToken to the proxy so it can be returned on withdraw (revenue = extra yield).
-        vm.prank(backend);
-        TestERC20(yieldTokenAddr).mint(proxy, amount);
-        // Mint protocolToken via the proxy to track _protocolBalance.
-        YieldModuleGeneralHarness(payable(proxy)).generateRevenue(yieldTokenAddr, proxy, amount);
-    }
-
-    /* GENERIC FIXTURE HELPERS (operate on YieldModuleGeneralHarness) */
-
-    /// Registers the general implementation in the factory and unpauses.
-    /// Called by YieldModuleBase.setUp or by module-specific setUp if they use a different impl.
-    function _registerGeneralImplementation() internal {
-        vm.prank(backend);
-        factory.setImplementation(address(ymGeneralImpl));
-        vm.prank(backend);
-        factory.unpause();
-    }
+    /* DEPLOY */
 
     function _deployGeneralYieldModule(
         address moduleOwner,
@@ -214,7 +126,6 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         yieldModule.enterProtocolByOwner(address(yieldToken));
     }
 
-    /// Full scenario: deployed, entered and revenue generated (standard ACCUMULATED_REVENUE).
     function _deployEnteredRevenueGeneralModule(address moduleOwner)
         internal
         returns (YieldModuleGeneralHarness yieldModule)
@@ -224,7 +135,7 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         _generateRevenue(address(yieldToken), address(yieldModule), ACCUMULATED_REVENUE);
     }
 
-    /* GENERIC HARNESS ACTOR WRAPPERS (bind yieldToken) */
+    /* GENERIC HARNESS ACTOR WRAPPERS */
 
     function _enterViaProcessor(YieldModuleGeneralHarness yieldModule, uint networkFee) internal {
         _enterViaProcessor(IYieldModule(address(yieldModule)), address(yieldToken), networkFee);
@@ -238,10 +149,131 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         _collectViaProcessor(IYieldModule(address(yieldModule)), address(yieldToken));
     }
 
-    /* FEE-DEBT SCENARIO (general, operates on YieldModuleGeneralHarness) */
+    function _enterViaProcessor(
+        IYieldModule yieldModule,
+        address yieldTokenAddr,
+        uint networkFee
+    ) internal {
+        vm.prank(backend);
+        processor.enterProtocol(address(yieldModule), yieldTokenAddr, networkFee);
+    }
 
-    /// Scenario: fee debt persisted after failed fee payment, protocol balance below the debt.
-    /// Returns the debt remaining after the partial payment (smallDeposit = 1e6).
+    function _exitViaProcessor(
+        IYieldModule yieldModule,
+        address yieldTokenAddr,
+        uint networkFee
+    ) internal {
+        vm.prank(backend);
+        processor.exitProtocol(address(yieldModule), yieldTokenAddr, networkFee);
+    }
+
+    function _collectViaProcessor(IYieldModule yieldModule, address yieldTokenAddr) internal {
+        vm.prank(backend);
+        processor.collectServiceFee(address(yieldModule), yieldTokenAddr);
+    }
+
+    function _executeViaForwarder(address target, bytes memory data, uint value) internal {
+        uint48 deadline = uint48(block.timestamp + 1 hours);
+        uint nonce = forwarder.nonces(owner);
+
+        bytes32 domainSeparator = keccak256(
+            abi.encode(
+                keccak256(
+                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                ),
+                keccak256(bytes("Tangem ERC2771 Forwarder")),
+                keccak256(bytes("1")),
+                block.chainid,
+                address(forwarder)
+            )
+        );
+
+        bytes32 structHash = keccak256(
+            abi.encode(
+                keccak256(
+                    "ForwardRequest(address from,address to,uint256 value,uint256 gas,uint256 nonce,uint48 deadline,bytes data)"
+                ),
+                owner,
+                target,
+                value,
+                1_000_000,
+                nonce,
+                deadline,
+                keccak256(data)
+            )
+        );
+
+        bytes32 digest =
+            keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, structHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPk, digest);
+
+        ERC2771Forwarder.ForwardRequestData memory request = ERC2771Forwarder.ForwardRequestData({
+            from: owner,
+            to: target,
+            value: value,
+            gas: 1_000_000,
+            deadline: deadline,
+            data: data,
+            signature: abi.encodePacked(r, s, v)
+        });
+
+        vm.prank(backend);
+        forwarder.execute{ value: value }(request);
+    }
+
+    /* Helpers */
+
+    function _withdraw(
+        IYieldModule yieldModule,
+        address moduleOwner,
+        address token,
+        uint amount
+    ) internal {
+        vm.prank(moduleOwner);
+        yieldModule.withdraw(token, amount);
+    }
+
+    function _withdrawAndDeactivate(
+        IYieldModule yieldModule,
+        address moduleOwner,
+        address token
+    ) internal {
+        vm.prank(moduleOwner);
+        yieldModule.withdrawAndDeactivate(token);
+    }
+
+    function _setServiceFeeRate(uint feeRate) internal {
+        vm.prank(backend);
+        processor.setServiceFeeRate(feeRate);
+    }
+
+    function _allowSwapProvider(address provider) internal {
+        vm.startPrank(backend);
+        swapExecutionRegistry.setTargetAllowed(provider, true);
+        swapExecutionRegistry.setSpenderAllowed(provider, true);
+        vm.stopPrank();
+    }
+
+    function _mintYieldToken(address to, uint amount) internal virtual {
+        vm.prank(backend);
+        yieldToken.mint(to, amount);
+    }
+
+    function _generateRevenue(address yieldTokenAddr, address proxy, uint amount) internal virtual {
+        vm.prank(backend);
+        TestERC20(yieldTokenAddr).mint(proxy, amount);
+        YieldModuleGeneralHarness(payable(proxy)).generateRevenue(yieldTokenAddr, proxy, amount);
+    }
+
+    function _registerGeneralImplementation() internal {
+        vm.prank(backend);
+        factory.setImplementation(address(ymGeneralImpl));
+        vm.prank(backend);
+        factory.unpause();
+    }
+
+    /* FEE-DEBT SCENARIO */
+
     function _createGeneralFeeDebtState(address moduleOwner)
         internal
         returns (YieldModuleGeneralHarness yieldModule, uint remainingFeeDebt)
@@ -252,8 +284,6 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         remainingFeeDebt = feeDebt - smallDeposit;
     }
 
-    /// Same scenario with a configurable re-enter deposit (paid toward the debt).
-    /// Returns the full debt as it was before the re-enter payment.
     function _createGeneralFeeDebtState(
         address moduleOwner,
         uint reEnterDeposit

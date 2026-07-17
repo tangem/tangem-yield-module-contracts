@@ -11,7 +11,12 @@ abstract contract BaseTest is Test {
     uint240 internal constant DEFAULT_MAX_NETWORK_FEE = 1e6;
 
     address public backend = makeAddr("backend");
-    address public owner = makeAddr("owner");
+    address public owner;
+    uint256 public ownerPk;
     address public feeReceiver = makeAddr("feeReceiver");
     address public otherAccount = makeAddr("otherAccount");
+
+    function setUp() public virtual {
+        (owner, ownerPk) = makeAddrAndKey("owner");
+    }
 }

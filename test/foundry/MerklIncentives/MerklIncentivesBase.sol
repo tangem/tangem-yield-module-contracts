@@ -4,10 +4,8 @@ pragma solidity ^0.8.29;
 import { TestERC20 } from "contracts/test/TestERC20.sol";
 import { AaveV3YieldModuleBase } from "test/foundry/TangemAaveV3YieldModule/AaveV3YieldModuleBase.sol";
 import { TangemAaveV3YieldModuleHarness } from "test/foundry/harnesses/TangemAaveV3YieldModuleHarness.sol";
+import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 
-/// Test base for MerklIncentives. Uses the AAVE harness backed by AaveV3PoolMock so the
-/// yield flow is explicit: supply moves the underlying to the pool and mints aToken 1:1,
-/// revenue mints extra aToken, withdraw burns aToken and returns the underlying.
 abstract contract MerklIncentivesBase is AaveV3YieldModuleBase {
     TangemAaveV3YieldModuleHarness ym;
 
@@ -30,8 +28,6 @@ abstract contract MerklIncentivesBase is AaveV3YieldModuleBase {
     function _fundMerklDistributor(address token, uint amount) internal {
         deal(token, address(merklDistributor), amount, true);
     }
-
-    /* SINGLE-TOKEN CLAIM WRAPPERS (operate on `ym`) */
 
     function _claimSingleAsOwner(address rewardToken, uint amount) internal {
         (
@@ -68,5 +64,18 @@ abstract contract MerklIncentivesBase is AaveV3YieldModuleBase {
         amounts = new uint[](1);
         amounts[0] = amount;
         proofs_ = new bytes32[][](1);
+    }
+
+    function _claimSingleAsOwnerViaForwarder(address rewardToken, uint amount) internal {
+        (
+            address[] memory tokens,
+            uint[] memory amounts,
+            bytes32[][] memory proofs_
+        ) = _singleClaimArgs(rewardToken, amount);
+
+        bytes memory data =
+            abi.encodeCall(IMerklIncentives.claimMerklRewardsOwner, (tokens, amounts, proofs_));
+
+        _executeViaForwarder(address(ym), data, 0);
     }
 }
