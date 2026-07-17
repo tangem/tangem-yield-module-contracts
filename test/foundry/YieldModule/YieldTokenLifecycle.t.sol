@@ -46,7 +46,7 @@ contract YieldTokenLifecycleTest is YieldModuleBase {
         assertTrue(initModule.isProtocolToken(pt));
     }
 
-    function test_initYieldToken_RevertsTokenAlreadyInitialized() public {
+    function test_initYieldToken_Reverts_WhenTokenAlreadyInitialized() public {
         vm.prank(initOwner);
         initModule.initYieldToken(address(yieldToken), MAX_NETWORK_FEE);
 
@@ -55,13 +55,13 @@ contract YieldTokenLifecycleTest is YieldModuleBase {
         initModule.initYieldToken(address(yieldToken), MAX_NETWORK_FEE);
     }
 
-    function test_initYieldToken_RevertsTokenAlreadyInitialized_WhenDeactivated() public {
+    function test_initYieldToken_Reverts_WhenTokenAlreadyInitializedButDeactivated() public {
         vm.expectRevert(IYieldModule.TokenAlreadyInitialized.selector);
         vm.prank(owner);
         yieldModule.initYieldToken(address(yieldToken), MAX_NETWORK_FEE);
     }
 
-    function test_initYieldToken_RevertsOnlyOwnerOrFactory() public {
+    function test_initYieldToken_Reverts_WhenNotOwnerOrFactory() public {
         vm.expectRevert(IYieldModule.OnlyOwnerOrFactory.selector);
         vm.prank(otherAccount);
         initModule.initYieldToken(address(yieldToken), MAX_NETWORK_FEE);
@@ -104,7 +104,7 @@ contract YieldTokenLifecycleTest is YieldModuleBase {
         assertEq(maxNetworkFee, NEW_MAX_NETWORK_FEE);
     }
 
-    function test_reactivateToken_RevertsTokenNotInitialized() public {
+    function test_reactivateToken_Reverts_WhenTokenNotInitialized() public {
         address uninitializedToken = makeAddr("uninitializedToken");
 
         vm.expectRevert(IYieldModule.TokenNotInitialized.selector);
@@ -112,7 +112,7 @@ contract YieldTokenLifecycleTest is YieldModuleBase {
         yieldModule.reactivateToken(uninitializedToken, NEW_MAX_NETWORK_FEE);
     }
 
-    function test_reactivateToken_RevertsTokenAlreadyActive() public {
+    function test_reactivateToken_Reverts_WhenTokenAlreadyActive() public {
         vm.prank(initOwner);
         initModule.initYieldToken(address(yieldToken), MAX_NETWORK_FEE); // active after init
 
@@ -121,7 +121,7 @@ contract YieldTokenLifecycleTest is YieldModuleBase {
         initModule.reactivateToken(address(yieldToken), NEW_MAX_NETWORK_FEE);
     }
 
-    function test_reactivateToken_RevertsOnlyOwner() public {
+    function test_reactivateToken_Reverts_WhenNotOwner() public {
         vm.expectRevert(IYieldModule.OnlyOwner.selector);
         vm.prank(otherAccount);
         yieldModule.reactivateToken(address(yieldToken), NEW_MAX_NETWORK_FEE);

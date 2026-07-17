@@ -20,13 +20,11 @@ contract WeirdTokensTest is AaveV3YieldModuleBase {
 
     YieldModuleHarness internal yieldModule;
     address internal receiver;
-    uint internal serviceFee;
 
     function setUp() public override {
         super.setUp();
 
         yieldModule = _deployEnteredRevenueModule(owner);
-        serviceFee = ACCUMULATED_SERVICE_FEE;
         receiver = otherAccount;
     }
 
@@ -36,7 +34,7 @@ contract WeirdTokensTest is AaveV3YieldModuleBase {
         protocolToken.blacklist(feeReceiver);
 
         vm.expectEmit(address(yieldModule));
-        emit IYieldModule.FeePaymentFailed(address(yieldToken), serviceFee);
+        emit IYieldModule.FeePaymentFailed(address(yieldToken), ACCUMULATED_SERVICE_FEE);
         vm.expectEmit(address(yieldModule));
         emit IYieldModule.WithdrawProcessed(address(yieldToken), WITHDRAW_AMOUNT);
 
@@ -44,7 +42,7 @@ contract WeirdTokensTest is AaveV3YieldModuleBase {
 
         assertEq(yieldToken.balanceOf(owner), WITHDRAW_AMOUNT);
         assertEq(protocolToken.balanceOf(feeReceiver), 0);
-        assertEq(yieldModule.feeDebts(address(yieldToken)), serviceFee);
+        assertEq(yieldModule.feeDebts(address(yieldToken)), ACCUMULATED_SERVICE_FEE);
 
         (uint checkpoint,) = yieldModule.latestFeePaymentStates(address(yieldToken));
         assertEq(checkpoint, PROTOCOL_BALANCE - WITHDRAW_AMOUNT);
@@ -54,8 +52,7 @@ contract WeirdTokensTest is AaveV3YieldModuleBase {
 
     function test_enterProtocolByOwner_SuppliesPostTaxBalanceWhenYieldTokenHasTransferTax() public {
         address fotOwner = makeAddr("fotOwner");
-        YieldModuleHarness fotModule =
-            _deployYieldModuleWithFunds(fotOwner, FOT_DEPOSIT);
+        YieldModuleHarness fotModule = _deployYieldModuleWithFunds(fotOwner, FOT_DEPOSIT);
 
         yieldToken.setFixedTax(TAX);
 

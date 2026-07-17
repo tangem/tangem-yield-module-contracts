@@ -12,21 +12,20 @@ import { PRECISION } from "contracts/resources/Constants.sol";
 
 contract CollectServiceFeeTest is YieldModuleBase {
     YieldModuleHarness internal yieldModule;
-    uint internal serviceFee;
 
     function setUp() public override {
         super.setUp();
         _registerGeneralImplementation();
 
         yieldModule = _deployEnteredRevenueModule(owner);
-        serviceFee = ACCUMULATED_SERVICE_FEE;
     }
 
     function test_collectServiceFee_SetsLatestFeePaymentState() public {
         uint newFeeRate = 2_000;
         _setServiceFeeRate(newFeeRate);
 
-        uint expectedProtocolBalance = INITIAL_OWNER_BALANCE + ACCUMULATED_REVENUE - serviceFee;
+        uint expectedProtocolBalance =
+            INITIAL_OWNER_BALANCE + ACCUMULATED_REVENUE - ACCUMULATED_SERVICE_FEE;
 
         _assertLatestFeePaymentState(yieldModule, INITIAL_OWNER_BALANCE, SERVICE_FEE_RATE);
 
@@ -39,12 +38,12 @@ contract CollectServiceFeeTest is YieldModuleBase {
         address protocolTokenAddr = address(yieldModule.protocolTokens(address(yieldToken)));
 
         vm.expectEmit(protocolTokenAddr);
-        emit IERC20.Transfer(address(yieldModule), feeReceiver, serviceFee);
+        emit IERC20.Transfer(address(yieldModule), feeReceiver, ACCUMULATED_SERVICE_FEE);
 
         _collectViaProcessor(yieldModule);
     }
 
-    function test_collectServiceFee_RevertsOnlyProcessor() public {
+    function test_collectServiceFee_Reverts_WhenNotProcessor() public {
         vm.expectRevert(IYieldModule.OnlyProcessor.selector);
         vm.prank(owner);
         yieldModule.collectServiceFee(address(yieldToken));
@@ -52,14 +51,17 @@ contract CollectServiceFeeTest is YieldModuleBase {
 
     function test_collectServiceFee_EmitsFeePaymentProcessed() public {
         vm.expectEmit(address(yieldModule));
-        emit IYieldModule.FeePaymentProcessed(address(yieldToken), serviceFee, feeReceiver);
+        emit IYieldModule.FeePaymentProcessed(
+            address(yieldToken),
+            ACCUMULATED_SERVICE_FEE,
+            feeReceiver
+        );
 
         _collectViaProcessor(yieldModule);
     }
 
-    function test_collectServiceFee_RevertsNothingToCollect() public {
-        YieldModuleHarness yieldModule2 =
-            _deployYieldModuleWithFunds(otherAccount, 10_000e6);
+    function test_collectServiceFee_Reverts_WhenNothingToCollect() public {
+        YieldModuleHarness yieldModule2 = _deployYieldModuleWithFunds(otherAccount, 10_000e6);
 
         // first enter with zero network fee and no revenue => baseline sync only, nothing to collect
         _enterViaProcessor(yieldModule2, 0);
@@ -69,11 +71,8 @@ contract CollectServiceFeeTest is YieldModuleBase {
         processor.collectServiceFee(address(yieldModule2), address(yieldToken));
     }
 
-    function test_collectServiceFee_RevertsFeeProcessingFailedWhenDebtExistsAndProtocolBalanceIsZero()
-        public
-    {
-        YieldModuleHarness yieldModule2 =
-            _deployYieldModuleWithFunds(otherAccount, 100_000e6);
+    function test_collectServiceFee_Reverts_WhenDebtExistsAndProtocolBalanceIsZero() public {
+        YieldModuleHarness yieldModule2 = _deployYieldModuleWithFunds(otherAccount, 100_000e6);
         uint revenue = 10_000e6;
 
         _enterViaProcessor(yieldModule2, 0);

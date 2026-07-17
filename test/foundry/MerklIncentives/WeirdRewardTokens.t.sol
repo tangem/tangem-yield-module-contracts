@@ -61,8 +61,7 @@ contract WeirdRewardTokensTest is MerklIncentivesBase {
         ReentrantERC20 token = new ReentrantERC20("ReentrantRewardToken", "RRT", 18);
         token.mint(address(merklDistributor), AMOUNT);
 
-        YieldModuleHarness attackedModule =
-            _deployYieldModule(address(token), address(0), 0);
+        YieldModuleHarness attackedModule = _deployYieldModule(address(token), address(0), 0);
 
         bytes memory claimCall = _claimCalldata(address(token));
         token.setHook(address(attackedModule), claimCall);
@@ -74,12 +73,9 @@ contract WeirdRewardTokensTest is MerklIncentivesBase {
     /*  helpers  */
 
     function _claimCalldata(address rewardToken) internal view returns (bytes memory) {
-        address[] memory tokens = new address[](1);
-        tokens[0] = rewardToken;
-        uint[] memory amounts = new uint[](1);
-        amounts[0] = AMOUNT;
-        bytes32[][] memory proofs_ = new bytes32[][](1);
+        (address[] memory tokens, uint[] memory amounts, bytes32[][] memory proofs) =
+            _singleClaimArgs(rewardToken, AMOUNT);
 
-        return abi.encodeCall(ym.claimMerklRewardsOwner, (tokens, amounts, proofs_));
+        return abi.encodeCall(ym.claimMerklRewardsOwner, (tokens, amounts, proofs));
     }
 }

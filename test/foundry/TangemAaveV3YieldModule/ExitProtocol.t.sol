@@ -13,13 +13,11 @@ import { AaveV3PoolMock } from "contracts/test/AaveV3PoolMock.sol";
 
 contract ExitProtocolTest is AaveV3YieldModuleBase {
     YieldModuleHarness internal yieldModule;
-    uint internal serviceFee;
 
     function setUp() public override {
         super.setUp();
 
         yieldModule = _deployEnteredRevenueModule(owner);
-        serviceFee = ACCUMULATED_SERVICE_FEE;
     }
 
     function test_exitProtocol_WithdrawsTotalProtocolBalanceToOwner() public {
@@ -39,7 +37,7 @@ contract ExitProtocolTest is AaveV3YieldModuleBase {
         assertFalse(active);
     }
 
-    function test_exitProtocol_Reverts_NetworkFeeExceedsMax() public {
+    function test_exitProtocol_Reverts_WhenNetworkFeeExceedsMax() public {
         vm.expectRevert(IYieldModule.NetworkFeeExceedsMax.selector);
         vm.prank(backend);
         processor.exitProtocol(
@@ -47,13 +45,13 @@ contract ExitProtocolTest is AaveV3YieldModuleBase {
         );
     }
 
-    function test_exitProtocol_Reverts_OnlyProcessor() public {
+    function test_exitProtocol_Reverts_WhenNotProcessor() public {
         vm.expectRevert(IYieldModule.OnlyProcessor.selector);
         vm.prank(owner);
         yieldModule.exitProtocol(address(yieldToken), NETWORK_FEE);
     }
 
-    function test_exitProtocol_Reverts_TokenNotActive() public {
+    function test_exitProtocol_Reverts_WhenTokenNotActive() public {
         _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
 
         vm.expectRevert(IYieldModule.TokenNotActive.selector);
@@ -84,7 +82,7 @@ contract ExitProtocolTest is AaveV3YieldModuleBase {
 
     function test_exitProtocol_TransfersServiceAndNetworkFeeFromOwnerToFeeReceiver() public {
         vm.expectEmit(address(yieldToken));
-        emit IERC20.Transfer(owner, feeReceiver, serviceFee + NETWORK_FEE);
+        emit IERC20.Transfer(owner, feeReceiver, ACCUMULATED_SERVICE_FEE + NETWORK_FEE);
 
         _exitViaProcessor(yieldModule, NETWORK_FEE);
     }
@@ -93,7 +91,7 @@ contract ExitProtocolTest is AaveV3YieldModuleBase {
         vm.expectEmit(address(yieldModule));
         emit IYieldModule.FeePaymentProcessed(
             address(yieldToken),
-            NETWORK_FEE + serviceFee,
+            NETWORK_FEE + ACCUMULATED_SERVICE_FEE,
             feeReceiver
         );
 

@@ -71,7 +71,7 @@ contract EnterProtocolTest is AaveV3YieldModuleBase {
         assertEq(protocolBalance, TOTAL_ENTER_AMOUNT - networkFee);
     }
 
-    function testFuzz_enterProtocol_RevertsNetworkFeeExceedsMax(uint networkFee) public {
+    function testFuzz_enterProtocol_Reverts_WhenNetworkFeeExceedsMax(uint networkFee) public {
         networkFee = bound(networkFee, uint(DEFAULT_MAX_NETWORK_FEE) + 1, type(uint128).max);
 
         vm.expectRevert(IYieldModule.NetworkFeeExceedsMax.selector);
@@ -79,7 +79,7 @@ contract EnterProtocolTest is AaveV3YieldModuleBase {
         processor.enterProtocol(address(yieldModule), address(yieldToken), networkFee);
     }
 
-    function test_enterProtocol_RevertsNetworkFeeExceedsAmount() public {
+    function test_enterProtocol_Reverts_WhenNetworkFeeExceedsAmount() public {
         _enterViaProcessor(yieldModule, NETWORK_FEE);
         _mintYieldToken(owner, NETWORK_FEE);
 
@@ -88,7 +88,7 @@ contract EnterProtocolTest is AaveV3YieldModuleBase {
         processor.enterProtocol(address(yieldModule), address(yieldToken), NETWORK_FEE);
     }
 
-    function test_enterProtocol_RevertsOnlyProcessor() public {
+    function test_enterProtocol_Reverts_WhenNotProcessor() public {
         vm.expectRevert(IYieldModule.OnlyProcessor.selector);
         vm.prank(owner);
         yieldModule.enterProtocol(address(yieldToken), NETWORK_FEE);
@@ -193,13 +193,11 @@ contract EnterProtocolTest is AaveV3YieldModuleBase {
 
         _enterViaProcessor(yieldModule, NETWORK_FEE);
 
-        (uint protocolBalance, uint storedFeeRate) =
-            yieldModule.latestFeePaymentStates(address(yieldToken));
-        assertEq(
-            protocolBalance,
-            TOTAL_ENTER_AMOUNT + revenue + FRESH_OWNER_BALANCE - serviceFee - NETWORK_FEE
+        _assertLatestFeePaymentState(
+            yieldModule,
+            TOTAL_ENTER_AMOUNT + revenue + FRESH_OWNER_BALANCE - serviceFee - NETWORK_FEE,
+            newFeeRate
         );
-        assertEq(storedFeeRate, newFeeRate);
         assertEq(protocolToken.balanceOf(feeReceiver), serviceFee + NETWORK_FEE);
     }
 
@@ -231,7 +229,7 @@ contract EnterProtocolTest is AaveV3YieldModuleBase {
         _enterByOwner();
     }
 
-    function test_enterProtocolByOwner_RevertsOnlyOwner() public {
+    function test_enterProtocolByOwner_Reverts_WhenNotOwner() public {
         vm.expectRevert(IYieldModule.OnlyOwner.selector);
         vm.prank(otherAccount);
         yieldModule.enterProtocolByOwner(address(yieldToken));
@@ -355,19 +353,19 @@ contract EnterProtocolTest is AaveV3YieldModuleBase {
         _enterByOwnerAmount(ENTER_AMOUNT);
     }
 
-    function test_enterProtocolByOwnerAmount_RevertsOnlyOwner() public {
+    function test_enterProtocolByOwnerAmount_Reverts_WhenNotOwner() public {
         vm.expectRevert(IYieldModule.OnlyOwner.selector);
         vm.prank(owner);
         amountModule.enterProtocolByOwner(address(yieldToken), ENTER_AMOUNT);
     }
 
-    function test_enterProtocolByOwnerAmount_RevertsZeroAmount() public {
+    function test_enterProtocolByOwnerAmount_Reverts_WhenAmountIsZero() public {
         vm.expectRevert(Requires.ZeroAmount.selector);
         vm.prank(amountOwner);
         amountModule.enterProtocolByOwner(address(yieldToken), 0);
     }
 
-    function test_enterProtocolByOwnerAmount_RevertsTokenNotActive() public {
+    function test_enterProtocolByOwnerAmount_Reverts_WhenTokenNotActive() public {
         vm.expectRevert(IYieldModule.TokenNotActive.selector);
         vm.prank(amountOwner);
         amountModule.enterProtocolByOwner(address(0), ENTER_AMOUNT);

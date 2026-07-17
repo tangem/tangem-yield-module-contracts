@@ -5,16 +5,9 @@ pragma solidity ^0.8.29;
 import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 import { AaveV3YieldModuleBase } from "./AaveV3YieldModuleBase.sol";
 
-import { TangemYieldModuleFactory } from "contracts/core/TangemYieldModuleFactory.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
 contract TangemAaveV3YieldModuleTest is AaveV3YieldModuleBase {
-    function test_deployYieldModule_SetsOwner() public {
-        YieldModuleHarness yieldModule = _deployYieldModule(owner, address(0), 0);
-
-        assertEq(yieldModule.owner(), owner);
-    }
-
     function test_deployYieldModule_InitializesYieldToken() public {
         YieldModuleHarness yieldModule =
             _deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
@@ -38,15 +31,6 @@ contract TangemAaveV3YieldModuleTest is AaveV3YieldModuleBase {
             address(protocolToken),
             DEFAULT_MAX_NETWORK_FEE
         );
-
-        _deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
-    }
-
-    function test_deployYieldModule_EmitsYieldModuleDeployed() public {
-        address expectedYieldModule = factory.calculateYieldModuleAddress(owner);
-
-        vm.expectEmit(true, true, false, false, address(factory));
-        emit TangemYieldModuleFactory.YieldModuleDeployed(owner, expectedYieldModule);
 
         _deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
     }

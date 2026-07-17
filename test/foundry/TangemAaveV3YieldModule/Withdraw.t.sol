@@ -21,14 +21,12 @@ contract WithdrawTest is AaveV3YieldModuleBase {
     YieldModuleHarness internal nonYieldModule;
     address internal nonYieldOwner = makeAddr("nonYieldOwner");
     address internal nonYieldToken;
-    uint internal serviceFee;
 
     function setUp() public override {
         super.setUp();
 
         // Main module: funded, entered, revenue generated (withdraw & withdrawAndDeactivate)
         yieldModule = _deployEnteredRevenueModule(owner);
-        serviceFee = ACCUMULATED_SERVICE_FEE;
 
         // Separate module with no active yield token (withdrawNonYieldToken tests)
         nonYieldModule = _deployYieldModule(nonYieldOwner, address(0), 0);
@@ -47,9 +45,13 @@ contract WithdrawTest is AaveV3YieldModuleBase {
 
     function test_withdraw_ProcessesServiceFeeAndEmitsWithdrawProcessed() public {
         vm.expectEmit(address(protocolToken));
-        emit IERC20.Transfer(address(yieldModule), feeReceiver, serviceFee);
+        emit IERC20.Transfer(address(yieldModule), feeReceiver, ACCUMULATED_SERVICE_FEE);
         vm.expectEmit(address(yieldModule));
-        emit IYieldModule.FeePaymentProcessed(address(yieldToken), serviceFee, feeReceiver);
+        emit IYieldModule.FeePaymentProcessed(
+            address(yieldToken),
+            ACCUMULATED_SERVICE_FEE,
+            feeReceiver
+        );
         vm.expectEmit(address(yieldModule));
         emit IYieldModule.WithdrawProcessed(address(yieldToken), WITHDRAW_AMOUNT);
 
@@ -60,7 +62,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         uint newFeeRate = 700;
         _setServiceFeeRate(newFeeRate);
 
-        uint expectedProtocolBalance = PROTOCOL_BALANCE - WITHDRAW_AMOUNT - serviceFee;
+        uint expectedProtocolBalance = PROTOCOL_BALANCE - WITHDRAW_AMOUNT - ACCUMULATED_SERVICE_FEE;
 
         _assertLatestFeePaymentState(yieldModule, INITIAL_OWNER_BALANCE, SERVICE_FEE_RATE);
 
@@ -71,39 +73,38 @@ contract WithdrawTest is AaveV3YieldModuleBase {
 
     // any amount up to protocolBalance - fee succeeds; the fee is always reserved
     function testFuzz_withdraw(uint amount) public {
-        amount = bound(amount, 1, PROTOCOL_BALANCE - serviceFee);
+        amount = bound(amount, 1, PROTOCOL_BALANCE - ACCUMULATED_SERVICE_FEE);
 
         _withdraw(yieldModule, owner, address(yieldToken), amount);
 
         assertEq(yieldToken.balanceOf(owner), amount);
-        assertEq(protocolToken.balanceOf(feeReceiver), serviceFee);
+        assertEq(protocolToken.balanceOf(feeReceiver), ACCUMULATED_SERVICE_FEE);
         assertEq(
-            yieldModule.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE - amount - serviceFee
+            yieldModule.protocolBalance(address(yieldToken)),
+            PROTOCOL_BALANCE - amount - ACCUMULATED_SERVICE_FEE
         );
     }
 
-    function testFuzz_withdraw_RevertsInsufficientFundsWhenAmountPlusFeeExceedsProtocolBalance(uint amount)
-        public
-    {
-        amount = bound(amount, PROTOCOL_BALANCE - serviceFee + 1, type(uint128).max);
+    function testFuzz_withdraw_Reverts_WhenAmountPlusFeeExceedsProtocolBalance(uint amount) public {
+        amount = bound(amount, PROTOCOL_BALANCE - ACCUMULATED_SERVICE_FEE + 1, type(uint128).max);
 
         vm.expectRevert(IYieldModule.InsufficientFunds.selector);
         _withdraw(yieldModule, owner, address(yieldToken), amount);
     }
 
-    function test_withdraw_RevertsTokenNotActive() public {
+    function test_withdraw_Reverts_WhenTokenNotActive() public {
         _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
 
         vm.expectRevert(IYieldModule.TokenNotActive.selector);
         _withdraw(yieldModule, owner, address(yieldToken), 1e6);
     }
 
-    function test_withdraw_RevertsZeroAmount() public {
+    function test_withdraw_Reverts_WhenAmountIsZero() public {
         vm.expectRevert(Requires.ZeroAmount.selector);
         _withdraw(yieldModule, owner, address(yieldToken), 0);
     }
 
-    function test_withdraw_RevertsOnlyOwner() public {
+    function test_withdraw_Reverts_WhenNotOwner() public {
         vm.expectRevert(IYieldModule.OnlyOwner.selector);
         vm.prank(otherAccount);
         yieldModule.withdraw(address(yieldToken), 1e6);
@@ -113,8 +114,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         uint deposit = 5_000e6;
         uint amount = 1_000e6;
 
-        YieldModuleHarness yieldModule2 =
-            _deployYieldModuleWithFunds(otherAccount, deposit);
+        YieldModuleHarness yieldModule2 = _deployYieldModuleWithFunds(otherAccount, deposit);
         // no revenue => service fee is zero
         _enterViaProcessor(yieldModule2, 0);
 
@@ -138,7 +138,11 @@ contract WithdrawTest is AaveV3YieldModuleBase {
 
     function test_withdrawAndDeactivate_WithdrawsProtocolBalanceMinusFeeToOwner() public {
         vm.expectEmit(address(pool));
-        emit AaveV3PoolMock.Withdraw(address(yieldToken), PROTOCOL_BALANCE - serviceFee, owner);
+        emit AaveV3PoolMock.Withdraw(
+            address(yieldToken),
+            PROTOCOL_BALANCE - ACCUMULATED_SERVICE_FEE,
+            owner
+        );
 
         _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
     }
@@ -153,14 +157,14 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         assertFalse(active);
     }
 
-    function test_withdrawAndDeactivate_RevertsTokenNotActive() public {
+    function test_withdrawAndDeactivate_Reverts_WhenTokenNotActive() public {
         _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
 
         vm.expectRevert(IYieldModule.TokenNotActive.selector);
         _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
     }
 
-    function test_withdrawAndDeactivate_RevertsOnlyOwner() public {
+    function test_withdrawAndDeactivate_Reverts_WhenNotOwner() public {
         vm.expectRevert(IYieldModule.OnlyOwner.selector);
         vm.prank(otherAccount);
         yieldModule.withdrawAndDeactivate(address(yieldToken));
@@ -170,7 +174,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         vm.expectEmit(address(yieldModule));
         emit IYieldModule.WithdrawAndDeactivateProcessed(
             address(yieldToken),
-            PROTOCOL_BALANCE - serviceFee
+            PROTOCOL_BALANCE - ACCUMULATED_SERVICE_FEE
         );
 
         _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
@@ -189,14 +193,18 @@ contract WithdrawTest is AaveV3YieldModuleBase {
 
     function test_withdrawAndDeactivate_TransfersServiceFeeToFeeReceiver() public {
         vm.expectEmit(address(protocolToken));
-        emit IERC20.Transfer(address(yieldModule), feeReceiver, serviceFee);
+        emit IERC20.Transfer(address(yieldModule), feeReceiver, ACCUMULATED_SERVICE_FEE);
 
         _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
     }
 
     function test_withdrawAndDeactivate_EmitsFeePaymentProcessed() public {
         vm.expectEmit(address(yieldModule));
-        emit IYieldModule.FeePaymentProcessed(address(yieldToken), serviceFee, feeReceiver);
+        emit IYieldModule.FeePaymentProcessed(
+            address(yieldToken),
+            ACCUMULATED_SERVICE_FEE,
+            feeReceiver
+        );
 
         _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
     }
@@ -204,8 +212,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
     function test_withdrawAndDeactivate_SyncsLatestFeePaymentStateWithoutFeeWhenFeeIsZero() public {
         uint deposit = 5_000e6;
 
-        YieldModuleHarness yieldModule2 =
-            _deployYieldModuleWithFunds(otherAccount, deposit);
+        YieldModuleHarness yieldModule2 = _deployYieldModuleWithFunds(otherAccount, deposit);
         // first enter, no revenue => baseline set, fee == 0
         _enterViaProcessor(yieldModule2, 0);
 
@@ -224,8 +231,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
     function test_withdrawAndDeactivate_SucceedsWhenPersistedFeeDebtExceedsProtocolBalance()
         public
     {
-        (YieldModuleHarness yieldModule2, uint remainingFeeDebt) =
-            _createFeeDebtState(otherAccount);
+        (YieldModuleHarness yieldModule2, uint remainingFeeDebt) = _createFeeDebtState(otherAccount);
 
         // partial fee payment during re-enter reduced the debt by the small deposit
         assertEq(yieldModule2.feeDebts(address(yieldToken)), remainingFeeDebt);
@@ -247,7 +253,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         nonYieldModule.withdrawNonYieldToken(nonYieldToken);
     }
 
-    function test_withdrawNonYieldToken_RevertsWithdrawingYieldToken() public {
+    function test_withdrawNonYieldToken_Reverts_WhenWithdrawingYieldToken() public {
         vm.prank(nonYieldOwner);
         nonYieldModule.initYieldToken(address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
 
@@ -256,7 +262,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         nonYieldModule.withdrawNonYieldToken(address(yieldToken));
     }
 
-    function test_withdrawNonYieldToken_RevertsWithdrawingProtocolToken() public {
+    function test_withdrawNonYieldToken_Reverts_WhenWithdrawingProtocolToken() public {
         vm.prank(nonYieldOwner);
         nonYieldModule.initYieldToken(address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
 
@@ -265,7 +271,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         nonYieldModule.withdrawNonYieldToken(address(protocolToken));
     }
 
-    function test_withdrawNonYieldToken_RevertsOnlyOwner() public {
+    function test_withdrawNonYieldToken_Reverts_WhenNotOwner() public {
         vm.expectRevert(IYieldModule.OnlyOwner.selector);
         vm.prank(owner);
         nonYieldModule.withdrawNonYieldToken(nonYieldToken);
@@ -305,7 +311,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         assertEq(backend.balance, receiverBalanceBefore + NATIVE_BALANCE);
     }
 
-    function test_withdrawNativeAll_RevertsNativeTransferFailed() public {
+    function test_withdrawNativeAll_Reverts_WhenNativeTransferFails() public {
         vm.deal(address(yieldModule), NATIVE_BALANCE);
         // contract without receive/fallback
         address badReceiver = address(swapExecutionRegistry);
@@ -315,13 +321,13 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         yieldModule.withdrawNativeAll(badReceiver);
     }
 
-    function test_withdrawNativeAll_RevertsZeroAddress() public {
+    function test_withdrawNativeAll_Reverts_WhenReceiverIsZero() public {
         vm.expectRevert(Requires.ZeroAddress.selector);
         vm.prank(owner);
         yieldModule.withdrawNativeAll(address(0));
     }
 
-    function test_withdrawNativeAll_RevertsOnlyOwner() public {
+    function test_withdrawNativeAll_Reverts_WhenNotOwner() public {
         vm.expectRevert(IYieldModule.OnlyOwner.selector);
         vm.prank(otherAccount);
         yieldModule.withdrawNativeAll(backend);

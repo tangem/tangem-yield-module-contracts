@@ -39,7 +39,7 @@ contract SwapExecutionRegistryTest is BaseTest {
         assertTrue(registry.hasRole(registry.ALLOWLIST_ADMIN_ROLE(), backend));
     }
 
-    function test_constructor_RevertsZeroAddress() public {
+    function test_constructor_Reverts_WhenAdminIsZero() public {
         vm.expectRevert(ISwapExecutionRegistry.ZeroAddress.selector);
         new SwapExecutionRegistry(address(0));
     }
@@ -56,13 +56,13 @@ contract SwapExecutionRegistryTest is BaseTest {
         assertTrue(registry.allowedTargets(target));
     }
 
-    function test_setTargetAllowed_RevertsZeroAddress() public {
+    function test_setTargetAllowed_Reverts_WhenTargetIsZero() public {
         vm.expectRevert(ISwapExecutionRegistry.ZeroAddress.selector);
         vm.prank(backend);
         registry.setTargetAllowed(address(0), true);
     }
 
-    function test_setTargetAllowed_RevertsUnauthorized() public {
+    function test_setTargetAllowed_Reverts_WhenNotAllowlistAdmin() public {
         _expectUnauthorized(otherAccount);
         vm.prank(otherAccount);
         registry.setTargetAllowed(target, true);
@@ -80,13 +80,13 @@ contract SwapExecutionRegistryTest is BaseTest {
         assertTrue(registry.allowedSpenders(spender));
     }
 
-    function test_setSpenderAllowed_RevertsZeroAddress() public {
+    function test_setSpenderAllowed_Reverts_WhenSpenderIsZero() public {
         vm.expectRevert(ISwapExecutionRegistry.ZeroAddress.selector);
         vm.prank(backend);
         registry.setSpenderAllowed(address(0), true);
     }
 
-    function test_setSpenderAllowed_RevertsUnauthorized() public {
+    function test_setSpenderAllowed_Reverts_WhenNotAllowlistAdmin() public {
         _expectUnauthorized(otherAccount);
         vm.prank(otherAccount);
         registry.setSpenderAllowed(spender, true);
@@ -136,7 +136,7 @@ contract SwapExecutionRegistryTest is BaseTest {
         assertFalse(registry.allowedTargets(targets[1]));
     }
 
-    function test_setTargetsAllowed_RevertsZeroAddressWhenAnyTargetIsZero() public {
+    function test_setTargetsAllowed_Reverts_WhenAnyTargetIsZero() public {
         address[] memory targets = new address[](3);
         targets[0] = target;
         targets[1] = address(0);
@@ -152,7 +152,7 @@ contract SwapExecutionRegistryTest is BaseTest {
         registry.setTargetsAllowed(new address[](0), true);
     }
 
-    function test_setTargetsAllowed_RevertsUnauthorized() public {
+    function test_setTargetsAllowed_Reverts_WhenNotAllowlistAdmin() public {
         _expectUnauthorized(otherAccount);
         vm.prank(otherAccount);
         registry.setTargetsAllowed(_twoAddresses(target, spender), true);
@@ -193,7 +193,7 @@ contract SwapExecutionRegistryTest is BaseTest {
         assertFalse(registry.allowedSpenders(spenders[1]));
     }
 
-    function test_setSpendersAllowed_RevertsZeroAddressWhenAnySpenderIsZero() public {
+    function test_setSpendersAllowed_Reverts_WhenAnySpenderIsZero() public {
         address[] memory spenders = new address[](3);
         spenders[0] = target;
         spenders[1] = address(0);
@@ -209,7 +209,7 @@ contract SwapExecutionRegistryTest is BaseTest {
         registry.setSpendersAllowed(new address[](0), true);
     }
 
-    function test_setSpendersAllowed_RevertsUnauthorized() public {
+    function test_setSpendersAllowed_Reverts_WhenNotAllowlistAdmin() public {
         _expectUnauthorized(otherAccount);
         vm.prank(otherAccount);
         registry.setSpendersAllowed(_twoAddresses(target, spender), true);
@@ -233,7 +233,7 @@ contract SwapExecutionRegistryTest is BaseTest {
         assertFalse(registry.allowedTargets(targets[1]));
     }
 
-    function test_setTargetsAllowedMany_RevertsLengthMismatch() public {
+    function test_setTargetsAllowedMany_Reverts_WhenLengthsMismatch() public {
         address[] memory targets = _twoAddresses(target, spender);
         bool[] memory statuses = new bool[](1);
         statuses[0] = true;
@@ -243,7 +243,7 @@ contract SwapExecutionRegistryTest is BaseTest {
         registry.setTargetsAllowedMany(targets, statuses);
     }
 
-    function test_setTargetsAllowedMany_RevertsZeroAddressWhenAnyTargetIsZero() public {
+    function test_setTargetsAllowedMany_Reverts_WhenAnyTargetIsZero() public {
         address[] memory targets = _twoAddresses(target, address(0));
         bool[] memory statuses = _twoStatuses(true, false);
 
@@ -257,7 +257,7 @@ contract SwapExecutionRegistryTest is BaseTest {
         registry.setTargetsAllowedMany(new address[](0), new bool[](0));
     }
 
-    function test_setTargetsAllowedMany_RevertsUnauthorized() public {
+    function test_setTargetsAllowedMany_Reverts_WhenNotAllowlistAdmin() public {
         _expectUnauthorized(otherAccount);
         vm.prank(otherAccount);
         registry.setTargetsAllowedMany(_twoAddresses(target, spender), _twoStatuses(true, true));
@@ -281,7 +281,7 @@ contract SwapExecutionRegistryTest is BaseTest {
         assertTrue(registry.allowedSpenders(spenders[1]));
     }
 
-    function test_setSpendersAllowedMany_RevertsLengthMismatch() public {
+    function test_setSpendersAllowedMany_Reverts_WhenLengthsMismatch() public {
         address[] memory spenders = _twoAddresses(target, spender);
         bool[] memory statuses = new bool[](1);
         statuses[0] = true;
@@ -291,7 +291,7 @@ contract SwapExecutionRegistryTest is BaseTest {
         registry.setSpendersAllowedMany(spenders, statuses);
     }
 
-    function test_setSpendersAllowedMany_RevertsZeroAddressWhenAnySpenderIsZero() public {
+    function test_setSpendersAllowedMany_Reverts_WhenAnySpenderIsZero() public {
         address[] memory spenders = _twoAddresses(target, address(0));
         bool[] memory statuses = _twoStatuses(true, false);
 
@@ -305,7 +305,7 @@ contract SwapExecutionRegistryTest is BaseTest {
         registry.setSpendersAllowedMany(new address[](0), new bool[](0));
     }
 
-    function test_setSpendersAllowedMany_RevertsUnauthorized() public {
+    function test_setSpendersAllowedMany_Reverts_WhenNotAllowlistAdmin() public {
         _expectUnauthorized(otherAccount);
         vm.prank(otherAccount);
         registry.setSpendersAllowedMany(_twoAddresses(target, spender), _twoStatuses(true, true));

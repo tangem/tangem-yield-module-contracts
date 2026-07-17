@@ -92,9 +92,11 @@ contract RewardRouteTest is MerklIncentivesBase {
 
         TestERC20[] memory tokens = _createRewardTokens(numTokens);
 
-        address[] memory rewardTokens = new address[](numTokens);
-        uint[] memory cumulativeAmounts = new uint[](numTokens);
-        bytes32[][] memory proofs = new bytes32[][](numTokens);
+        (
+            address[] memory rewardTokens,
+            uint[] memory cumulativeAmounts,
+            bytes32[][] memory proofs
+        ) = _claimArgs(numTokens);
 
         for (uint i; i < numTokens; ++i) {
             rewardTokens[i] = address(tokens[i]);
@@ -310,17 +312,17 @@ contract RewardRouteTest is MerklIncentivesBase {
         _fundMerklDistributor(address(yieldToken), pushAmount);
         _fundMerklDistributor(address(protocolToken), keepAmount);
 
-        address[] memory rewardTokens = new address[](3);
+        (
+            address[] memory rewardTokens,
+            uint[] memory cumulativeAmounts,
+            bytes32[][] memory proofs
+        ) = _claimArgs(3);
         rewardTokens[0] = address(unknownToken);
         rewardTokens[1] = address(yieldToken);
         rewardTokens[2] = address(protocolToken);
-
-        uint[] memory cumulativeAmounts = new uint[](3);
         cumulativeAmounts[0] = sendAmount;
         cumulativeAmounts[1] = pushAmount;
         cumulativeAmounts[2] = keepAmount;
-
-        bytes32[][] memory proofs = new bytes32[][](3);
 
         vm.prank(owner);
         ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
