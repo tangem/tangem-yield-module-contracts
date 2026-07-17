@@ -33,7 +33,7 @@ contract TangemYieldProcessorTest is YieldModuleBase {
         processor.setFeeReceiver(newFeeReceiver);
     }
 
-    function test_setFeeReceiver_RevertsWithoutPropertySetterRole() public {
+    function test_setFeeReceiver_Reverts_WhenNotPropertySetter() public {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector,
@@ -47,7 +47,7 @@ contract TangemYieldProcessorTest is YieldModuleBase {
 
     /*  setServiceFeeRate  */
 
-    function test_setServiceFeeRate_RevertsInvalidFeeRate() public {
+    function test_setServiceFeeRate_Reverts_WhenFeeRateExceedsPrecision() public {
         vm.expectRevert(TangemYieldProcessor.InvalidFeeRate.selector);
         vm.prank(backend);
         processor.setServiceFeeRate(PRECISION + 1);
@@ -60,7 +60,7 @@ contract TangemYieldProcessorTest is YieldModuleBase {
         assertEq(processor.serviceFeeRate(), PRECISION);
     }
 
-    function test_constructor_RevertsInvalidFeeRate() public {
+    function test_constructor_Reverts_WhenFeeRateExceedsPrecision() public {
         vm.expectRevert(TangemYieldProcessor.InvalidFeeRate.selector);
         new TangemYieldProcessor(feeReceiver, PRECISION + 1);
     }
@@ -84,7 +84,7 @@ contract TangemYieldProcessorTest is YieldModuleBase {
         processor.pause();
     }
 
-    function test_pause_RevertsWithoutPauserRole() public {
+    function test_pause_Reverts_WhenNotPauser() public {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector,
@@ -129,8 +129,7 @@ contract TangemYieldProcessorTest is YieldModuleBase {
 
     function test_unpause_RestoresProtocolOperations() public {
         _registerGeneralImplementation();
-        YieldModuleHarness yieldModule =
-            _deployYieldModuleWithFunds(owner, INITIAL_OWNER_BALANCE);
+        YieldModuleHarness yieldModule = _deployYieldModuleWithFunds(owner, INITIAL_OWNER_BALANCE);
 
         vm.startPrank(backend);
         processor.pause();
@@ -153,7 +152,7 @@ contract TangemYieldProcessorTest is YieldModuleBase {
         processor.unpause();
     }
 
-    function test_unpause_RevertsWithoutPauserRole() public {
+    function test_unpause_Reverts_WhenNotPauser() public {
         vm.prank(backend);
         processor.pause();
 

@@ -61,15 +61,15 @@ contract SwapTest is AaveV3YieldModuleBase {
         );
     }
 
-    /* ============================================================ swap =========================================================== */
+    /*  swap  */
 
-    function test_swap_RevertsOnlyOwner() public {
+    function test_swap_Reverts_WhenNotOwner() public {
         vm.expectRevert(IYieldModule.OnlyOwner.selector);
         vm.prank(backend);
         yieldModule.swap(tokenIn, 1e6, address(swapProvider), address(0), _revertEmptyData());
     }
 
-    function test_swap_RevertsTokenNotActive() public {
+    function test_swap_Reverts_WhenTokenNotActive() public {
         vm.prank(owner);
         yieldModule.withdrawAndDeactivate(tokenIn);
 
@@ -77,18 +77,18 @@ contract SwapTest is AaveV3YieldModuleBase {
         _swap(1e6, _revertEmptyData());
     }
 
-    function test_swap_RevertsDataTooShort() public {
+    function test_swap_Reverts_WhenDataTooShort() public {
         vm.expectRevert(IYieldModule.DataTooShort.selector);
         _swap(1e6, hex"123456");
     }
 
-    function test_swap_RevertsTargetHasNoCode() public {
+    function test_swap_Reverts_WhenTargetHasNoCode() public {
         vm.expectRevert(IYieldModule.TargetHasNoCode.selector);
         vm.prank(owner);
         yieldModule.swap(tokenIn, 1e6, otherAccount, address(0), hex"12345678");
     }
 
-    function test_swap_RevertsTargetNotAllowed() public {
+    function test_swap_Reverts_WhenTargetNotAllowed() public {
         SwapProviderMock notAllowedProvider = new SwapProviderMock();
 
         vm.expectRevert(IYieldModule.TargetNotAllowed.selector);
@@ -96,7 +96,7 @@ contract SwapTest is AaveV3YieldModuleBase {
         yieldModule.swap(tokenIn, 1e6, address(notAllowedProvider), address(0), _revertEmptyData());
     }
 
-    function test_swap_RevertsSpenderNotAllowed() public {
+    function test_swap_Reverts_WhenSpenderNotAllowed() public {
         vm.expectRevert(IYieldModule.SpenderNotAllowed.selector);
         vm.prank(owner);
         yieldModule.swap(tokenIn, 1e6, address(swapProvider), otherAccount, _revertEmptyData());
@@ -109,7 +109,7 @@ contract SwapTest is AaveV3YieldModuleBase {
         _swap(1e6, abi.encodeWithSelector(SwapProviderMock.revertWithError.selector));
     }
 
-    function test_swap_RevertsProviderCallFailedWhenProviderRevertsWithoutData() public {
+    function test_swap_Reverts_WhenProviderRevertsWithoutData() public {
         _mintYieldToken(owner, 1e6);
 
         vm.expectRevert(IYieldModule.ProviderCallFailed.selector);
@@ -185,9 +185,7 @@ contract SwapTest is AaveV3YieldModuleBase {
         _swap(amountIn, data);
     }
 
-    function test_swap_RevertsInsufficientFundsWhenPullAmountExceedsProtocolBalanceMinusFee()
-        public
-    {
+    function test_swap_Reverts_WhenPullAmountExceedsProtocolBalanceMinusFee() public {
         uint depositAmount = 1_000e6;
         uint ownerTopup = 500e6;
         uint amountIn = 2_000e6;
@@ -244,7 +242,7 @@ contract SwapTest is AaveV3YieldModuleBase {
         assertEq(yieldToken.allowance(address(yieldModule), address(swapProvider)), 0, "allowance");
     }
 
-    function testFuzz_swap_RevertsInsufficientFundsWhenSourcesCannotCoverAmount(
+    function testFuzz_swap_Reverts_WhenSourcesCannotCoverAmount(
         uint amountIn,
         uint moduleBalance,
         uint ownerBalance,
@@ -264,7 +262,7 @@ contract SwapTest is AaveV3YieldModuleBase {
 
     /*  swapAndReceive  */
 
-    function test_swapAndReceive_RevertsOnlyOwner() public {
+    function test_swapAndReceive_Reverts_WhenNotOwner() public {
         TestERC20 outToken = _deployTestToken();
 
         vm.expectRevert(IYieldModule.OnlyOwner.selector);
@@ -280,19 +278,17 @@ contract SwapTest is AaveV3YieldModuleBase {
         );
     }
 
-    function test_swapAndReceive_RevertsZeroAddressWhenTokenOutIsZero() public {
+    function test_swapAndReceive_Reverts_WhenTokenOutIsZero() public {
         vm.expectRevert(Requires.ZeroAddress.selector);
         _swapAndReceive(address(0), otherAccount, 1e6, _swapExactInData(address(0), 1e6, 0));
     }
 
-    function test_swapAndReceive_RevertsTokenInEqualsTokenOut() public {
+    function test_swapAndReceive_Reverts_WhenTokenInEqualsTokenOut() public {
         vm.expectRevert(IYieldModule.TokenInEqualsTokenOut.selector);
         _swapAndReceive(tokenIn, otherAccount, 1e6, _swapExactInData(tokenIn, 1e6, 0));
     }
 
-    function test_swapAndReceive_RevertsWithdrawingProtocolTokenWhenTokenOutIsProtocolToken()
-        public
-    {
+    function test_swapAndReceive_Reverts_WhenTokenOutIsProtocolToken() public {
         vm.expectRevert(IYieldModule.WithdrawingProtocolToken.selector);
         _swapAndReceive(
             address(protocolToken),
@@ -302,7 +298,7 @@ contract SwapTest is AaveV3YieldModuleBase {
         );
     }
 
-    function test_swapAndReceive_RevertsSwapPayoutNotReceived() public {
+    function test_swapAndReceive_Reverts_WhenSwapPayoutNotReceived() public {
         TestERC20 outToken = _deployTestToken();
         uint amountIn = 1_000e6;
 
@@ -317,7 +313,7 @@ contract SwapTest is AaveV3YieldModuleBase {
         );
     }
 
-    function test_swapAndReceive_RevertsZeroAddressWhenTokenOutNotActiveAndReceiverIsZero() public {
+    function test_swapAndReceive_Reverts_WhenTokenOutNotActiveAndReceiverIsZero() public {
         TestERC20 outToken = _deployTestToken();
         uint amountIn = 1_000e6;
         uint amountOut = 500e6;
@@ -334,7 +330,7 @@ contract SwapTest is AaveV3YieldModuleBase {
         );
     }
 
-    function test_swapAndReceive_RevertsSendingToThisWhenReceiverIsModule() public {
+    function test_swapAndReceive_Reverts_WhenReceiverIsModule() public {
         TestERC20 outToken = _deployTestToken();
         uint amountIn = 1_000e6;
         uint amountOut = 500e6;

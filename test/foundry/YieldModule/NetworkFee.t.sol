@@ -29,7 +29,7 @@ contract NetworkFeeTest is YieldModuleBase {
         assertEq(maxNetworkFee, NEW_MAX_NETWORK_FEE);
     }
 
-    function test_setYieldTokenMaxNetworkFee_RevertsOnlyOwner() public {
+    function test_setYieldTokenMaxNetworkFee_Reverts_WhenNotOwner() public {
         vm.expectRevert(IYieldModule.OnlyOwner.selector);
         vm.prank(otherAccount);
         yieldModule.setYieldTokenMaxNetworkFee(address(yieldToken), NEW_MAX_NETWORK_FEE);
@@ -43,7 +43,7 @@ contract NetworkFeeTest is YieldModuleBase {
         yieldModule.setYieldTokenMaxNetworkFee(address(yieldToken), NEW_MAX_NETWORK_FEE);
     }
 
-    function test_setYieldTokenMaxNetworkFee_RevertsTokenNotInitialized() public {
+    function test_setYieldTokenMaxNetworkFee_Reverts_WhenTokenNotInitialized() public {
         address uninitializedToken = makeAddr("uninitializedToken");
 
         vm.expectRevert(IYieldModule.TokenNotInitialized.selector);
@@ -51,7 +51,7 @@ contract NetworkFeeTest is YieldModuleBase {
         yieldModule.setYieldTokenMaxNetworkFee(uninitializedToken, NEW_MAX_NETWORK_FEE);
     }
 
-    function test_setYieldTokenMaxNetworkFee_RevertsTokenNotActive() public {
+    function test_setYieldTokenMaxNetworkFee_Reverts_WhenTokenNotActive() public {
         vm.prank(owner);
         yieldModule.withdrawAndDeactivate(address(yieldToken));
 
@@ -83,7 +83,7 @@ contract NetworkFeeTest is YieldModuleBase {
         );
     }
 
-    function test_calculateFee_RevertsNetworkFeeExceedsMax() public {
+    function test_calculateFee_Reverts_WhenNetworkFeeExceedsMax() public {
         vm.expectRevert(IYieldModule.NetworkFeeExceedsMax.selector);
         yieldModule.calculateFee(address(yieldToken), uint(DEFAULT_MAX_NETWORK_FEE) + 1);
     }

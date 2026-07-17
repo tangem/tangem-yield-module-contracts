@@ -4,25 +4,26 @@ pragma solidity ^0.8.29;
 
 import { IERC1967 } from "@openzeppelin/contracts/interfaces/IERC1967.sol";
 
+import { YieldModuleBase } from "../YieldModuleBase.sol";
+import { YieldModuleGeneralHarness } from "../harnesses/YieldModuleGeneralHarness.sol";
 import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
-import { AaveV3YieldModuleBase } from "./AaveV3YieldModuleBase.sol";
 
-import { TangemAaveV3YieldModule } from "contracts/aave/TangemAaveV3YieldModule.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
-contract UpgradeTest is AaveV3YieldModuleBase {
+contract UpgradeTest is YieldModuleBase {
     address internal constant NEW_FORWARDER = address(0);
 
     YieldModuleHarness internal yieldModule;
-    TangemAaveV3YieldModule internal newImplementation;
+    YieldModuleGeneralHarness internal newImplementation;
 
     function setUp() public override {
         super.setUp();
+        _registerGeneralImplementation();
 
         yieldModule = _deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
 
-        newImplementation = new TangemAaveV3YieldModule(
-            address(pool),
+        newImplementation = new YieldModuleGeneralHarness(
+            address(generalPool),
             address(merklDistributor),
             address(processor),
             address(factory),
@@ -45,16 +46,16 @@ contract UpgradeTest is AaveV3YieldModuleBase {
         assertEq(yieldModule.trustedForwarder(), NEW_FORWARDER);
     }
 
-    function test_upgradeToAndCall_RevertsOnlyOwner() public {
+    function test_upgradeToAndCall_Reverts_WhenNotOwner() public {
         vm.expectRevert(IYieldModule.OnlyOwner.selector);
         vm.prank(otherAccount);
         yieldModule.upgradeToAndCall(address(newImplementation), "");
     }
 
-    function test_upgradeToAndCall_RevertsUnauthorizedImplementation() public {
+    function test_upgradeToAndCall_Reverts_WhenImplementationNotAuthorized() public {
         vm.expectRevert(IYieldModule.UnauthorizedImplementation.selector);
         vm.prank(owner);
-        yieldModule.upgradeToAndCall(address(implementation), "");
+        yieldModule.upgradeToAndCall(address(ymGeneralImpl), "");
     }
 
     function test_upgradeToAndCall_EmitsUpgraded() public {

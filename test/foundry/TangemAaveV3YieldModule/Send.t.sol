@@ -3,6 +3,7 @@
 pragma solidity ^0.8.29;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Vm } from "forge-std/src/Test.sol";
 
 import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 import { AaveV3YieldModuleBase } from "./AaveV3YieldModuleBase.sol";
@@ -17,7 +18,6 @@ contract SendTest is AaveV3YieldModuleBase {
 
     YieldModuleHarness internal yieldModule;
     address internal receiver;
-    uint internal serviceFee;
 
     function setUp() public override {
         super.setUp();
@@ -29,8 +29,6 @@ contract SendTest is AaveV3YieldModuleBase {
 
         _mintYieldToken(owner, SEND_FRESH_OWNER_BALANCE);
         _generateRevenue(address(yieldModule), ACCUMULATED_REVENUE);
-
-        serviceFee = ACCUMULATED_SERVICE_FEE;
     }
 
     function _send(uint amount) internal {
@@ -65,20 +63,20 @@ contract SendTest is AaveV3YieldModuleBase {
         _send(SEND_AMOUNT);
     }
 
-    function test_send_RevertsSendingToOwner() public {
+    function test_send_Reverts_WhenSendingToOwner() public {
         vm.expectRevert(IYieldModule.SendingToOwner.selector);
         vm.prank(owner);
         yieldModule.send(address(yieldToken), owner, SEND_AMOUNT);
     }
 
-    function test_send_RevertsTokenNotActive() public {
+    function test_send_Reverts_WhenTokenNotActive() public {
         _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
 
         vm.expectRevert(IYieldModule.TokenNotActive.selector);
         _send(SEND_AMOUNT);
     }
 
-    function test_send_RevertsOnlyOwner() public {
+    function test_send_Reverts_WhenNotOwner() public {
         vm.expectRevert(IYieldModule.OnlyOwner.selector);
         vm.prank(otherAccount);
         yieldModule.send(address(yieldToken), receiver, SEND_AMOUNT);
@@ -98,7 +96,7 @@ contract SendTest is AaveV3YieldModuleBase {
         _setServiceFeeRate(newFeeRate);
 
         uint expectedProtocolBalance =
-            PROTOCOL_BALANCE - SEND_AMOUNT - serviceFee + SEND_FRESH_OWNER_BALANCE;
+            PROTOCOL_BALANCE - SEND_AMOUNT - ACCUMULATED_SERVICE_FEE + SEND_FRESH_OWNER_BALANCE;
 
         _assertLatestFeePaymentState(yieldModule, INITIAL_OWNER_BALANCE, SERVICE_FEE_RATE);
 
@@ -109,7 +107,7 @@ contract SendTest is AaveV3YieldModuleBase {
 
     function test_send_TransfersServiceFeeToFeeReceiver() public {
         vm.expectEmit(address(protocolToken));
-        emit IERC20.Transfer(address(yieldModule), feeReceiver, serviceFee);
+        emit IERC20.Transfer(address(yieldModule), feeReceiver, ACCUMULATED_SERVICE_FEE);
 
         _send(SEND_AMOUNT);
     }
@@ -119,27 +117,27 @@ contract SendTest is AaveV3YieldModuleBase {
 
         vm.recordLogs();
         _send(SEND_AMOUNT);
-        _assertEventNotEmitted(
-            vm.getRecordedLogs(), keccak256("FeePaymentProcessed(address,uint256,address)")
-        );
 
-        _mintYieldToken(owner, SEND_AMOUNT);
-
-        vm.recordLogs();
-        _send(SEND_AMOUNT);
-        _assertEventNotEmitted(vm.getRecordedLogs(), FEE_PAYMENT_FAILED_EVENT_SIG);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        _assertEventNotEmitted(logs, keccak256("FeePaymentProcessed(address,uint256,address)"));
+        _assertEventNotEmitted(logs, FEE_PAYMENT_FAILED_EVENT_SIG);
     }
 
     function test_send_EmitsFeePaymentProcessed() public {
         vm.expectEmit(address(yieldModule));
-        emit IYieldModule.FeePaymentProcessed(address(yieldToken), serviceFee, feeReceiver);
+        emit IYieldModule.FeePaymentProcessed(
+            address(yieldToken),
+            ACCUMULATED_SERVICE_FEE,
+            feeReceiver
+        );
 
         _send(SEND_AMOUNT);
     }
 
     // owner balance covers the amount first; only the missing part is pulled (with fee reserved)
     function testFuzz_send(uint amount) public {
-        amount = bound(amount, 1, SEND_FRESH_OWNER_BALANCE + PROTOCOL_BALANCE - serviceFee);
+        amount =
+            bound(amount, 1, SEND_FRESH_OWNER_BALANCE + PROTOCOL_BALANCE - ACCUMULATED_SERVICE_FEE);
         uint pullAmount = amount > SEND_FRESH_OWNER_BALANCE ? amount - SEND_FRESH_OWNER_BALANCE : 0;
 
         vm.prank(owner);
@@ -150,10 +148,10 @@ contract SendTest is AaveV3YieldModuleBase {
         if (pullAmount > 0) {
             assertEq(
                 yieldModule.protocolBalance(address(yieldToken)),
-                PROTOCOL_BALANCE - pullAmount - serviceFee,
+                PROTOCOL_BALANCE - pullAmount - ACCUMULATED_SERVICE_FEE,
                 "protocol"
             );
-            assertEq(protocolToken.balanceOf(feeReceiver), serviceFee, "fee");
+            assertEq(protocolToken.balanceOf(feeReceiver), ACCUMULATED_SERVICE_FEE, "fee");
         } else {
             // protocol untouched => no fee processed
             assertEq(yieldModule.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE, "protocol");
@@ -161,10 +159,10 @@ contract SendTest is AaveV3YieldModuleBase {
         }
     }
 
-    function testFuzz_send_RevertsInsufficientFundsWhenPullAmountExceedsProtocolBalanceMinusFee(uint amount)
+    function testFuzz_send_Reverts_WhenPullAmountExceedsProtocolBalanceMinusFee(uint amount)
         public
     {
-        uint maxAmount = SEND_FRESH_OWNER_BALANCE + PROTOCOL_BALANCE - serviceFee;
+        uint maxAmount = SEND_FRESH_OWNER_BALANCE + PROTOCOL_BALANCE - ACCUMULATED_SERVICE_FEE;
         amount = bound(amount, maxAmount + 1, type(uint128).max);
 
         vm.expectRevert(IYieldModule.InsufficientFunds.selector);

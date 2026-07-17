@@ -3,6 +3,7 @@
 pragma solidity ^0.8.29;
 
 import { YieldModuleBase } from "../YieldModuleBase.sol";
+import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 
 import { TangemYieldModuleFactory } from "contracts/core/TangemYieldModuleFactory.sol";
 
@@ -12,7 +13,22 @@ contract TangemYieldModuleFactoryTest is YieldModuleBase {
         _registerGeneralImplementation();
     }
 
-    function test_deployYieldModule_RevertsModuleAlreadyDeployed() public {
+    function test_deployYieldModule_SetsOwner() public {
+        YieldModuleHarness yieldModule = _deployYieldModule(owner, address(0), 0);
+
+        assertEq(yieldModule.owner(), owner);
+    }
+
+    function test_deployYieldModule_EmitsYieldModuleDeployed() public {
+        address expectedYieldModule = factory.calculateYieldModuleAddress(owner);
+
+        vm.expectEmit(true, true, false, false, address(factory));
+        emit TangemYieldModuleFactory.YieldModuleDeployed(owner, expectedYieldModule);
+
+        _deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
+    }
+
+    function test_deployYieldModule_Reverts_WhenModuleAlreadyDeployed() public {
         _deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
 
         vm.expectRevert(TangemYieldModuleFactory.ModuleAlreadyDeployed.selector);
@@ -20,7 +36,7 @@ contract TangemYieldModuleFactoryTest is YieldModuleBase {
         factory.deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
     }
 
-    function test_deployYieldModule_RevertsOnlyOwnerInitsToken() public {
+    function test_deployYieldModule_Reverts_WhenNonOwnerInitsToken() public {
         vm.expectRevert(TangemYieldModuleFactory.OnlyOwnerInitsToken.selector);
         vm.prank(otherAccount);
         factory.deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);

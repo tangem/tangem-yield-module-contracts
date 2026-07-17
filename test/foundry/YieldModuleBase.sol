@@ -281,7 +281,6 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         factory.unpause();
     }
 
-    /// Asserts the latest fee payment checkpoint (protocol balance + fee rate) for yieldToken.
     function _assertLatestFeePaymentState(
         YieldModuleHarness yieldModule,
         uint expectedProtocolBalance,
