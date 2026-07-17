@@ -30,7 +30,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         TestERC20 rewardToken = _createRewardToken();
         _fundMerklDistributor(address(rewardToken), AMOUNT);
 
-        vm.expectEmit(address(ym));
+        vm.expectEmit(true, true, true, true, address(ym));
         emit IMerklIncentives.MerklClaimed(
             address(merklDistributor),
             address(rewardToken),
@@ -52,7 +52,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         _fundMerklDistributor(address(rewardToken), AMOUNT);
 
         // routing and the event carry the actually received delta, not the claimed amount
-        vm.expectEmit(address(ym));
+        vm.expectEmit(true, true, true, true, address(ym));
         emit IMerklIncentives.MerklClaimed(
             address(merklDistributor),
             address(rewardToken),
@@ -142,7 +142,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         _fundMerklDistributor(address(yieldToken), YIELD_AMOUNT);
 
         // the reward becomes a protocol position: finalToken is the aToken, kept by the module
-        vm.expectEmit(address(ym));
+        vm.expectEmit(true, true, true, true, address(ym));
         emit IMerklIncentives.MerklClaimed(
             address(merklDistributor),
             address(yieldToken),
@@ -198,7 +198,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         _fundMerklDistributor(address(protocolToken), YIELD_AMOUNT);
 
         // the aToken reward stays as-is on the module: final fields mirror the claim
-        vm.expectEmit(address(ym));
+        vm.expectEmit(true, true, true, true, address(ym));
         emit IMerklIncentives.MerklClaimed(
             address(merklDistributor),
             address(protocolToken),
@@ -251,7 +251,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         _fundMerklDistributor(address(protocolToken), YIELD_AMOUNT);
 
         // the aToken reward is unwrapped: the owner receives the underlying yieldToken
-        vm.expectEmit(address(ym));
+        vm.expectEmit(true, true, true, true, address(ym));
         emit IMerklIncentives.MerklClaimed(
             address(merklDistributor),
             address(protocolToken),
