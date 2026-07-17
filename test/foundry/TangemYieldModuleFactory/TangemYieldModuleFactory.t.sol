@@ -13,7 +13,7 @@ contract TangemYieldModuleFactoryTest is YieldModuleBase {
     }
 
     function test_deployYieldModule_RevertsModuleAlreadyDeployed() public {
-        _deployGeneralYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
+        _deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
 
         vm.expectRevert(TangemYieldModuleFactory.ModuleAlreadyDeployed.selector);
         vm.prank(owner);

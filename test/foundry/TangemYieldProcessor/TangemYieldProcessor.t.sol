@@ -6,7 +6,7 @@ import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.so
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
 import { YieldModuleBase } from "../YieldModuleBase.sol";
-import { YieldModuleGeneralHarness } from "../harnesses/YieldModuleGeneralHarness.sol";
+import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 
 import { TangemYieldProcessor } from "contracts/core/TangemYieldProcessor.sol";
 import { PRECISION } from "contracts/resources/Constants.sol";
@@ -129,8 +129,8 @@ contract TangemYieldProcessorTest is YieldModuleBase {
 
     function test_unpause_RestoresProtocolOperations() public {
         _registerGeneralImplementation();
-        YieldModuleGeneralHarness yieldModule =
-            _deployGeneralYieldModuleWithFunds(owner, INITIAL_OWNER_BALANCE);
+        YieldModuleHarness yieldModule =
+            _deployYieldModuleWithFunds(owner, INITIAL_OWNER_BALANCE);
 
         vm.startPrank(backend);
         processor.pause();

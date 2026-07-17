@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import { TangemAaveV3YieldModuleHarness } from "../harnesses/TangemAaveV3YieldModuleHarness.sol";
+import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 import { AaveV3YieldModuleBase } from "./AaveV3YieldModuleBase.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
@@ -12,7 +12,7 @@ import { PRECISION } from "contracts/resources/Constants.sol";
 import { AaveV3PoolMock } from "contracts/test/AaveV3PoolMock.sol";
 
 contract ExitProtocolTest is AaveV3YieldModuleBase {
-    TangemAaveV3YieldModuleHarness internal yieldModule;
+    YieldModuleHarness internal yieldModule;
     uint internal serviceFee;
 
     function setUp() public override {
@@ -75,16 +75,11 @@ contract ExitProtocolTest is AaveV3YieldModuleBase {
         uint newFeeRate = 300;
         _setServiceFeeRate(newFeeRate);
 
-        (uint protocolBalance, uint serviceFeeRate) =
-            yieldModule.latestFeePaymentStates(address(yieldToken));
-        assertEq(protocolBalance, INITIAL_OWNER_BALANCE);
-        assertEq(serviceFeeRate, SERVICE_FEE_RATE);
+        _assertLatestFeePaymentState(yieldModule, INITIAL_OWNER_BALANCE, SERVICE_FEE_RATE);
 
         _exitViaProcessor(yieldModule, NETWORK_FEE);
 
-        (protocolBalance, serviceFeeRate) = yieldModule.latestFeePaymentStates(address(yieldToken));
-        assertEq(protocolBalance, 0);
-        assertEq(serviceFeeRate, newFeeRate);
+        _assertLatestFeePaymentState(yieldModule, 0, newFeeRate);
     }
 
     function test_exitProtocol_TransfersServiceAndNetworkFeeFromOwnerToFeeReceiver() public {

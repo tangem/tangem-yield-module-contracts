@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import { TangemAaveV3YieldModuleHarness } from "../harnesses/TangemAaveV3YieldModuleHarness.sol";
+import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 import { AaveV3YieldModuleBase } from "./AaveV3YieldModuleBase.sol";
 
 import { Requires } from "contracts/common/Requires.sol";
@@ -17,8 +17,8 @@ contract WithdrawTest is AaveV3YieldModuleBase {
     uint internal constant NATIVE_BALANCE = 0.001 ether;
     uint internal constant MODULE_BALANCE = 4_000_000e6;
 
-    TangemAaveV3YieldModuleHarness internal yieldModule;
-    TangemAaveV3YieldModuleHarness internal nonYieldModule;
+    YieldModuleHarness internal yieldModule;
+    YieldModuleHarness internal nonYieldModule;
     address internal nonYieldOwner = makeAddr("nonYieldOwner");
     address internal nonYieldToken;
     uint internal serviceFee;
@@ -62,16 +62,11 @@ contract WithdrawTest is AaveV3YieldModuleBase {
 
         uint expectedProtocolBalance = PROTOCOL_BALANCE - WITHDRAW_AMOUNT - serviceFee;
 
-        (uint protocolBalance, uint serviceFeeRate) =
-            yieldModule.latestFeePaymentStates(address(yieldToken));
-        assertEq(protocolBalance, INITIAL_OWNER_BALANCE);
-        assertEq(serviceFeeRate, SERVICE_FEE_RATE);
+        _assertLatestFeePaymentState(yieldModule, INITIAL_OWNER_BALANCE, SERVICE_FEE_RATE);
 
         _withdraw(yieldModule, owner, address(yieldToken), WITHDRAW_AMOUNT);
 
-        (protocolBalance, serviceFeeRate) = yieldModule.latestFeePaymentStates(address(yieldToken));
-        assertEq(protocolBalance, expectedProtocolBalance);
-        assertEq(serviceFeeRate, newFeeRate);
+        _assertLatestFeePaymentState(yieldModule, expectedProtocolBalance, newFeeRate);
     }
 
     // any amount up to protocolBalance - fee succeeds; the fee is always reserved
@@ -118,7 +113,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         uint deposit = 5_000e6;
         uint amount = 1_000e6;
 
-        TangemAaveV3YieldModuleHarness yieldModule2 =
+        YieldModuleHarness yieldModule2 =
             _deployYieldModuleWithFunds(otherAccount, deposit);
         // no revenue => service fee is zero
         _enterViaProcessor(yieldModule2, 0);
@@ -185,16 +180,11 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         uint newFeeRate = 300;
         _setServiceFeeRate(newFeeRate);
 
-        (uint protocolBalance, uint serviceFeeRate) =
-            yieldModule.latestFeePaymentStates(address(yieldToken));
-        assertEq(protocolBalance, INITIAL_OWNER_BALANCE);
-        assertEq(serviceFeeRate, SERVICE_FEE_RATE);
+        _assertLatestFeePaymentState(yieldModule, INITIAL_OWNER_BALANCE, SERVICE_FEE_RATE);
 
         _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
 
-        (protocolBalance, serviceFeeRate) = yieldModule.latestFeePaymentStates(address(yieldToken));
-        assertEq(protocolBalance, 0);
-        assertEq(serviceFeeRate, newFeeRate);
+        _assertLatestFeePaymentState(yieldModule, 0, newFeeRate);
     }
 
     function test_withdrawAndDeactivate_TransfersServiceFeeToFeeReceiver() public {
@@ -214,7 +204,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
     function test_withdrawAndDeactivate_SyncsLatestFeePaymentStateWithoutFeeWhenFeeIsZero() public {
         uint deposit = 5_000e6;
 
-        TangemAaveV3YieldModuleHarness yieldModule2 =
+        YieldModuleHarness yieldModule2 =
             _deployYieldModuleWithFunds(otherAccount, deposit);
         // first enter, no revenue => baseline set, fee == 0
         _enterViaProcessor(yieldModule2, 0);
@@ -234,7 +224,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
     function test_withdrawAndDeactivate_SucceedsWhenPersistedFeeDebtExceedsProtocolBalance()
         public
     {
-        (TangemAaveV3YieldModuleHarness yieldModule2, uint remainingFeeDebt) =
+        (YieldModuleHarness yieldModule2, uint remainingFeeDebt) =
             _createFeeDebtState(otherAccount);
 
         // partial fee payment during re-enter reduced the debt by the small deposit

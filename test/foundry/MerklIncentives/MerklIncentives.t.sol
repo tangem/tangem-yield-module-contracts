@@ -2,11 +2,8 @@
 /* solhint-disable func-name-mixedcase */
 pragma solidity ^0.8.29;
 
-import {
-    MerklIncentivesBase,
-    TangemAaveV3YieldModuleHarness,
-    TestERC20
-} from "./MerklIncentivesBase.sol";
+import { MerklIncentivesBase, TestERC20 } from "./MerklIncentivesBase.sol";
+import { TangemAaveV3YieldModuleHarness } from "test/foundry/harnesses/TangemAaveV3YieldModuleHarness.sol";
 import { Requires } from "contracts/common/Requires.sol";
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
