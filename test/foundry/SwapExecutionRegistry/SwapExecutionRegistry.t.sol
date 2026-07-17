@@ -15,7 +15,9 @@ contract SwapExecutionRegistryTest is BaseTest {
 
     SwapExecutionRegistry public registry;
 
-    function setUp() public virtual {
+    function setUp() public virtual override {
+        super.setUp();
+
         vm.prank(backend);
         registry = new SwapExecutionRegistry(backend);
         vm.label(address(registry), "swapExecutionRegistry");

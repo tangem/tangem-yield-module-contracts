@@ -40,6 +40,17 @@ contract MerklIncentivesTest is MerklIncentivesBase {
         TestERC20 rewardToken = _createRewardToken();
         _fundMerklDistributor(address(rewardToken), AMOUNT);
 
+        vm.expectEmit(address(ym));
+        emit IMerklIncentives.MerklClaimed(
+            address(merklDistributor),
+            address(rewardToken),
+            AMOUNT,
+            owner,
+            address(rewardToken),
+            AMOUNT,
+            owner
+        );
+
         _claimSingleAsOwner(address(rewardToken), AMOUNT);
 
         assertEq(rewardToken.balanceOf(owner), AMOUNT);
@@ -50,7 +61,39 @@ contract MerklIncentivesTest is MerklIncentivesBase {
         TestERC20 rewardToken = _createRewardToken();
         _fundMerklDistributor(address(rewardToken), AMOUNT);
 
+        vm.expectEmit(address(ym));
+        emit IMerklIncentives.MerklClaimed(
+            address(merklDistributor),
+            address(rewardToken),
+            AMOUNT,
+            owner,
+            address(rewardToken),
+            AMOUNT,
+            address(processor)
+        );
+
         _claimSingleAsBE(address(rewardToken), AMOUNT);
+
+        assertEq(rewardToken.balanceOf(owner), AMOUNT);
+        assertEq(rewardToken.balanceOf(address(ym)), 0);
+    }
+
+    function test_claimMerklRewardsOwner_Success_ViaForwarder() public {
+        TestERC20 rewardToken = _createRewardToken();
+        _fundMerklDistributor(address(rewardToken), AMOUNT);
+
+        vm.expectEmit(address(ym));
+        emit IMerklIncentives.MerklClaimed(
+            address(merklDistributor),
+            address(rewardToken),
+            AMOUNT,
+            owner,
+            address(rewardToken),
+            AMOUNT,
+            owner
+        );
+
+        _claimSingleAsOwnerViaForwarder(address(rewardToken), AMOUNT);
 
         assertEq(rewardToken.balanceOf(owner), AMOUNT);
         assertEq(rewardToken.balanceOf(address(ym)), 0);
