@@ -2,21 +2,20 @@
 pragma solidity ^0.8.29;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import { MerklIncentives } from "contracts/merkl/MerklIncentives.sol";
 import { YieldModuleHarness } from "./YieldModuleHarness.sol";
 import { YieldModuleLiquidUpgradeable } from "contracts/core/YieldModuleLiquidUpgradeable.sol";
-import { TestERC20 } from "contracts/test/TestERC20.sol";
+import { GeneralPoolMock } from "contracts/test/GeneralPoolMock.sol";
 
-/// Concrete protocol-agnostic harness. Uses TestERC20 as a fake "pool": each yieldToken gets
-/// its own TestERC20 protocolToken (mint/burn instead of real deposit/withdraw).
-/// Used by MerklIncentives and other protocol-agnostic test suites.
 contract YieldModuleGeneralHarness is YieldModuleHarness {
-    mapping(address => TestERC20) internal _protocolTokens;
-    mapping(address => address) internal _yieldTokensByProtocol;
+    using SafeERC20 for IERC20;
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
+    GeneralPoolMock public immutable pool;
+
     constructor(
+        address pool_,
         address distributor_,
         address yieldProcessor_,
         address factory_,
@@ -28,6 +27,8 @@ contract YieldModuleGeneralHarness is YieldModuleHarness {
             yieldProcessor_, factory_, trustedForwarder_, swapExecutionRegistry_
         )
     {
+        pool = GeneralPoolMock(pool_);
+
         _disableInitializers();
     }
 
@@ -35,18 +36,14 @@ contract YieldModuleGeneralHarness is YieldModuleHarness {
         __YieldModule_init(_owner);
     }
 
-    /* HOOK IMPLEMENTATIONS — fake pool via TestERC20 mint/burn */
+    /* HOOK IMPLEMENTATIONS — delegate to GeneralPoolMock */
 
     function _initProtocolToken(address yieldToken) internal override returns (address) {
-        TestERC20 pt = new TestERC20("TestProtocolToken", "ptTST", 18);
-        pt.forceBurn(address(this), pt.balanceOf(address(this)));
-        _protocolTokens[yieldToken] = pt;
-        _yieldTokensByProtocol[address(pt)] = yieldToken;
-        return address(pt);
+        return pool.initProtocolToken(yieldToken);
     }
 
     function _getProtocolToken(address yieldToken) internal view override returns (address) {
-        return address(_protocolTokens[yieldToken]);
+        return address(pool.protocolTokens(yieldToken));
     }
 
     function _getYieldTokenByProtocolToken(address protocolToken)
@@ -55,11 +52,12 @@ contract YieldModuleGeneralHarness is YieldModuleHarness {
         override
         returns (address)
     {
-        return _yieldTokensByProtocol[protocolToken];
+        return pool.yieldTokensByProtocolToken(protocolToken);
     }
 
     function _pushToProtocol(address yieldToken, uint amount) internal override {
-        _protocolTokens[yieldToken].mint(address(this), amount);
+        IERC20(yieldToken).forceApprove(address(pool), amount);
+        pool.deposit(yieldToken, amount);
     }
 
     function _pullFromProtocolToOwner(address yieldToken, uint amount)
@@ -67,12 +65,7 @@ contract YieldModuleGeneralHarness is YieldModuleHarness {
         override
         returns (uint)
     {
-        if (amount == type(uint).max) {
-            amount = _protocolTokens[yieldToken].balanceOf(address(this));
-        }
-        _protocolTokens[yieldToken].forceBurn(address(this), amount);
-        IERC20(yieldToken).transfer(owner, amount);
-        return amount;
+        return pool.withdraw(yieldToken, amount, owner);
     }
 
     function _pullFromProtocolToModule(address yieldToken, uint amount)
@@ -80,18 +73,6 @@ contract YieldModuleGeneralHarness is YieldModuleHarness {
         override
         returns (uint)
     {
-        if (amount == type(uint).max) {
-            amount = _protocolTokens[yieldToken].balanceOf(address(this));
-        }
-        _protocolTokens[yieldToken].forceBurn(address(this), amount);
-        return amount;
-    }
-
-    /* REVENUE SIMULATION */
-
-    /// Mints protocolToken to track _protocolBalance. yieldToken minting is handled by
-    /// YieldModuleBase._generateRevenue (which has backend access to mint yieldToken).
-    function generateRevenue(address yieldToken, address account, uint amount) external {
-        _protocolTokens[yieldToken].mint(account, amount);
+        return pool.withdraw(yieldToken, amount, address(this));
     }
 }
