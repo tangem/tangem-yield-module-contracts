@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {TestERC20} from "./TestERC20.sol";
+import { TestERC20 } from "./TestERC20.sol";
 
 contract ReentrantERC20 is TestERC20 {
     address public hookTarget;
@@ -14,7 +14,7 @@ contract ReentrantERC20 is TestERC20 {
         string memory name,
         string memory symbol,
         uint8 decimals_
-    ) TestERC20(name, symbol, decimals_) {}
+    ) TestERC20(name, symbol, decimals_) { }
 
     function setHook(address target, bytes calldata data) external {
         hookTarget = target;

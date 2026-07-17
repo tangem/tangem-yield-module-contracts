@@ -54,7 +54,8 @@ contract WeirdTokensTest is AaveV3YieldModuleBase {
 
     function test_enterProtocolByOwner_SuppliesPostTaxBalanceWhenYieldTokenHasTransferTax() public {
         address fotOwner = makeAddr("fotOwner");
-        TangemAaveV3YieldModuleHarness fotModule = _deployYieldModuleWithFunds(fotOwner, FOT_DEPOSIT);
+        TangemAaveV3YieldModuleHarness fotModule =
+            _deployYieldModuleWithFunds(fotOwner, FOT_DEPOSIT);
 
         yieldToken.setFixedTax(TAX);
 
@@ -79,7 +80,6 @@ contract WeirdTokensTest is AaveV3YieldModuleBase {
         assertEq(yieldToken.balanceOf(owner), 0);
     }
 
-
     function test_send_Reverts_WhenTaxErodesAmountPulledFromProtocol() public {
         yieldToken.setFixedTax(TAX);
 
@@ -90,7 +90,9 @@ contract WeirdTokensTest is AaveV3YieldModuleBase {
 
     /*  negative rebase / balance slashing  */
 
-    function test_withdrawAndDeactivate_ChargesNoFeeWhenProtocolBalanceDropsBelowCheckpoint() public {
+    function test_withdrawAndDeactivate_ChargesNoFeeWhenProtocolBalanceDropsBelowCheckpoint()
+        public
+    {
         // simulate a negative rebase: burn the revenue plus part of the principal
         protocolToken.forceBurn(address(yieldModule), ACCUMULATED_REVENUE + BALANCE_DROP);
         uint remaining = INITIAL_OWNER_BALANCE - BALANCE_DROP;

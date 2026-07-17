@@ -6,16 +6,30 @@ import { Test } from "forge-std/src/Test.sol";
 import { YieldModuleLiquidUpgradeable } from "contracts/core/YieldModuleLiquidUpgradeable.sol";
 
 contract StorageLayoutStub is YieldModuleLiquidUpgradeable {
-    constructor() YieldModuleLiquidUpgradeable(address(1), address(2), address(3), address(4)) {}
+    constructor() YieldModuleLiquidUpgradeable(address(1), address(2), address(3), address(4)) { }
 
-    function initialize(address) external {}
+    function initialize(address) external { }
 
-    function _initProtocolToken(address) internal pure override returns (address) { return address(0); }
-    function _pushToProtocol(address, uint) internal override {}
-    function _pullFromProtocolToOwner(address, uint) internal pure override returns (uint) { return 0; }
-    function _pullFromProtocolToModule(address, uint) internal pure override returns (uint) { return 0; }
-    function _getYieldTokenByProtocolToken(address) internal pure override returns (address) { return address(0); }
-    function _getProtocolToken(address) internal pure override returns (address) { return address(0); }
+    function _initProtocolToken(address) internal pure override returns (address) {
+        return address(0);
+    }
+    function _pushToProtocol(address, uint) internal override { }
+
+    function _pullFromProtocolToOwner(address, uint) internal pure override returns (uint) {
+        return 0;
+    }
+
+    function _pullFromProtocolToModule(address, uint) internal pure override returns (uint) {
+        return 0;
+    }
+
+    function _getYieldTokenByProtocolToken(address) internal pure override returns (address) {
+        return address(0);
+    }
+
+    function _getProtocolToken(address) internal pure override returns (address) {
+        return address(0);
+    }
 }
 
 contract StorageLayoutTest is Test {

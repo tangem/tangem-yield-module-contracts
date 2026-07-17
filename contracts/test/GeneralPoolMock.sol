@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {TestERC20, IERC20} from "./TestERC20.sol";
- 
+import { IERC20, TestERC20 } from "./TestERC20.sol";
+
 contract GeneralPoolMock {
     event Deposit(address yieldToken, uint amount);
     event Withdraw(address yieldToken, uint amount, address to);

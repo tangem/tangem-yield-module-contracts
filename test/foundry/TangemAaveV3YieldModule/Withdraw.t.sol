@@ -62,7 +62,8 @@ contract WithdrawTest is AaveV3YieldModuleBase {
 
         uint expectedProtocolBalance = PROTOCOL_BALANCE - WITHDRAW_AMOUNT - serviceFee;
 
-        (uint protocolBalance, uint serviceFeeRate) = yieldModule.latestFeePaymentStates(address(yieldToken));
+        (uint protocolBalance, uint serviceFeeRate) =
+            yieldModule.latestFeePaymentStates(address(yieldToken));
         assertEq(protocolBalance, INITIAL_OWNER_BALANCE);
         assertEq(serviceFeeRate, SERVICE_FEE_RATE);
 
@@ -81,10 +82,14 @@ contract WithdrawTest is AaveV3YieldModuleBase {
 
         assertEq(yieldToken.balanceOf(owner), amount);
         assertEq(protocolToken.balanceOf(feeReceiver), serviceFee);
-        assertEq(yieldModule.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE - amount - serviceFee);
+        assertEq(
+            yieldModule.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE - amount - serviceFee
+        );
     }
 
-    function testFuzz_withdraw_RevertsInsufficientFundsWhenAmountPlusFeeExceedsProtocolBalance(uint amount) public {
+    function testFuzz_withdraw_RevertsInsufficientFundsWhenAmountPlusFeeExceedsProtocolBalance(uint amount)
+        public
+    {
         amount = bound(amount, PROTOCOL_BALANCE - serviceFee + 1, type(uint128).max);
 
         vm.expectRevert(IYieldModule.InsufficientFunds.selector);
@@ -113,12 +118,17 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         uint deposit = 5_000e6;
         uint amount = 1_000e6;
 
-        TangemAaveV3YieldModuleHarness yieldModule2 = _deployYieldModuleWithFunds(otherAccount, deposit);
+        TangemAaveV3YieldModuleHarness yieldModule2 =
+            _deployYieldModuleWithFunds(otherAccount, deposit);
         // no revenue => service fee is zero
         _enterViaProcessor(yieldModule2, 0);
 
         vm.expectEmit(address(yieldModule2));
-        emit IYieldModule.LatestFeePaymentStateUpdated(address(yieldToken), deposit - amount, SERVICE_FEE_RATE);
+        emit IYieldModule.LatestFeePaymentStateUpdated(
+            address(yieldToken),
+            deposit - amount,
+            SERVICE_FEE_RATE
+        );
         vm.expectEmit(address(yieldModule2));
         emit IYieldModule.FeePaymentProcessed(address(yieldToken), 0, feeReceiver);
 
@@ -163,7 +173,10 @@ contract WithdrawTest is AaveV3YieldModuleBase {
 
     function test_withdrawAndDeactivate_EmitsWithdrawAndDeactivateProcessed() public {
         vm.expectEmit(address(yieldModule));
-        emit IYieldModule.WithdrawAndDeactivateProcessed(address(yieldToken), PROTOCOL_BALANCE - serviceFee);
+        emit IYieldModule.WithdrawAndDeactivateProcessed(
+            address(yieldToken),
+            PROTOCOL_BALANCE - serviceFee
+        );
 
         _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
     }
@@ -172,7 +185,8 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         uint newFeeRate = 300;
         _setServiceFeeRate(newFeeRate);
 
-        (uint protocolBalance, uint serviceFeeRate) = yieldModule.latestFeePaymentStates(address(yieldToken));
+        (uint protocolBalance, uint serviceFeeRate) =
+            yieldModule.latestFeePaymentStates(address(yieldToken));
         assertEq(protocolBalance, INITIAL_OWNER_BALANCE);
         assertEq(serviceFeeRate, SERVICE_FEE_RATE);
 
@@ -200,7 +214,8 @@ contract WithdrawTest is AaveV3YieldModuleBase {
     function test_withdrawAndDeactivate_SyncsLatestFeePaymentStateWithoutFeeWhenFeeIsZero() public {
         uint deposit = 5_000e6;
 
-        TangemAaveV3YieldModuleHarness yieldModule2 = _deployYieldModuleWithFunds(otherAccount, deposit);
+        TangemAaveV3YieldModuleHarness yieldModule2 =
+            _deployYieldModuleWithFunds(otherAccount, deposit);
         // first enter, no revenue => baseline set, fee == 0
         _enterViaProcessor(yieldModule2, 0);
 
@@ -216,8 +231,11 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         _assertEventNotEmitted(vm.getRecordedLogs(), FEE_PAYMENT_FAILED_EVENT_SIG);
     }
 
-    function test_withdrawAndDeactivate_SucceedsWhenPersistedFeeDebtExceedsProtocolBalance() public {
-        (TangemAaveV3YieldModuleHarness yieldModule2, uint remainingFeeDebt) = _createFeeDebtState(otherAccount);
+    function test_withdrawAndDeactivate_SucceedsWhenPersistedFeeDebtExceedsProtocolBalance()
+        public
+    {
+        (TangemAaveV3YieldModuleHarness yieldModule2, uint remainingFeeDebt) =
+            _createFeeDebtState(otherAccount);
 
         // partial fee payment during re-enter reduced the debt by the small deposit
         assertEq(yieldModule2.feeDebts(address(yieldToken)), remainingFeeDebt);
@@ -273,7 +291,9 @@ contract WithdrawTest is AaveV3YieldModuleBase {
 
     /*  withdrawNativeAll  */
 
-    function test_withdrawNativeAll_EmitsWithdrawNativeProcessedWithZeroAmountWhenBalanceIsZero() public {
+    function test_withdrawNativeAll_EmitsWithdrawNativeProcessedWithZeroAmountWhenBalanceIsZero()
+        public
+    {
         vm.expectEmit(address(yieldModule));
         emit IYieldModule.WithdrawNativeProcessed(backend, 0);
 

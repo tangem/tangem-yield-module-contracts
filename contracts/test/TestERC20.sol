@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { ERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract TestERC20 is ERC20 {
     uint8 private immutable _decimals;
@@ -42,17 +42,18 @@ contract TestERC20 is ERC20 {
         fixedTax = tax;
     }
 
-    function transfer(address to, uint value)
-        public
-        override
-        notBlacklisted(msg.sender)
-        notBlacklisted(to)
-        returns (bool)
-    {
+    function transfer(
+        address to,
+        uint value
+    ) public override notBlacklisted(msg.sender) notBlacklisted(to) returns (bool) {
         return super.transfer(to, value);
     }
 
-    function transferFrom(address from, address to, uint value)
+    function transferFrom(
+        address from,
+        address to,
+        uint value
+    )
         public
         override
         notBlacklisted(msg.sender)
