@@ -2,7 +2,7 @@
 solc = "0.8.29"
 optimizer = true
 optimizer_runs = 10_000
-evm_version = "paris"
+evm_version = "cancun"
 src = "contracts"
 out = "foundry-artifacts"
 cache_path = "cache/foundry"
