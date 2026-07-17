@@ -13,7 +13,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         ym = _deployEnteredRevenueModule(owner);
     }
 
-    /* SEND_TO_OWNER — reward token is unknown to the module */
+    /* SEND_TO_OWNER */
 
     function test_claim_SendsToOwner_WhenRewardTokenIsUnknown() public {
         TestERC20 rewardToken = _createRewardToken();
@@ -52,7 +52,6 @@ contract RewardRouteTest is MerklIncentivesBase {
         rewardToken.setFixedTax(tax);
         _fundMerklDistributor(address(rewardToken), AMOUNT);
 
-        // routing and the event carry the actually received delta, not the claimed amount
         vm.expectEmit(true, true, true, true, address(ym));
         emit IMerklIncentives.MerklClaimed(
             address(merklDistributor),
@@ -80,7 +79,6 @@ contract RewardRouteTest is MerklIncentivesBase {
 
         _claimSingleAsOwner(address(yieldToken), YIELD_AMOUNT);
 
-        // a deactivated yieldToken is not pushed back to the protocol — it goes to the owner
         assertEq(yieldToken.balanceOf(owner), ownerBalanceBefore + YIELD_AMOUNT);
         assertEq(yieldToken.balanceOf(address(pool)), poolBalanceBefore);
         assertEq(ym.protocolBalance(address(yieldToken)), protocolBalanceBefore);
@@ -100,7 +98,6 @@ contract RewardRouteTest is MerklIncentivesBase {
 
         for (uint i; i < numTokens; ++i) {
             rewardTokens[i] = address(tokens[i]);
-            // capped only by uint256 overflow of the token's totalSupply on funding
             cumulativeAmounts[i] = bound(rawAmounts[i], 1, type(uint).max - tokens[i].totalSupply());
             _fundMerklDistributor(rewardTokens[i], cumulativeAmounts[i]);
         }
@@ -108,7 +105,6 @@ contract RewardRouteTest is MerklIncentivesBase {
         vm.prank(owner);
         ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
 
-        // every unknown token is routed to the owner in full
         for (uint i; i < numTokens; ++i) {
             assertEq(tokens[i].balanceOf(owner), cumulativeAmounts[i]);
             assertEq(tokens[i].balanceOf(address(ym)), 0);
@@ -116,11 +112,9 @@ contract RewardRouteTest is MerklIncentivesBase {
         }
     }
 
-    /* PUSH_TO_PROTOCOL — reward token is an active yield token */
+    /* PUSH_TO_PROTOCOL */
 
-    function testFuzz_claim_PushesToProtocol_WhenRewardTokenIsActiveYieldToken(
-        uint amount
-    ) public {
+    function testFuzz_claim_PushesToProtocol_WhenRewardTokenIsActiveYieldToken(uint amount) public {
         amount = bound(
             amount, 1, type(uint).max - yieldToken.totalSupply() - protocolToken.totalSupply()
         );
@@ -135,7 +129,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         assertEq(yieldToken.balanceOf(address(pool)), poolBalanceBefore + amount);
         assertEq(yieldToken.balanceOf(address(ym)), 0);
         assertEq(yieldToken.balanceOf(owner), 0);
-        // the reward itself is fee-free at any size
+
         assertEq(ym.calculateServiceFee(address(yieldToken)), ACCUMULATED_SERVICE_FEE);
         assertEq(merklDistributor.claimed(address(ym), address(yieldToken)), amount);
     }
@@ -174,14 +168,12 @@ contract RewardRouteTest is MerklIncentivesBase {
         _claimSingleAsOwner(address(yieldToken), YIELD_AMOUNT);
     }
 
-    /* KEEP_IN_MODULE — reward token is a protocol token of an active yield token */
+    /* KEEP_IN_MODULE */
 
-    function testFuzz_claim_KeepsInModule_WhenRewardTokenIsProtocolTokenOfActiveYieldToken(
-        uint amount
-    ) public {
-        amount = bound(
-            amount, 1, type(uint).max - protocolToken.totalSupply() - PROTOCOL_BALANCE
-        );
+    function testFuzz_claim_KeepsInModule_WhenRewardTokenIsProtocolTokenOfActiveYieldToken(uint amount)
+        public
+    {
+        amount = bound(amount, 1, type(uint).max - protocolToken.totalSupply() - PROTOCOL_BALANCE);
 
         uint poolBalanceBefore = yieldToken.balanceOf(address(pool));
 
@@ -215,7 +207,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         _claimSingleAsOwner(address(protocolToken), YIELD_AMOUNT);
     }
 
-    /* UNWRAP_TO_OWNER — reward token is a protocol token of an inactive yield token */
+    /* UNWRAP_TO_OWNER  */
 
     function testFuzz_claim_UnwrapsToOwner_WhenYieldTokenIsInactive(uint amount) public {
         _withdrawAndDeactivate(ym, owner, address(yieldToken));
@@ -277,8 +269,6 @@ contract RewardRouteTest is MerklIncentivesBase {
 
         _claimSingleAsOwner(address(rewardToken), AMOUNT);
 
-        // repeat the claim with the same cumulative amount: the distributor pays the delta
-        // over what was already claimed, i.e. nothing
         vm.expectRevert(
             abi.encodeWithSelector(
                 IMerklIncentives.MerklClaimedNoReward.selector, address(rewardToken), owner
@@ -311,8 +301,6 @@ contract RewardRouteTest is MerklIncentivesBase {
     ) public {
         uint poolBalanceBefore = yieldToken.balanceOf(address(pool));
 
-        // independent amounts per route to catch any cross-wiring between them;
-        // quarter of uint256 max keeps every pairwise sum overflow-free
         sendAmount = bound(sendAmount, 1, type(uint).max / 4);
         pushAmount = bound(pushAmount, 1, type(uint).max / 4);
         keepAmount = bound(keepAmount, 1, type(uint).max / 4);
@@ -337,18 +325,19 @@ contract RewardRouteTest is MerklIncentivesBase {
         vm.prank(owner);
         ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
 
-        // SEND_TO_OWNER: the unknown token went straight to the owner
+        // SEND_TO_OWNER:
         assertEq(unknownToken.balanceOf(owner), sendAmount);
         assertEq(unknownToken.balanceOf(address(ym)), 0);
 
-        // PUSH_TO_PROTOCOL: the yieldToken reward was supplied to the pool
+        // PUSH_TO_PROTOCOL:
         assertEq(yieldToken.balanceOf(address(pool)), poolBalanceBefore + pushAmount);
         assertEq(yieldToken.balanceOf(address(ym)), 0);
         assertEq(yieldToken.balanceOf(owner), 0);
 
-        // KEEP_IN_MODULE: the aToken reward stayed on the module; together with the
-        // supplied reward the position grew by both amounts
-        assertEq(ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + pushAmount + keepAmount);
+        // KEEP_IN_MODULE:
+        assertEq(
+            ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + pushAmount + keepAmount
+        );
         assertEq(protocolToken.balanceOf(owner), 0);
 
         // rewards are fee-free regardless of the route
@@ -358,7 +347,6 @@ contract RewardRouteTest is MerklIncentivesBase {
     /* Withdrawal pre-claim flow */
 
     function test_claim_ThenWithdrawAndDeactivate_TransfersEverythingToOwner() public {
-        // pre-claim: the yieldToken reward is supplied into the position
         _fundMerklDistributor(address(yieldToken), YIELD_AMOUNT);
         _claimSingleAsOwner(address(yieldToken), YIELD_AMOUNT);
 

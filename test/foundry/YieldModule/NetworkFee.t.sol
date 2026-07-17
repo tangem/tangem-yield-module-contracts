@@ -42,4 +42,49 @@ contract NetworkFeeTest is YieldModuleBase {
         vm.prank(owner);
         yieldModule.setYieldTokenMaxNetworkFee(address(yieldToken), NEW_MAX_NETWORK_FEE);
     }
+
+    function test_setYieldTokenMaxNetworkFee_RevertsTokenNotInitialized() public {
+        address uninitializedToken = makeAddr("uninitializedToken");
+
+        vm.expectRevert(IYieldModule.TokenNotInitialized.selector);
+        vm.prank(owner);
+        yieldModule.setYieldTokenMaxNetworkFee(uninitializedToken, NEW_MAX_NETWORK_FEE);
+    }
+
+    function test_setYieldTokenMaxNetworkFee_RevertsTokenNotActive() public {
+        vm.prank(owner);
+        yieldModule.withdrawAndDeactivate(address(yieldToken));
+
+        vm.expectRevert(IYieldModule.TokenNotActive.selector);
+        vm.prank(owner);
+        yieldModule.setYieldTokenMaxNetworkFee(address(yieldToken), NEW_MAX_NETWORK_FEE);
+    }
+
+    /*  calculateFee  */
+
+    function test_calculateFee_ReturnsNetworkFeeWhenServiceFeeIsZero() public view {
+        // fresh module, no revenue => service fee is zero
+        assertEq(yieldModule.calculateFee(address(yieldToken), NETWORK_FEE), NETWORK_FEE);
+    }
+
+    function test_calculateFee_ReturnsServiceFeePlusNetworkFee() public {
+        YieldModuleGeneralHarness revenueModule = _deployEnteredRevenueGeneralModule(otherAccount);
+
+        assertEq(
+            revenueModule.calculateFee(address(yieldToken), NETWORK_FEE),
+            ACCUMULATED_SERVICE_FEE + NETWORK_FEE
+        );
+    }
+
+    function test_calculateFee_AllowsNetworkFeeEqualToMax() public view {
+        assertEq(
+            yieldModule.calculateFee(address(yieldToken), DEFAULT_MAX_NETWORK_FEE),
+            DEFAULT_MAX_NETWORK_FEE
+        );
+    }
+
+    function test_calculateFee_RevertsNetworkFeeExceedsMax() public {
+        vm.expectRevert(IYieldModule.NetworkFeeExceedsMax.selector);
+        yieldModule.calculateFee(address(yieldToken), uint(DEFAULT_MAX_NETWORK_FEE) + 1);
+    }
 }

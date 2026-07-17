@@ -28,7 +28,6 @@ contract YieldTokenByProtocolTokenTest is MerklIncentivesBase {
 
         _claimSingleAsOwner(address(protocolToken), YIELD_AMOUNT);
 
-        // the mapping is cached back and the reward still followed KEEP_IN_MODULE
         assertEq(ym.yieldTokenByProtocolToken(address(protocolToken)), address(yieldToken));
         assertEq(ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + YIELD_AMOUNT);
     }
@@ -52,7 +51,6 @@ contract YieldTokenByProtocolTokenTest is MerklIncentivesBase {
         _mockUnderlyingAsset(address(yieldToken));
         _fundMerklDistributor(address(protocolToken), YIELD_AMOUNT);
 
-        // the pool now reports another aToken for the resolved yield token
         DataTypes.ReserveData memory reserveData;
         reserveData.aTokenAddress = makeAddr("otherAToken");
         vm.mockCall(

@@ -36,7 +36,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         nonYieldToken = address(yieldToken);
     }
 
-    /* ========================================================== withdraw ========================================================== */
+    /*  withdraw  */
 
     function test_withdraw_WithdrawsSpecifiedAmountFromPoolToOwner() public {
         vm.expectEmit(address(pool));
@@ -129,7 +129,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         _assertEventNotEmitted(vm.getRecordedLogs(), FEE_PAYMENT_FAILED_EVENT_SIG);
     }
 
-    /* =================================================== withdrawAndDeactivate ==================================================== */
+    /*  withdrawAndDeactivate  */
 
     function test_withdrawAndDeactivate_WithdrawsProtocolBalanceMinusFeeToOwner() public {
         vm.expectEmit(address(pool));
@@ -146,6 +146,13 @@ contract WithdrawTest is AaveV3YieldModuleBase {
 
         (, active,) = yieldModule.yieldTokensData(address(yieldToken));
         assertFalse(active);
+    }
+
+    function test_withdrawAndDeactivate_RevertsTokenNotActive() public {
+        _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
+
+        vm.expectRevert(IYieldModule.TokenNotActive.selector);
+        _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
     }
 
     function test_withdrawAndDeactivate_RevertsOnlyOwner() public {
@@ -222,7 +229,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         assertFalse(active);
     }
 
-    /* ================================================== withdrawNonYieldToken ==================================================== */
+    /*  withdrawNonYieldToken  */
 
     function test_withdrawNonYieldToken_TransfersTotalModuleBalanceToOwner() public {
         vm.expectEmit(nonYieldToken);
@@ -264,7 +271,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         nonYieldModule.withdrawNonYieldToken(nonYieldToken);
     }
 
-    /* ===================================================== withdrawNativeAll ===================================================== */
+    /*  withdrawNativeAll  */
 
     function test_withdrawNativeAll_EmitsWithdrawNativeProcessedWithZeroAmountWhenBalanceIsZero() public {
         vm.expectEmit(address(yieldModule));

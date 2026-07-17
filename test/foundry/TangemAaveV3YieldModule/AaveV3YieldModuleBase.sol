@@ -10,7 +10,6 @@ import { AaveV3PoolMock } from "contracts/test/AaveV3PoolMock.sol";
 import { TestERC20 } from "contracts/test/TestERC20.sol";
 
 abstract contract AaveV3YieldModuleBase is YieldModuleBase {
-    /* Aave scenario amounts */
     uint internal constant INITIAL_MODULE_BALANCE = 50_000e6;
     uint internal constant TOTAL_ENTER_AMOUNT = INITIAL_OWNER_BALANCE + INITIAL_MODULE_BALANCE;
     uint internal constant FRESH_OWNER_BALANCE = 50_000e6;
@@ -52,7 +51,7 @@ abstract contract AaveV3YieldModuleBase is YieldModuleBase {
         vm.label(address(implementation), "implementation");
     }
 
-    /* FIXTURE HELPERS (return the Aave harness type) */
+    /* FIXTURE HELPERS */
 
     function _deployYieldModule(
         address moduleOwner,
@@ -68,7 +67,6 @@ abstract contract AaveV3YieldModuleBase is YieldModuleBase {
         vm.label(address(yieldModule), "yieldModule");
     }
 
-    /// Deploys a module with the yield token initialized, owner funded and max approval given.
     function _deployYieldModuleWithFunds(
         address moduleOwner,
         uint ownerBalance
@@ -81,7 +79,6 @@ abstract contract AaveV3YieldModuleBase is YieldModuleBase {
         yieldToken.approve(address(yieldModule), type(uint).max);
     }
 
-    /// Full scenario: deployed, entered and revenue generated (standard ACCUMULATED_REVENUE).
     function _deployEnteredRevenueModule(address moduleOwner)
         internal
         returns (TangemAaveV3YieldModuleHarness yieldModule)
@@ -91,7 +88,7 @@ abstract contract AaveV3YieldModuleBase is YieldModuleBase {
         _generateRevenue(address(yieldModule), ACCUMULATED_REVENUE);
     }
 
-    /* AAVE-SPECIFIC ACTOR WRAPPERS (bind yieldToken) */
+    /* ACTOR WRAPPERS */
 
     function _enterViaProcessor(
         TangemAaveV3YieldModuleHarness yieldModule,
@@ -113,10 +110,6 @@ abstract contract AaveV3YieldModuleBase is YieldModuleBase {
 
     /* FEE-DEBT SCENARIO */
 
-    /// Scenario: fee debt persisted after failed fee payment, protocol balance below the debt.
-    /// Mirrors the hardhat "Fee debt persistence" setup: enter, generate revenue, force fee
-    /// failure on exit, then reactivate and re-enter with a small deposit (paid toward the debt).
-    /// Returns the debt remaining after that partial payment.
     function _createFeeDebtState(address moduleOwner)
         internal
         returns (TangemAaveV3YieldModuleHarness yieldModule, uint remainingFeeDebt)
@@ -127,8 +120,6 @@ abstract contract AaveV3YieldModuleBase is YieldModuleBase {
         remainingFeeDebt = feeDebt - smallDeposit;
     }
 
-    /// Same scenario with a configurable re-enter deposit (paid toward the debt).
-    /// Returns the full debt as it was before the re-enter payment.
     function _createFeeDebtState(
         address moduleOwner,
         uint reEnterDeposit
@@ -163,16 +154,11 @@ abstract contract AaveV3YieldModuleBase is YieldModuleBase {
         vm.stopPrank();
     }
 
-    /* AAVE-SPECIFIC HELPERS */
-
-    /// Simulates protocol yield by minting protocol (aave) tokens to the account.
     function _generateRevenue(address account, uint amount) internal {
         pool.generateRevenue(account, amount);
     }
 
-    /// Override of the general 3-arg hook — delegates to the AAVE pool.
     function _generateRevenue(address, address account, uint amount) internal override {
         pool.generateRevenue(account, amount);
     }
-
 }

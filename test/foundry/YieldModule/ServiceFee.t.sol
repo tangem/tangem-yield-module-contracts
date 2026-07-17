@@ -21,7 +21,7 @@ contract ServiceFeeTest is YieldModuleBase {
         (debtModule, remainingFeeDebt) = _createGeneralFeeDebtState(debtOwner);
     }
 
-    /* ==================================================== calculateServiceFee ==================================================== */
+    /*  calculateServiceFee  */
 
     function test_calculateServiceFee_AfterRevenue() public {
         YieldModuleGeneralHarness yieldModule =
@@ -88,7 +88,7 @@ contract ServiceFeeTest is YieldModuleBase {
         );
     }
 
-    /* ==================================================== Fee debt repayment ==================================================== */
+    /*  Fee debt repayment  */
 
     function testFuzz_enterProtocolByOwner_PartiallyRepaysFeeDebt(uint reEnterDeposit) public {
         reEnterDeposit = bound(reEnterDeposit, 1, feeDebt - 1);
@@ -115,7 +115,7 @@ contract ServiceFeeTest is YieldModuleBase {
         assertEq(yieldModule.protocolBalance(address(yieldToken)), reEnterDeposit - feeDebt);
     }
 
-    /* ============================================== Fee debt & effective balances ============================================== */
+    /*  Fee debt & effective balances  */
 
     function test_calculateServiceFee_ReturnsPersistedDebtWhenProtocolBalanceIsNotAboveBaseline()
         public

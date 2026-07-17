@@ -202,9 +202,11 @@ contract SwapTest is AaveV3YieldModuleBase {
         _swap(amountIn, _revertEmptyData());
     }
 
-    /// Seeds the three funding sources independently: protocol first (via owner enter),
-    /// then module residue and fresh owner balance. No revenue => service fee is zero.
-    function _seedFundingSources(uint moduleBalance, uint ownerBalance, uint protocolBalance) internal {
+    function _seedFundingSources(
+        uint moduleBalance,
+        uint ownerBalance,
+        uint protocolBalance
+    ) internal {
         _mintYieldToken(owner, protocolBalance);
         vm.prank(owner);
         yieldModule.enterProtocolByOwner(tokenIn);
@@ -260,7 +262,7 @@ contract SwapTest is AaveV3YieldModuleBase {
         _swap(amountIn, _revertEmptyData());
     }
 
-    /* ======================================================= swapAndReceive ====================================================== */
+    /*  swapAndReceive  */
 
     function test_swapAndReceive_RevertsOnlyOwner() public {
         TestERC20 outToken = _deployTestToken();
