@@ -12,7 +12,7 @@ abstract contract BaseTest is Test {
 
     address public backend = makeAddr("backend");
     address public owner;
-    uint256 public ownerPk;
+    uint public ownerPk;
     address public feeReceiver = makeAddr("feeReceiver");
     address public otherAccount = makeAddr("otherAccount");
 

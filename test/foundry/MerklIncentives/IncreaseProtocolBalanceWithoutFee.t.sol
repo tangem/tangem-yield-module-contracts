@@ -33,9 +33,7 @@ contract IncreaseProtocolBalanceWithoutFeeTest is MerklIncentivesBase {
     }
 
     function testFuzz_claim_MovesFeeCheckpoint_OnKeepInModule(uint amount) public {
-        amount = bound(
-            amount, 1, type(uint).max - protocolToken.totalSupply() - PROTOCOL_BALANCE
-        );
+        amount = bound(amount, 1, type(uint).max - protocolToken.totalSupply() - PROTOCOL_BALANCE);
 
         (uint checkpointBefore,) = ym.latestFeePaymentStates(address(yieldToken));
         uint feeBefore = ym.calculateServiceFee(address(yieldToken));
