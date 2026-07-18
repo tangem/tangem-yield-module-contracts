@@ -72,6 +72,7 @@ interface IYieldModule {
     error TokenRiskSuspended();
     error RiskActionRateLimited();
     error NotSuspended();
+    error AlreadySuspended();
 
     function initialize(address owner) external;
 
@@ -131,7 +132,7 @@ interface IYieldModule {
 
     function calculateServiceFee(address yieldToken) external view returns (uint);
 
-    function riskSuspended(address yieldToken) external view returns (bool);
+    function entrySuspended(address yieldToken) external view returns (bool);
 
-    function lastRiskActionAt(address yieldToken) external view returns (uint);
+    function lastSuspensionAt(address yieldToken) external view returns (uint);
 }
