@@ -2177,7 +2177,7 @@ describe("TangemBridgeProcessor", function () {
       // the unpaid remainder is still owed after the exit
       expect(await yieldModule.protocolBalance(yieldToken)).to.equal(0);
       expect(await yieldModule.calculateServiceFee(yieldToken)).to.equal(fee - protocolBal);
-      expect(await yieldModule.riskSuspended(yieldToken)).to.be.true;
+      expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
     });
   });
 
@@ -2214,12 +2214,12 @@ describe("TangemBridgeProcessor", function () {
       expect(yieldTokenData.active).to.be.true;
     });
 
-    it("Should set riskSuspended for the token", async function () {
-      expect(await yieldModule.riskSuspended(yieldToken)).to.be.false;
+    it("Should set entrySuspended for the token", async function () {
+      expect(await yieldModule.entrySuspended(yieldToken)).to.be.false;
 
       await (await processor.softExit(yieldModule, yieldToken)).wait();
 
-      expect(await yieldModule.riskSuspended(yieldToken)).to.be.true;
+      expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
     });
 
     it("Should charge the service fee on accrued revenue", async function () {
@@ -2261,7 +2261,7 @@ describe("TangemBridgeProcessor", function () {
         .withArgs(yieldToken, 0, 0);
       await expect(tx).to.not.emit(pool, "Withdraw");
 
-      expect(await yieldModule.riskSuspended(yieldToken)).to.be.true;
+      expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
     });
 
     it("Should emit SoftExitTriggered and RiskSuspensionSet with correct parameters", async function () {
@@ -2314,16 +2314,29 @@ describe("TangemBridgeProcessor", function () {
         .to.be.revertedWithCustomError(yieldModule, "TokenRiskSuspended");
     });
 
-    it("Should enforce the 24h rate limit between two softExits", async function () {
+    it("Should NOT rate-limit a repeated softExit while the token is still suspended", async function () {
       await (await processor.softExit(yieldModule, yieldToken)).wait();
 
+      // escalation of an already-suspended token is free, only starting an episode is limited
+      await expect(processor.softExit(yieldModule, yieldToken)).to.not.be.reverted;
+    });
+
+    it("Should enforce the 24h rate limit on a new suspension episode after resume", async function () {
+      await (await processor.softExit(yieldModule, yieldToken)).wait();
+      await (await processor.resumeAndEnterProtocol(yieldModule, yieldToken)).wait();
+
+      // the token is no longer suspended, so the next episode is gated by the cooldown
       await expect(processor.softExit(yieldModule, yieldToken))
         .to.be.revertedWithCustomError(yieldModule, "RiskActionRateLimited");
 
+      const timerBefore = await yieldModule.lastSuspensionAt(yieldToken);
       await time.increase(RISK_COOLDOWN);
 
+      // the new episode re-emits the suspension event and re-arms the timer
       await expect(processor.softExit(yieldModule, yieldToken))
-        .to.not.be.reverted;
+        .to.emit(yieldModule, "RiskSuspensionSet")
+        .withArgs(yieldToken, true);
+      expect(await yieldModule.lastSuspensionAt(yieldToken)).to.be.gt(timerBefore);
     });
 
     it("Should NOT consume the rate-limit budget when the withdraw reverts", async function () {
@@ -2345,7 +2358,7 @@ describe("TangemBridgeProcessor", function () {
           .withArgs(yieldToken, exitAmount, owner);
 
         expect(await yieldModule.protocolBalance(yieldToken)).to.equal(initialOwnerBalance - exitAmount);
-        expect(await yieldModule.riskSuspended(yieldToken)).to.be.true;
+        expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
       });
 
       it("Should revert when amount is zero", async function () {
@@ -2391,20 +2404,74 @@ describe("TangemBridgeProcessor", function () {
           .withArgs(yieldToken, expectedFee, feeReceiver);
 
         expect(await yieldModule.protocolBalance(yieldToken)).to.equal(0);
-        expect(await yieldModule.riskSuspended(yieldToken)).to.be.true;
+        expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
       });
 
-      it("Should allow repeated partial softExit after the cooldown while still suspended", async function () {
+      it("Should allow chunked partial softExits without waiting for the cooldown", async function () {
         await (await processor["softExit(address,address,uint256)"](yieldModule, yieldToken, exitAmount)).wait();
-        expect(await yieldModule.riskSuspended(yieldToken)).to.be.true;
+        expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
 
-        await time.increase(RISK_COOLDOWN);
-
+        // a large position can be drained back-to-back; only the first chunk armed the cooldown
         await expect(processor["softExit(address,address,uint256)"](yieldModule, yieldToken, exitAmount))
           .to.emit(pool, "Withdraw")
           .withArgs(yieldToken, exitAmount, owner);
 
         expect(await yieldModule.protocolBalance(yieldToken)).to.equal(initialOwnerBalance - 2 * exitAmount);
+      });
+
+      it("Should emit RiskSuspensionSet only on the first chunk of an episode", async function () {
+        await (await processor["softExit(address,address,uint256)"](yieldModule, yieldToken, exitAmount)).wait();
+
+        const tx = await processor["softExit(address,address,uint256)"](yieldModule, yieldToken, exitAmount);
+
+        await expect(tx).to.emit(yieldModule, "SoftExitTriggered");
+        await expect(tx).to.not.emit(yieldModule, "RiskSuspensionSet");
+      });
+
+      it("Should NOT bump the cooldown timer on subsequent chunks", async function () {
+        await (await processor["softExit(address,address,uint256)"](yieldModule, yieldToken, exitAmount)).wait();
+        const episodeStartedAt = await yieldModule.lastSuspensionAt(yieldToken);
+
+        await time.increase(12 * 60 * 60);
+        await (await processor["softExit(address,address,uint256)"](yieldModule, yieldToken, exitAmount)).wait();
+
+        // the timer marks the episode start, so a later chunk must not extend it
+        expect(await yieldModule.lastSuspensionAt(yieldToken)).to.equal(episodeStartedAt);
+      });
+
+      it("Should charge the fee once across back-to-back chunks (no amplification)", async function () {
+        await (await pool.generateRevenue(yieldModule, accumulatedRevenue)).wait();
+
+        const feeRate = await processor.serviceFeeRate();
+        const expectedFee = (BigInt(accumulatedRevenue) * feeRate) / BigInt(PRECISION);
+        const feeReceiver = await processor.feeReceiver();
+
+        // the whole watermark delta is charged on the first chunk...
+        await expect(processor["softExit(address,address,uint256)"](yieldModule, yieldToken, exitAmount))
+          .to.emit(yieldModule, "FeePaymentProcessed")
+          .withArgs(yieldToken, expectedFee, feeReceiver);
+
+        // ...and the immediate next chunk charges nothing
+        await expect(processor["softExit(address,address,uint256)"](yieldModule, yieldToken, exitAmount))
+          .to.emit(yieldModule, "FeePaymentProcessed")
+          .withArgs(yieldToken, 0, feeReceiver);
+      });
+
+      it("Should allow a new episode 24h after the FIRST chunk even if later chunks happened", async function () {
+        await (await processor["softExit(address,address,uint256)"](yieldModule, yieldToken, exitAmount)).wait();
+        const episodeStartedAt = await yieldModule.lastSuspensionAt(yieldToken);
+
+        await time.increase(12 * 60 * 60);
+        await (await processor["softExit(address,address,uint256)"](yieldModule, yieldToken, exitAmount)).wait();
+        await (await processor.resumeAndEnterProtocol(yieldModule, yieldToken)).wait();
+
+        // still within the cooldown counted from the episode start
+        await expect(processor.suspendToken(yieldModule, yieldToken))
+          .to.be.revertedWithCustomError(yieldModule, "RiskActionRateLimited");
+
+        // ...but eligible exactly 24h after the FIRST chunk, ~12h after the last one
+        await time.increaseTo(episodeStartedAt + BigInt(24 * 60 * 60));
+        await expect(processor.suspendToken(yieldModule, yieldToken)).to.not.be.reverted;
       });
     });
   });
@@ -2427,11 +2494,11 @@ describe("TangemBridgeProcessor", function () {
       await (await processor.enterProtocol(yieldModule, yieldToken, 0)).wait();
     });
 
-    it("Should set riskSuspended without withdrawing", async function () {
+    it("Should set entrySuspended without withdrawing", async function () {
       await expect(processor.suspendToken(yieldModule, yieldToken))
         .to.not.emit(pool, "Withdraw");
 
-      expect(await yieldModule.riskSuspended(yieldToken)).to.be.true;
+      expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
     });
 
     it("Should emit RiskSuspensionSet(token, true)", async function () {
@@ -2459,19 +2526,64 @@ describe("TangemBridgeProcessor", function () {
     it("Should arm the rate-limit timer", async function () {
       await (await processor.suspendToken(yieldModule, yieldToken)).wait();
 
-      expect(await yieldModule.lastRiskActionAt(yieldToken)).to.be.gt(0);
+      expect(await yieldModule.lastSuspensionAt(yieldToken)).to.be.gt(0);
     });
 
-    it("Should enforce the 24h rate limit on repeated suspend", async function () {
+    it("Should revert with AlreadySuspended on a repeated suspend", async function () {
       await (await processor.suspendToken(yieldModule, yieldToken)).wait();
+
+      await expect(processor.suspendToken(yieldModule, yieldToken))
+        .to.be.revertedWithCustomError(yieldModule, "AlreadySuspended");
+
+      // the flag, not the timer, gates a repeated suspend
+      await time.increase(24 * 60 * 60);
+
+      await expect(processor.suspendToken(yieldModule, yieldToken))
+        .to.be.revertedWithCustomError(yieldModule, "AlreadySuspended");
+    });
+
+    it("Should enforce the 24h rate limit on a new suspend after resume", async function () {
+      await (await processor.suspendToken(yieldModule, yieldToken)).wait();
+      await (await processor.resumeAndEnterProtocol(yieldModule, yieldToken)).wait();
 
       await expect(processor.suspendToken(yieldModule, yieldToken))
         .to.be.revertedWithCustomError(yieldModule, "RiskActionRateLimited");
 
+      const timerBefore = await yieldModule.lastSuspensionAt(yieldToken);
       await time.increase(24 * 60 * 60);
 
-      await expect(processor.suspendToken(yieldModule, yieldToken)).to.not.be.reverted;
-      expect(await yieldModule.riskSuspended(yieldToken)).to.be.true;
+      // the new episode re-emits the suspension event and re-arms the timer
+      await expect(processor.suspendToken(yieldModule, yieldToken))
+        .to.emit(yieldModule, "RiskSuspensionSet")
+        .withArgs(yieldToken, true);
+      expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
+      expect(await yieldModule.lastSuspensionAt(yieldToken)).to.be.gt(timerBefore);
+    });
+
+    it("Should allow immediate softExit escalation after suspendToken", async function () {
+      await (await processor.suspendToken(yieldModule, yieldToken)).wait();
+
+      // escalation from suspend to exit must not wait out the cooldown
+      await expect(processor.softExit(yieldModule, yieldToken)).to.not.be.reverted;
+
+      expect(await yieldModule.protocolBalance(yieldToken)).to.equal(0);
+      expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
+    });
+
+    it("Should keep the suspension intact when an escalation softExit reverts", async function () {
+      await (await processor.suspendToken(yieldModule, yieldToken)).wait();
+      const episodeStartedAt = await yieldModule.lastSuspensionAt(yieldToken);
+
+      // simulate an illiquid pool during escalation
+      await (await pool.setFailWithdraw(true)).wait();
+      await expect(processor.softExit(yieldModule, yieldToken)).to.be.reverted;
+
+      expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
+      expect(await yieldModule.lastSuspensionAt(yieldToken)).to.equal(episodeStartedAt);
+
+      // retry succeeds as soon as the pool allows it, still without a cooldown
+      await (await pool.setFailWithdraw(false)).wait();
+      await expect(processor.softExit(yieldModule, yieldToken)).to.not.be.reverted;
     });
 
     it("Should NOT block owner withdraw while suspended (full balance in protocol)", async function () {
@@ -2523,7 +2635,7 @@ describe("TangemBridgeProcessor", function () {
       await (await processor.enterProtocol(yieldModule, yieldToken, 0)).wait();
     });
 
-    it("Should clear riskSuspended and re-enter owner funds after a softExit", async function () {
+    it("Should clear entrySuspended and re-enter owner funds after a softExit", async function () {
       await (await processor.softExit(yieldModule, yieldToken)).wait();
       await time.increase(RISK_COOLDOWN);
 
@@ -2533,7 +2645,7 @@ describe("TangemBridgeProcessor", function () {
         .and.to.emit(yieldModule, "RiskSuspensionSet")
         .withArgs(yieldToken, false);
 
-      expect(await yieldModule.riskSuspended(yieldToken)).to.be.false;
+      expect(await yieldModule.entrySuspended(yieldToken)).to.be.false;
     });
 
     it("Should charge the service fee on revenue accrued during suspension", async function () {
@@ -2574,12 +2686,12 @@ describe("TangemBridgeProcessor", function () {
 
       expect(await yieldModule.protocolBalance(yieldToken)).to.equal(BigInt(initialOwnerBalance) + revenue - expectedFee);
       expect(await yieldModule.calculateServiceFee(yieldToken)).to.equal(0);
-      expect(await yieldModule.riskSuspended(yieldToken)).to.be.false;
+      expect(await yieldModule.entrySuspended(yieldToken)).to.be.false;
     });
 
     it("Should stay suspended if the re-entry reverts", async function () {
       await (await processor.softExit(yieldModule, yieldToken)).wait();
-      const timerAfterSoftExit = await yieldModule.lastRiskActionAt(yieldToken);
+      const timerAfterSoftExit = await yieldModule.lastSuspensionAt(yieldToken);
       await time.increase(RISK_COOLDOWN);
 
       // force the re-entry (pool.supply) to revert
@@ -2588,8 +2700,8 @@ describe("TangemBridgeProcessor", function () {
       await expect(processor.resumeAndEnterProtocol(yieldModule, yieldToken)).to.be.reverted;
 
       // whole tx rolled back: token stays suspended and the cooldown timer is unchanged
-      expect(await yieldModule.riskSuspended(yieldToken)).to.be.true;
-      expect(await yieldModule.lastRiskActionAt(yieldToken)).to.equal(timerAfterSoftExit);
+      expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
+      expect(await yieldModule.lastSuspensionAt(yieldToken)).to.equal(timerAfterSoftExit);
     });
 
     it("Should re-enable normal processor enterProtocol after resume", async function () {
@@ -2643,14 +2755,14 @@ describe("TangemBridgeProcessor", function () {
       await expect(processor.resumeAndEnterProtocol(yieldModule, yieldToken))
         .to.not.be.reverted;
 
-      expect(await yieldModule.riskSuspended(yieldToken)).to.be.false;
+      expect(await yieldModule.entrySuspended(yieldToken)).to.be.false;
 
       await (await yieldToken.mint(owner, 1000)).wait();
       await expect(processor.enterProtocol(yieldModule, yieldToken, 0)).to.not.be.reverted;
     });
   });
 
-  describe("riskSuspended gating of swapAndReceive", function () {
+  describe("entrySuspended gating of swapAndReceive", function () {
     const maxNetworkFee = 12345;
     let yieldModule, yieldModuleAddress, swapProvider, swapProviderAddress;
     let tokenIn, ownerAddress, backendAddress, otherAddress;

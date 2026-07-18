@@ -59,10 +59,10 @@ abstract contract YieldModuleLiquidUpgradeable is
     mapping(address => uint) public feeDebts;
     mapping(address => bool) public isProtocolToken;
 
-    // yield token => deposits paused by the risk service
-    mapping(address => bool) public riskSuspended;
-    // yield token => timestamp of the last softExit / resumeAndEnterProtocol
-    mapping(address => uint) public lastRiskActionAt;
+    // yield token => entry into the protocol paused by the risk service
+    mapping(address => bool) public entrySuspended;
+    // yield token => timestamp of the start of the last suspension episode (softExit / suspendToken)
+    mapping(address => uint) public lastSuspensionAt;
 
     modifier onlyOwner {
         require(_msgSender() == owner, OnlyOwner());
@@ -141,10 +141,11 @@ abstract contract YieldModuleLiquidUpgradeable is
     // pause new deposits without withdrawing any funds
     function suspendToken(address yieldToken) external onlyProcessor {
         require(yieldTokensData[yieldToken].active, TokenNotActive());
+        require(!entrySuspended[yieldToken], AlreadySuspended());
 
-        _enforceRiskRateLimit(yieldToken);
+        _enforceSuspensionRateLimit(yieldToken);
 
-        riskSuspended[yieldToken] = true;
+        entrySuspended[yieldToken] = true;
 
         emit RiskSuspensionSet(yieldToken, true);
     }
@@ -153,10 +154,10 @@ abstract contract YieldModuleLiquidUpgradeable is
     // a revert during re-entry keeps the token suspended
     function resumeAndEnterProtocol(address yieldToken) external onlyProcessor {
         require(yieldTokensData[yieldToken].active, TokenNotActive());
-        require(riskSuspended[yieldToken], NotSuspended());
+        require(entrySuspended[yieldToken], NotSuspended());
 
         // clear before re-entering so the deposit check in _enterProtocol passes
-        riskSuspended[yieldToken] = false;
+        entrySuspended[yieldToken] = false;
 
         if (IERC20(yieldToken).balanceOf(owner) > 0) {
             _enterProtocol(yieldToken, type(uint).max, 0);
@@ -494,7 +495,7 @@ abstract contract YieldModuleLiquidUpgradeable is
     function _enterProtocol(address yieldToken, uint amount, uint networkFee) private {
         require(yieldTokensData[yieldToken].active, TokenNotActive());
         // deposits stay blocked while risk-suspended; resume clears the flag before entering
-        require(!riskSuspended[yieldToken], TokenRiskSuspended());
+        require(!entrySuspended[yieldToken], TokenRiskSuspended());
 
         IERC20 ierc20YieldToken = IERC20(yieldToken);
 
@@ -520,7 +521,14 @@ abstract contract YieldModuleLiquidUpgradeable is
     function _softExit(address yieldToken, uint amount) private {
         require(yieldTokensData[yieldToken].active, TokenNotActive());
 
-        _enforceRiskRateLimit(yieldToken);
+        // the cooldown only gates starting a new suspension episode; further softExits of an
+        // already-suspended token (escalation after suspend, chunked withdraw) are not limited.
+        // this is safe only while the service fee stays watermark-based on a non-decreasing
+        // protocol balance: then repeated exits never charge more than one full exit would
+        bool startingSuspension = !entrySuspended[yieldToken];
+        if (startingSuspension) {
+            _enforceSuspensionRateLimit(yieldToken);
+        }
 
         uint protocolBal = _protocolBalance(yieldToken);
         // calculate service fee before changing funds in a protocol
@@ -532,7 +540,9 @@ abstract contract YieldModuleLiquidUpgradeable is
             require(protocolBal >= amount + fee, InsufficientFunds());
         }
 
-        riskSuspended[yieldToken] = true;
+        if (startingSuspension) {
+            entrySuspended[yieldToken] = true;
+        }
 
         if (amount > 0) {
             // recipient is hardcoded to the owner
@@ -545,21 +555,23 @@ abstract contract YieldModuleLiquidUpgradeable is
         _tryProcessFee(yieldToken, fee, true);
 
         emit SoftExitTriggered(yieldToken, protocolBal, amount);
-        emit RiskSuspensionSet(yieldToken, true);
+        if (startingSuspension) {
+            emit RiskSuspensionSet(yieldToken, true);
+        }
     }
 
     // true when the token accepts new deposits (active and not risk-suspended)
     function _isDepositable(address yieldToken) private view returns (bool) {
-        return yieldTokensData[yieldToken].active && !riskSuspended[yieldToken];
+        return yieldTokensData[yieldToken].active && !entrySuspended[yieldToken];
     }
 
-    // at most one softExit or suspendToken per token per cooldown
-    function _enforceRiskRateLimit(address yieldToken) private {
+    // at most one new suspension episode (softExit or suspendToken) per token per cooldown
+    function _enforceSuspensionRateLimit(address yieldToken) private {
         require(
-            block.timestamp >= lastRiskActionAt[yieldToken] + RISK_ACTION_COOLDOWN,
+            block.timestamp >= lastSuspensionAt[yieldToken] + SUSPENSION_COOLDOWN,
             RiskActionRateLimited()
         );
-        lastRiskActionAt[yieldToken] = block.timestamp;
+        lastSuspensionAt[yieldToken] = block.timestamp;
     }
 
     function _processFeePaymentSuccess(address token, uint amount, address receiver) private {
