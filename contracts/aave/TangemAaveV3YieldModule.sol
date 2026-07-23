@@ -67,7 +67,10 @@ contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable, MerklIncentive
         override
         returns (address)
     {
-        return IAToken(protocolToken).UNDERLYING_ASSET_ADDRESS();
+        address underlying = IAToken(protocolToken).UNDERLYING_ASSET_ADDRESS();
+        address aToken = _getProtocolToken(underlying);
+
+        return protocolToken == aToken ? underlying : address(0);
     }
 
     function _getProtocolToken(address yieldToken)

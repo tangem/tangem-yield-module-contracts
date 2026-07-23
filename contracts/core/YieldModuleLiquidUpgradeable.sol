@@ -639,10 +639,10 @@ abstract contract YieldModuleLiquidUpgradeable is
     }
 
     function _updateYieldTokenByProtocolToken(address protocolToken) internal returns (address yieldToken) {
+        require(isProtocolToken[protocolToken], ProtocolTokenNotSet(protocolToken));
+
         yieldToken = _getYieldTokenByProtocolToken(protocolToken);
-    
         require(yieldTokensData[yieldToken].initialized, YieldTokenNotInitialized(yieldToken));
-        require(isProtocolToken[protocolToken] && _getProtocolToken(yieldToken) == protocolToken, ProtocolTokenNotSet(protocolToken));
 
         yieldTokenByProtocolToken[protocolToken] = yieldToken;
         emit YieldTokensByProtocolTokensSet(yieldToken);
