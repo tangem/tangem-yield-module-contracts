@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 import { ERC2771ContextUpgradeable } from "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import { ReentrancyGuardUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import { ReentrancyGuardTransientUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import { Requires } from "../common/Requires.sol";
@@ -19,7 +19,7 @@ abstract contract YieldModuleLiquidUpgradeable is
     ERC2771ContextUpgradeable,
     IYieldModule,
     UUPSUpgradeable,
-    ReentrancyGuardUpgradeable
+    ReentrancyGuardTransientUpgradeable
 {
     using SafeERC20 for IERC20;
     using Requires for uint;
@@ -94,7 +94,7 @@ abstract contract YieldModuleLiquidUpgradeable is
     receive() external payable { }
 
     function __YieldModule_init(address owner_) internal onlyInitializing {
-        __ReentrancyGuard_init();
+        __ReentrancyGuardTransient_init();
         __YieldModule_init_unchained(owner_);
     }
 
