@@ -125,14 +125,8 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         address finalRecipient = route.recipient;
 
         if (route.tokenAction == TokenAction.PUSH_TO_PROTOCOL) {
-            uint protocolBalanceBefore = _protocolBalance(rewardToken);
             _pushToProtocol(rewardToken, route.received);
-            uint protocolBalanceAfter = _protocolBalance(rewardToken);
-
-            require(protocolBalanceAfter > protocolBalanceBefore, ProtocolDepositFailed(rewardToken));
-
             finalToken = address(protocolTokens[rewardToken]);
-            finalAmount = protocolBalanceAfter - protocolBalanceBefore;
 
             _increaseProtocolBalanceWithoutFee(rewardToken, finalAmount);
         } else if (route.tokenAction == TokenAction.UNWRAP_TO_OWNER) {
