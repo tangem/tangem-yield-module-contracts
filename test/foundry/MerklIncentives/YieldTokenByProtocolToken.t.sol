@@ -8,7 +8,7 @@ import { MerklIncentivesBase } from "./MerklIncentivesBase.sol";
 import { IAToken } from "contracts/interfaces/IAToken.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
-/// Covers the lazy recovery of `yieldTokenByProtocolToken` (_updateYieldTokenByProtocolToken)
+/// Covers the lazy recovery of `yieldTokenByProtocolToken` (_resolveAndSetYieldTokenByProtocolToken)
 contract YieldTokenByProtocolTokenTest is MerklIncentivesBase {
     function setUp() public override {
         super.setUp();
@@ -68,7 +68,7 @@ contract YieldTokenByProtocolTokenTest is MerklIncentivesBase {
         _claimSingleAsOwner(address(protocolToken), YIELD_AMOUNT);
     }
 
-    function test_getYieldToken_Reverts_WhenTokenIsNotProtocolToken() public {
+    function test_resolveYieldToken_Reverts_WhenTokenIsNotProtocolToken() public {
         address fakeAToken = makeAddr("fakeAToken");
 
         // underlying resolves to an initialized yield token, but the module never
@@ -83,7 +83,7 @@ contract YieldTokenByProtocolTokenTest is MerklIncentivesBase {
             abi.encodeWithSelector(IYieldModule.ProtocolTokenNotSet.selector, fakeAToken)
         );
 
-        ym.exposed_getYieldToken(fakeAToken);
+        ym.exposed_resolveYieldToken(fakeAToken);
     }
 
     function _mockUnderlyingAsset(address underlying) internal {

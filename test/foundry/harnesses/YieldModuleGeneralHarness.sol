@@ -44,7 +44,7 @@ contract YieldModuleGeneralHarness is YieldModuleHarness {
         return address(pool.protocolTokens(yieldToken));
     }
 
-    function _getYieldTokenByProtocolToken(address protocolToken)
+    function _tryResolveYieldToken(address protocolToken)
         internal
         view
         override

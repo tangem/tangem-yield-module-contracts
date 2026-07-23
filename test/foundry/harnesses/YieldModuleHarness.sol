@@ -24,7 +24,7 @@ abstract contract YieldModuleHarness is MerklIncentives {
         yieldTokenByProtocolToken[protocolToken] = yieldToken;
     }
 
-    function exposed_getYieldToken(address protocolToken) public returns (address) {
-        return _getYieldToken(protocolToken);
+    function exposed_resolveYieldToken(address protocolToken) public returns (address) {
+        return _resolveYieldToken(protocolToken);
     }
 }
