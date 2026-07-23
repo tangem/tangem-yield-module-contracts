@@ -53,14 +53,7 @@ contract TestERC20 is ERC20 {
         address from,
         address to,
         uint value
-    )
-        public
-        override
-        notBlacklisted(msg.sender)
-        notBlacklisted(from)
-        notBlacklisted(to)
-        returns (bool)
-    {
+    ) public override notBlacklisted(msg.sender) notBlacklisted(from) notBlacklisted(to) returns (bool) {
         return super.transferFrom(from, to, value);
     }
 

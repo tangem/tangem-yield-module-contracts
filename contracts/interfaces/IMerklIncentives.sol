@@ -11,22 +11,22 @@ interface IMerklIncentives {
     event MerklClaimed(
         address indexed distributor,
         address indexed rewardToken,
-        uint256 received,
+        uint received,
         address finalRecipient,
         address finalToken,
-        uint256 finalAmount,
+        uint finalAmount,
         address indexed caller
     );
 
     function claimMerklRewardsOwner(
         address[] calldata rewardTokens,
-        uint256[] calldata cumulativeAmounts,
+        uint[] calldata cumulativeAmounts,
         bytes32[][] calldata proofs
     ) external;
 
     function claimMerklRewardsBE(
         address[] calldata rewardTokens,
-        uint256[] calldata cumulativeAmounts,
+        uint[] calldata cumulativeAmounts,
         bytes32[][] calldata proofs
     ) external;
 }

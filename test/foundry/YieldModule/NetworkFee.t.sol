@@ -70,17 +70,11 @@ contract NetworkFeeTest is YieldModuleBase {
     function test_calculateFee_ReturnsServiceFeePlusNetworkFee() public {
         YieldModuleHarness revenueModule = _deployEnteredRevenueModule(otherAccount);
 
-        assertEq(
-            revenueModule.calculateFee(address(yieldToken), NETWORK_FEE),
-            ACCUMULATED_SERVICE_FEE + NETWORK_FEE
-        );
+        assertEq(revenueModule.calculateFee(address(yieldToken), NETWORK_FEE), ACCUMULATED_SERVICE_FEE + NETWORK_FEE);
     }
 
     function test_calculateFee_AllowsNetworkFeeEqualToMax() public view {
-        assertEq(
-            yieldModule.calculateFee(address(yieldToken), DEFAULT_MAX_NETWORK_FEE),
-            DEFAULT_MAX_NETWORK_FEE
-        );
+        assertEq(yieldModule.calculateFee(address(yieldToken), DEFAULT_MAX_NETWORK_FEE), DEFAULT_MAX_NETWORK_FEE);
     }
 
     function test_calculateFee_Reverts_WhenNetworkFeeExceedsMax() public {

@@ -38,11 +38,7 @@ contract SendTest is AaveV3YieldModuleBase {
 
     function test_send_WithdrawsMissingAmountFromPoolToOwner() public {
         vm.expectEmit(address(pool));
-        emit AaveV3PoolMock.Withdraw(
-            address(yieldToken),
-            SEND_AMOUNT - SEND_FRESH_OWNER_BALANCE,
-            owner
-        );
+        emit AaveV3PoolMock.Withdraw(address(yieldToken), SEND_AMOUNT - SEND_FRESH_OWNER_BALANCE, owner);
 
         _send(SEND_AMOUNT);
     }
@@ -125,19 +121,14 @@ contract SendTest is AaveV3YieldModuleBase {
 
     function test_send_EmitsFeePaymentProcessed() public {
         vm.expectEmit(address(yieldModule));
-        emit IYieldModule.FeePaymentProcessed(
-            address(yieldToken),
-            ACCUMULATED_SERVICE_FEE,
-            feeReceiver
-        );
+        emit IYieldModule.FeePaymentProcessed(address(yieldToken), ACCUMULATED_SERVICE_FEE, feeReceiver);
 
         _send(SEND_AMOUNT);
     }
 
     // owner balance covers the amount first; only the missing part is pulled (with fee reserved)
     function testFuzz_send(uint amount) public {
-        amount =
-            bound(amount, 1, SEND_FRESH_OWNER_BALANCE + PROTOCOL_BALANCE - ACCUMULATED_SERVICE_FEE);
+        amount = bound(amount, 1, SEND_FRESH_OWNER_BALANCE + PROTOCOL_BALANCE - ACCUMULATED_SERVICE_FEE);
         uint pullAmount = amount > SEND_FRESH_OWNER_BALANCE ? amount - SEND_FRESH_OWNER_BALANCE : 0;
 
         vm.prank(owner);
@@ -159,9 +150,7 @@ contract SendTest is AaveV3YieldModuleBase {
         }
     }
 
-    function testFuzz_send_Reverts_WhenPullAmountExceedsProtocolBalanceMinusFee(uint amount)
-        public
-    {
+    function testFuzz_send_Reverts_WhenPullAmountExceedsProtocolBalanceMinusFee(uint amount) public {
         uint maxAmount = SEND_FRESH_OWNER_BALANCE + PROTOCOL_BALANCE - ACCUMULATED_SERVICE_FEE;
         amount = bound(amount, maxAmount + 1, type(uint128).max);
 

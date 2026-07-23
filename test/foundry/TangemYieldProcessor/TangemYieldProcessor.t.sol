@@ -36,9 +36,7 @@ contract TangemYieldProcessorTest is YieldModuleBase {
     function test_setFeeReceiver_Reverts_WhenNotPropertySetter() public {
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                otherAccount,
-                processor.PROPERTY_SETTER_ROLE()
+                IAccessControl.AccessControlUnauthorizedAccount.selector, otherAccount, processor.PROPERTY_SETTER_ROLE()
             )
         );
         vm.prank(otherAccount);
@@ -87,9 +85,7 @@ contract TangemYieldProcessorTest is YieldModuleBase {
     function test_pause_Reverts_WhenNotPauser() public {
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                otherAccount,
-                processor.PAUSER_ROLE()
+                IAccessControl.AccessControlUnauthorizedAccount.selector, otherAccount, processor.PAUSER_ROLE()
             )
         );
         vm.prank(otherAccount);
@@ -158,9 +154,7 @@ contract TangemYieldProcessorTest is YieldModuleBase {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                otherAccount,
-                processor.PAUSER_ROLE()
+                IAccessControl.AccessControlUnauthorizedAccount.selector, otherAccount, processor.PAUSER_ROLE()
             )
         );
         vm.prank(otherAccount);

@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol"; 
-import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "../interfaces/IYieldModule.sol";
-import "../interfaces/IYieldFactory.sol";
-import "../interfaces/IYieldProcessor.sol";
-import "../interfaces/ISwapExecutionRegistry.sol";
-import "../resources/Constants.sol";
-import "../common/Requires.sol";
+import { ERC2771ContextUpgradeable } from "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
+import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { ReentrancyGuardUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+import { Requires } from "../common/Requires.sol";
+import { ISwapExecutionRegistry } from "../interfaces/ISwapExecutionRegistry.sol";
+import { IYieldFactory } from "../interfaces/IYieldFactory.sol";
+import { IYieldModule } from "../interfaces/IYieldModule.sol";
+import { IYieldProcessor } from "../interfaces/IYieldProcessor.sol";
+import { PRECISION } from "../resources/Constants.sol";
 
 abstract contract YieldModuleLiquidUpgradeable is
     Initializable,
@@ -62,32 +63,35 @@ abstract contract YieldModuleLiquidUpgradeable is
     // protocol token => yield token
     mapping(address => address) public yieldTokenByProtocolToken;
 
-    modifier onlyOwner {
+    modifier onlyOwner() {
         require(_msgSender() == owner, OnlyOwner());
         _;
     }
 
-    modifier onlyOwnerOrFactory {
+    modifier onlyOwnerOrFactory() {
         address msgSender = _msgSender();
         require(msgSender == owner || msgSender == address(factory), OnlyOwnerOrFactory());
         _;
     }
 
-    modifier onlyProcessor {
+    modifier onlyProcessor() {
         require(_msgSender() == address(processor), OnlyProcessor());
         _;
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor(address processor_, address factory_, address trustedForwarder_, address swapExecutionRegistry_)
-        ERC2771ContextUpgradeable(trustedForwarder_)
-    {
+    constructor(
+        address processor_,
+        address factory_,
+        address trustedForwarder_,
+        address swapExecutionRegistry_
+    ) ERC2771ContextUpgradeable(trustedForwarder_) {
         processor = IYieldProcessor(processor_);
         factory = IYieldFactory(factory_);
         swapExecutionRegistry = ISwapExecutionRegistry(swapExecutionRegistry_);
     }
 
-    receive() external payable {}
+    receive() external payable { }
 
     function __YieldModule_init(address owner_) internal onlyInitializing {
         __ReentrancyGuard_init();
@@ -111,7 +115,7 @@ abstract contract YieldModuleLiquidUpgradeable is
 
         uint fee = calculateFee(yieldToken, networkFee); // calculate service fee before changing funds in a protocol
         uint amountToExit = type(uint).max; // withdraw all
-        
+
         uint exitAmount = _pullFromProtocolToOwner(yieldToken, amountToExit);
         _tryProcessFee(yieldToken, fee, false);
 
@@ -146,7 +150,7 @@ abstract contract YieldModuleLiquidUpgradeable is
 
         emit YieldTokenInitialized(yieldToken, protocolToken, maxNetworkFee);
     }
-    
+
     function send(address yieldToken, address to, uint amount) external onlyOwner {
         // use withdraw/withdrawAndDeactivate to send to owner to avoid funds being pushed back to protocol
         require(to != owner, SendingToOwner());
@@ -157,7 +161,7 @@ abstract contract YieldModuleLiquidUpgradeable is
 
         uint fee = calculateServiceFee(yieldToken); // calculate service fee before changing funds in a protocol
         uint ownerBalance = ierc20Token.balanceOf(owner);
-        
+
         uint protocolBal;
         uint pullAmount;
         if (ownerBalance < amount) {
@@ -171,10 +175,12 @@ abstract contract YieldModuleLiquidUpgradeable is
 
         ierc20Token.safeTransferFrom(owner, to, amount);
 
-        if (ownerBalance < amount) { // no need to process fee if the protocol balance hasn't changed
-            if (protocolBal == pullAmount + fee) { // avoid protocol rounding errors on sending all available funds
+        if (ownerBalance < amount) {
+            // no need to process fee if the protocol balance hasn't changed
+            if (protocolBal == pullAmount + fee) {
+                // avoid protocol rounding errors on sending all available funds
                 fee = _protocolBalance(yieldToken);
-            } 
+            }
             _tryProcessFee(yieldToken, fee, true);
         }
 
@@ -192,9 +198,10 @@ abstract contract YieldModuleLiquidUpgradeable is
 
         _pullFromProtocolToOwner(yieldToken, amount);
 
-        if (protocolBal == amount + fee) { // avoid protocol rounding errors on withdrawing all available funds
+        if (protocolBal == amount + fee) {
+            // avoid protocol rounding errors on withdrawing all available funds
             fee = _protocolBalance(yieldToken);
-        } 
+        }
         _tryProcessFee(yieldToken, fee, true);
 
         emit WithdrawProcessed(yieldToken, amount);
@@ -209,7 +216,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         uint fee = _calculateServiceFee(yieldToken, protocolBal);
 
         uint amountToExit = protocolBal >= fee ? protocolBal - fee : 0; // we should still allow to deactivate token even if there is some error
-        
+
         if (amountToExit > 0) {
             _pullFromProtocolToOwner(yieldToken, amountToExit);
         }
@@ -217,7 +224,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         // get protocol balance again to avoid protocol rounding errors
         // we can lose debt if the balance were less than the debt due to some error, but we have no means to get it anyway,
         // since not enough funds left, but we'll catch this behaviour with data collection
-        _tryProcessFee(yieldToken, _protocolBalance(yieldToken), true); 
+        _tryProcessFee(yieldToken, _protocolBalance(yieldToken), true);
 
         // disable token to avoid abuse by processor
         yieldTokenData.active = false;
@@ -246,7 +253,7 @@ abstract contract YieldModuleLiquidUpgradeable is
             return;
         }
 
-        (bool success, ) = to.call{value: amount}("");
+        (bool success,) = to.call{ value: amount }("");
         require(success, NativeTransferFailed());
 
         emit WithdrawNativeProcessed(to, amount);
@@ -288,26 +295,14 @@ abstract contract YieldModuleLiquidUpgradeable is
         address target,
         address spender,
         bytes calldata data
-    )
-        external
-        payable
-        onlyOwner
-        nonReentrant
-    {
+    ) external payable onlyOwner nonReentrant {
         SwapContext memory context = _prepareSwap(tokenIn, amountIn, target, spender, data);
 
         _callProvider(target, data);
 
         _finalizeSwap(context);
 
-        emit SwapInitiated(
-            tokenIn,
-            amountIn,
-            target,
-            context.spenderEffective,
-            msg.value,
-            keccak256(data)
-        );
+        emit SwapInitiated(tokenIn, amountIn, target, context.spenderEffective, msg.value, keccak256(data));
     }
 
     function swapAndReceive(
@@ -318,12 +313,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         address target,
         address spender,
         bytes calldata data
-    )
-        external
-        payable
-        onlyOwner
-        nonReentrant
-    {
+    ) external payable onlyOwner nonReentrant {
         tokenOut.requireNotZero();
         require(tokenOut != tokenIn, TokenInEqualsTokenOut());
         require(!isProtocolToken[tokenOut], WithdrawingProtocolToken());
@@ -440,7 +430,8 @@ abstract contract YieldModuleLiquidUpgradeable is
             } else {
                 _processFeePaymentSuccess(yieldToken, transferAmount, feeReceiver);
             }
-        } else { // shouldn't happen with proper fee receiver
+        } else {
+            // shouldn't happen with proper fee receiver
             _processFeePaymentFailure(yieldToken, amount);
         }
 
@@ -533,9 +524,9 @@ abstract contract YieldModuleLiquidUpgradeable is
 
     function _pullFromProtocolToModule(address yieldToken, uint amount) internal virtual returns (uint);
 
-    function _tryResolveYieldToken(address protocolToken) internal virtual view returns (address);
+    function _tryResolveYieldToken(address protocolToken) internal view virtual returns (address);
 
-    function _getProtocolToken(address yieldToken) internal virtual view returns (address);
+    function _getProtocolToken(address yieldToken) internal view virtual returns (address);
 
     function _prepareSwap(
         address tokenIn,
@@ -543,10 +534,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         address target,
         address spender,
         bytes calldata data
-    )
-        internal
-        returns (SwapContext memory context)
-    {
+    ) internal returns (SwapContext memory context) {
         require(yieldTokensData[tokenIn].active, TokenNotActive());
 
         amountIn.requireNotZero();
@@ -584,7 +572,8 @@ abstract contract YieldModuleLiquidUpgradeable is
             uint protocolBal = _protocolBalance(tokenIn);
 
             require(protocolBal >= needed + feeIn, InsufficientFunds());
-            if (protocolBal == needed + feeIn) { // avoid protocol rounding errors on withdrawing all available funds
+            if (protocolBal == needed + feeIn) {
+                // avoid protocol rounding errors on withdrawing all available funds
                 feeIn = type(uint).max; // use whole balance left as fee
             }
 
@@ -605,7 +594,7 @@ abstract contract YieldModuleLiquidUpgradeable is
     }
 
     function _callProvider(address target, bytes calldata data) internal {
-        (bool success, bytes memory ret) = target.call{value: msg.value}(data);
+        (bool success, bytes memory ret) = target.call{ value: msg.value }(data);
         if (!success) {
             if (ret.length > 0) {
                 assembly {
@@ -634,7 +623,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         if (yieldToken != address(0)) {
             return yieldToken;
         }
-        
+
         return _resolveAndSetYieldTokenByProtocolToken(protocolToken);
     }
 
@@ -648,12 +637,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         emit YieldTokensByProtocolTokensSet(yieldToken);
     }
 
-    function _authorizeUpgrade(address newImplementation)
-        internal
-        onlyOwner
-        override
-        view
-    {
+    function _authorizeUpgrade(address newImplementation) internal view override onlyOwner {
         require(factory.isValidImplementation(newImplementation), UnauthorizedImplementation());
     }
 }

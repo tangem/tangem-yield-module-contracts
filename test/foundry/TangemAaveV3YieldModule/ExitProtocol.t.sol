@@ -40,9 +40,7 @@ contract ExitProtocolTest is AaveV3YieldModuleBase {
     function test_exitProtocol_Reverts_WhenNetworkFeeExceedsMax() public {
         vm.expectRevert(IYieldModule.NetworkFeeExceedsMax.selector);
         vm.prank(backend);
-        processor.exitProtocol(
-            address(yieldModule), address(yieldToken), uint(DEFAULT_MAX_NETWORK_FEE) + 1
-        );
+        processor.exitProtocol(address(yieldModule), address(yieldToken), uint(DEFAULT_MAX_NETWORK_FEE) + 1);
     }
 
     function test_exitProtocol_Reverts_WhenNotProcessor() public {
@@ -89,11 +87,7 @@ contract ExitProtocolTest is AaveV3YieldModuleBase {
 
     function test_exitProtocol_EmitsFeePaymentProcessed() public {
         vm.expectEmit(address(yieldModule));
-        emit IYieldModule.FeePaymentProcessed(
-            address(yieldToken),
-            NETWORK_FEE + ACCUMULATED_SERVICE_FEE,
-            feeReceiver
-        );
+        emit IYieldModule.FeePaymentProcessed(address(yieldToken), NETWORK_FEE + ACCUMULATED_SERVICE_FEE, feeReceiver);
 
         _exitViaProcessor(yieldModule, NETWORK_FEE);
     }

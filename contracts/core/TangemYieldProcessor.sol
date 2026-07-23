@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
-import "@openzeppelin/contracts/utils/Arrays.sol";
-import "../interfaces/IYieldProcessor.sol";
-import "../interfaces/IYieldModule.sol";
-import "../resources/Constants.sol";
+import { AccessControlEnumerable } from "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
+import { Arrays } from "@openzeppelin/contracts/utils/Arrays.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
+
+import { IYieldModule } from "../interfaces/IYieldModule.sol";
+import { IYieldProcessor } from "../interfaces/IYieldProcessor.sol";
+import { PRECISION } from "../resources/Constants.sol";
 
 contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausable {
     using Arrays for uint[];
@@ -28,10 +29,7 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
 
     error InvalidFeeRate();
 
-    constructor(
-        address feeReceiver_,
-        uint serviceFeeRate_
-    ) {
+    constructor(address feeReceiver_, uint serviceFeeRate_) {
         feeReceiver = feeReceiver_;
         _setServiceFeeRate(serviceFeeRate_);
 
@@ -58,11 +56,10 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
         emit ProtocolExited(yieldModule);
     }
 
-    function collectServiceFee(address yieldModule, address yieldToken)
-        external
-        whenNotPaused
-        onlyRole(SERVICE_FEE_COLLECTOR_ROLE)
-    {
+    function collectServiceFee(
+        address yieldModule,
+        address yieldToken
+    ) external whenNotPaused onlyRole(SERVICE_FEE_COLLECTOR_ROLE) {
         IYieldModule(yieldModule).collectServiceFee(yieldToken);
 
         emit ServiceFeeCollected(yieldModule);

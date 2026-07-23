@@ -38,11 +38,7 @@ contract YieldTokenByProtocolTokenTest is MerklIncentivesBase {
         _mockUnderlyingAsset(unknownUnderlying);
         _fundMerklDistributor(address(protocolToken), YIELD_AMOUNT);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IYieldModule.YieldTokenNotInitialized.selector, unknownUnderlying
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IYieldModule.YieldTokenNotInitialized.selector, unknownUnderlying));
 
         _claimSingleAsOwner(address(protocolToken), YIELD_AMOUNT);
     }
@@ -59,11 +55,7 @@ contract YieldTokenByProtocolTokenTest is MerklIncentivesBase {
             abi.encode(reserveData)
         );
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IYieldModule.YieldTokenNotInitialized.selector, address(0)
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IYieldModule.YieldTokenNotInitialized.selector, address(0)));
 
         _claimSingleAsOwner(address(protocolToken), YIELD_AMOUNT);
     }
@@ -79,9 +71,7 @@ contract YieldTokenByProtocolTokenTest is MerklIncentivesBase {
             abi.encode(address(yieldToken))
         );
 
-        vm.expectRevert(
-            abi.encodeWithSelector(IYieldModule.ProtocolTokenNotSet.selector, fakeAToken)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IYieldModule.ProtocolTokenNotSet.selector, fakeAToken));
 
         ym.exposed_resolveYieldToken(fakeAToken);
     }

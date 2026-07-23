@@ -8,19 +8,11 @@ abstract contract YieldModuleHarness is MerklIncentives {
         feeDebts[yieldToken] = amount;
     }
 
-    function exposed_setLatestFeePaymentState(
-        address yieldToken,
-        uint protocolBalance_,
-        uint serviceFeeRate_
-    ) public {
-        latestFeePaymentStates[yieldToken] =
-            LatestFeePaymentState(protocolBalance_, serviceFeeRate_);
+    function exposed_setLatestFeePaymentState(address yieldToken, uint protocolBalance_, uint serviceFeeRate_) public {
+        latestFeePaymentStates[yieldToken] = LatestFeePaymentState(protocolBalance_, serviceFeeRate_);
     }
 
-    function exposed_setYieldTokenByProtocolToken(
-        address protocolToken,
-        address yieldToken
-    ) public {
+    function exposed_setYieldTokenByProtocolToken(address protocolToken, address yieldToken) public {
         yieldTokenByProtocolToken[protocolToken] = yieldToken;
     }
 

@@ -47,11 +47,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         vm.expectEmit(address(protocolToken));
         emit IERC20.Transfer(address(yieldModule), feeReceiver, ACCUMULATED_SERVICE_FEE);
         vm.expectEmit(address(yieldModule));
-        emit IYieldModule.FeePaymentProcessed(
-            address(yieldToken),
-            ACCUMULATED_SERVICE_FEE,
-            feeReceiver
-        );
+        emit IYieldModule.FeePaymentProcessed(address(yieldToken), ACCUMULATED_SERVICE_FEE, feeReceiver);
         vm.expectEmit(address(yieldModule));
         emit IYieldModule.WithdrawProcessed(address(yieldToken), WITHDRAW_AMOUNT);
 
@@ -79,10 +75,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
 
         assertEq(yieldToken.balanceOf(owner), amount);
         assertEq(protocolToken.balanceOf(feeReceiver), ACCUMULATED_SERVICE_FEE);
-        assertEq(
-            yieldModule.protocolBalance(address(yieldToken)),
-            PROTOCOL_BALANCE - amount - ACCUMULATED_SERVICE_FEE
-        );
+        assertEq(yieldModule.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE - amount - ACCUMULATED_SERVICE_FEE);
     }
 
     function testFuzz_withdraw_Reverts_WhenAmountPlusFeeExceedsProtocolBalance(uint amount) public {
@@ -119,11 +112,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         _enterViaProcessor(yieldModule2, 0);
 
         vm.expectEmit(address(yieldModule2));
-        emit IYieldModule.LatestFeePaymentStateUpdated(
-            address(yieldToken),
-            deposit - amount,
-            SERVICE_FEE_RATE
-        );
+        emit IYieldModule.LatestFeePaymentStateUpdated(address(yieldToken), deposit - amount, SERVICE_FEE_RATE);
         vm.expectEmit(address(yieldModule2));
         emit IYieldModule.FeePaymentProcessed(address(yieldToken), 0, feeReceiver);
 
@@ -138,11 +127,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
 
     function test_withdrawAndDeactivate_WithdrawsProtocolBalanceMinusFeeToOwner() public {
         vm.expectEmit(address(pool));
-        emit AaveV3PoolMock.Withdraw(
-            address(yieldToken),
-            PROTOCOL_BALANCE - ACCUMULATED_SERVICE_FEE,
-            owner
-        );
+        emit AaveV3PoolMock.Withdraw(address(yieldToken), PROTOCOL_BALANCE - ACCUMULATED_SERVICE_FEE, owner);
 
         _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
     }
@@ -200,11 +185,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
 
     function test_withdrawAndDeactivate_EmitsFeePaymentProcessed() public {
         vm.expectEmit(address(yieldModule));
-        emit IYieldModule.FeePaymentProcessed(
-            address(yieldToken),
-            ACCUMULATED_SERVICE_FEE,
-            feeReceiver
-        );
+        emit IYieldModule.FeePaymentProcessed(address(yieldToken), ACCUMULATED_SERVICE_FEE, feeReceiver);
 
         _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
     }
@@ -228,9 +209,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
         _assertEventNotEmitted(vm.getRecordedLogs(), FEE_PAYMENT_FAILED_EVENT_SIG);
     }
 
-    function test_withdrawAndDeactivate_SucceedsWhenPersistedFeeDebtExceedsProtocolBalance()
-        public
-    {
+    function test_withdrawAndDeactivate_SucceedsWhenPersistedFeeDebtExceedsProtocolBalance() public {
         (YieldModuleHarness yieldModule2, uint remainingFeeDebt) = _createFeeDebtState(otherAccount);
 
         // partial fee payment during re-enter reduced the debt by the small deposit
@@ -287,9 +266,7 @@ contract WithdrawTest is AaveV3YieldModuleBase {
 
     /*  withdrawNativeAll  */
 
-    function test_withdrawNativeAll_EmitsWithdrawNativeProcessedWithZeroAmountWhenBalanceIsZero()
-        public
-    {
+    function test_withdrawNativeAll_EmitsWithdrawNativeProcessedWithZeroAmountWhenBalanceIsZero() public {
         vm.expectEmit(address(yieldModule));
         emit IYieldModule.WithdrawNativeProcessed(backend, 0);
 

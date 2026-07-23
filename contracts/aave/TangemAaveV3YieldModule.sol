@@ -24,9 +24,7 @@ contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable, MerklIncentive
         address swapExecutionRegistry_
     )
         MerklIncentives(distributor_)
-        YieldModuleLiquidUpgradeable(
-            yieldProcessor_, factory_, trustedForwarder_, swapExecutionRegistry_
-        )
+        YieldModuleLiquidUpgradeable(yieldProcessor_, factory_, trustedForwarder_, swapExecutionRegistry_)
     {
         pool = IPool(pool_);
 
@@ -42,17 +40,11 @@ contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable, MerklIncentive
         pool.supply(yieldToken, amount, address(this), 0);
     }
 
-    function _pullFromProtocolToOwner(
-        address yieldToken,
-        uint amount
-    ) internal override returns (uint) {
+    function _pullFromProtocolToOwner(address yieldToken, uint amount) internal override returns (uint) {
         return pool.withdraw(yieldToken, amount, owner);
     }
 
-    function _pullFromProtocolToModule(
-        address yieldToken,
-        uint amount
-    ) internal override returns (uint) {
+    function _pullFromProtocolToModule(address yieldToken, uint amount) internal override returns (uint) {
         return pool.withdraw(yieldToken, amount, address(this));
     }
 
@@ -60,26 +52,14 @@ contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable, MerklIncentive
         return _getProtocolToken(yieldToken);
     }
 
-    function _tryResolveYieldToken(address protocolToken)
-        internal
-        view
-        virtual
-        override
-        returns (address)
-    {
+    function _tryResolveYieldToken(address protocolToken) internal view virtual override returns (address) {
         address underlying = IAToken(protocolToken).UNDERLYING_ASSET_ADDRESS();
         address aToken = _getProtocolToken(underlying);
 
         return protocolToken == aToken ? underlying : address(0);
     }
 
-    function _getProtocolToken(address yieldToken)
-        internal
-        view
-        virtual
-        override
-        returns (address)
-    {
+    function _getProtocolToken(address yieldToken) internal view virtual override returns (address) {
         return IPool(pool).getReserveData(yieldToken).aTokenAddress;
     }
 }

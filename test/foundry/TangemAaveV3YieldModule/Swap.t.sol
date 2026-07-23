@@ -34,11 +34,7 @@ contract SwapTest is AaveV3YieldModuleBase {
         return abi.encodeWithSelector(SwapProviderMock.revertEmpty.selector);
     }
 
-    function _swapExactInData(
-        address tokenOut,
-        uint amountIn,
-        uint amountOut
-    ) internal view returns (bytes memory) {
+    function _swapExactInData(address tokenOut, uint amountIn, uint amountOut) internal view returns (bytes memory) {
         return abi.encodeWithSelector(
             SwapProviderMock.swapExactIn.selector, tokenIn, tokenOut, amountIn, amountOut, backend
         );
@@ -49,16 +45,9 @@ contract SwapTest is AaveV3YieldModuleBase {
         yieldModule.swap(tokenIn, amountIn, address(swapProvider), address(0), data);
     }
 
-    function _swapAndReceive(
-        address tokenOut,
-        address to,
-        uint amountIn,
-        bytes memory data
-    ) internal {
+    function _swapAndReceive(address tokenOut, address to, uint amountIn, bytes memory data) internal {
         vm.prank(owner);
-        yieldModule.swapAndReceive(
-            tokenIn, tokenOut, to, amountIn, address(swapProvider), address(0), data
-        );
+        yieldModule.swapAndReceive(tokenIn, tokenOut, to, amountIn, address(swapProvider), address(0), data);
     }
 
     /*  swap  */
@@ -121,9 +110,7 @@ contract SwapTest is AaveV3YieldModuleBase {
         _mintYieldToken(owner, amountIn);
 
         // spendPartial spends amountIn - 1, leaving 1 wei residue on the module
-        bytes memory data = abi.encodeWithSelector(
-            SwapProviderMock.spendPartial.selector, tokenIn, amountIn, backend
-        );
+        bytes memory data = abi.encodeWithSelector(SwapProviderMock.spendPartial.selector, tokenIn, amountIn, backend);
 
         _swap(amountIn, data);
 
@@ -155,9 +142,7 @@ contract SwapTest is AaveV3YieldModuleBase {
         assertEq(yieldToken.balanceOf(backend) - sinkBalanceBefore, amountIn);
     }
 
-    function test_swap_PullsFromProtocolWhenOwnerBalanceInsufficientAndProcessesServiceFee()
-        public
-    {
+    function test_swap_PullsFromProtocolWhenOwnerBalanceInsufficientAndProcessesServiceFee() public {
         uint depositAmount = 100_000e6;
         uint accumulatedRevenue = 10_000e6;
         uint ownerTopup = 500e6;
@@ -200,11 +185,7 @@ contract SwapTest is AaveV3YieldModuleBase {
         _swap(amountIn, _revertEmptyData());
     }
 
-    function _seedFundingSources(
-        uint moduleBalance,
-        uint ownerBalance,
-        uint protocolBalance
-    ) internal {
+    function _seedFundingSources(uint moduleBalance, uint ownerBalance, uint protocolBalance) internal {
         _mintYieldToken(owner, protocolBalance);
         vm.prank(owner);
         yieldModule.enterProtocolByOwner(tokenIn);
@@ -290,12 +271,7 @@ contract SwapTest is AaveV3YieldModuleBase {
 
     function test_swapAndReceive_Reverts_WhenTokenOutIsProtocolToken() public {
         vm.expectRevert(IYieldModule.WithdrawingProtocolToken.selector);
-        _swapAndReceive(
-            address(protocolToken),
-            otherAccount,
-            1e6,
-            _swapExactInData(address(protocolToken), 1e6, 0)
-        );
+        _swapAndReceive(address(protocolToken), otherAccount, 1e6, _swapExactInData(address(protocolToken), 1e6, 0));
     }
 
     function test_swapAndReceive_Reverts_WhenSwapPayoutNotReceived() public {
@@ -305,12 +281,7 @@ contract SwapTest is AaveV3YieldModuleBase {
         _mintYieldToken(owner, amountIn);
 
         vm.expectRevert(IYieldModule.SwapPayoutNotReceived.selector);
-        _swapAndReceive(
-            address(outToken),
-            otherAccount,
-            amountIn,
-            _swapExactInData(address(outToken), amountIn, 0)
-        );
+        _swapAndReceive(address(outToken), otherAccount, amountIn, _swapExactInData(address(outToken), amountIn, 0));
     }
 
     function test_swapAndReceive_Reverts_WhenTokenOutNotActiveAndReceiverIsZero() public {
@@ -323,10 +294,7 @@ contract SwapTest is AaveV3YieldModuleBase {
 
         vm.expectRevert(Requires.ZeroAddress.selector);
         _swapAndReceive(
-            address(outToken),
-            address(0),
-            amountIn,
-            _swapExactInData(address(outToken), amountIn, amountOut)
+            address(outToken), address(0), amountIn, _swapExactInData(address(outToken), amountIn, amountOut)
         );
     }
 
@@ -340,10 +308,7 @@ contract SwapTest is AaveV3YieldModuleBase {
 
         vm.expectRevert(IYieldModule.SendingToThis.selector);
         _swapAndReceive(
-            address(outToken),
-            address(yieldModule),
-            amountIn,
-            _swapExactInData(address(outToken), amountIn, amountOut)
+            address(outToken), address(yieldModule), amountIn, _swapExactInData(address(outToken), amountIn, amountOut)
         );
     }
 
@@ -398,20 +363,14 @@ contract SwapTest is AaveV3YieldModuleBase {
         vm.expectEmit(address(pool));
         emit AaveV3PoolMock.Supply(address(outToken), amountOut, address(yieldModule), 0);
         vm.expectEmit(address(yieldModule));
-        emit IYieldModule.LatestFeePaymentStateUpdated(
-            address(outToken),
-            amountOut,
-            SERVICE_FEE_RATE
-        );
+        emit IYieldModule.LatestFeePaymentStateUpdated(address(outToken), amountOut, SERVICE_FEE_RATE);
         vm.expectEmit(address(yieldModule));
         emit IYieldModule.SwapAndReceiveCompleted(address(outToken), otherAccount, amountOut, true);
 
         _swapAndReceive(address(outToken), otherAccount, amountIn, data);
     }
 
-    function test_swapAndReceive_DepositsTokenOutAndProcessesServiceFeeWhenActiveAndRevenueExists()
-        public
-    {
+    function test_swapAndReceive_DepositsTokenOutAndProcessesServiceFeeWhenActiveAndRevenueExists() public {
         TestERC20 outToken = _deployTestToken();
 
         vm.prank(owner);

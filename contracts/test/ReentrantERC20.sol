@@ -10,11 +10,7 @@ contract ReentrantERC20 is TestERC20 {
 
     error HookCallFailed();
 
-    constructor(
-        string memory name,
-        string memory symbol,
-        uint8 decimals_
-    ) TestERC20(name, symbol, decimals_) { }
+    constructor(string memory name, string memory symbol, uint8 decimals_) TestERC20(name, symbol, decimals_) { }
 
     function setHook(address target, bytes calldata data) external {
         hookTarget = target;

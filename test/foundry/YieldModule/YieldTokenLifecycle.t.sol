@@ -35,8 +35,7 @@ contract YieldTokenLifecycleTest is YieldModuleBase {
         vm.prank(initOwner);
         initModule.initYieldToken(address(yieldToken), MAX_NETWORK_FEE);
 
-        (bool initialized, bool active, uint240 maxNetworkFee) =
-            initModule.yieldTokensData(address(yieldToken));
+        (bool initialized, bool active, uint240 maxNetworkFee) = initModule.yieldTokensData(address(yieldToken));
         assertTrue(initialized);
         assertTrue(active);
         assertEq(maxNetworkFee, MAX_NETWORK_FEE);
