@@ -47,7 +47,7 @@ contract YieldTokenByProtocolTokenTest is MerklIncentivesBase {
         _claimSingleAsOwner(address(protocolToken), YIELD_AMOUNT);
     }
 
-    function test_claim_Reverts_WhenProtocolReportsDifferentProtocolToken() public {
+    function test_claim_Reverts_WhenProtocolReturnsDifferentUnderlyingToken() public {
         _mockUnderlyingAsset(address(yieldToken));
         _fundMerklDistributor(address(protocolToken), YIELD_AMOUNT);
 
@@ -61,7 +61,7 @@ contract YieldTokenByProtocolTokenTest is MerklIncentivesBase {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IYieldModule.ProtocolTokenNotSet.selector, address(protocolToken)
+                IYieldModule.YieldTokenNotInitialized.selector, address(0)
             )
         );
 
