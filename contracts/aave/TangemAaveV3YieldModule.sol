@@ -60,7 +60,7 @@ contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable, MerklIncentive
         return _getProtocolToken(yieldToken);
     }
 
-    function _getYieldTokenByProtocolToken(address protocolToken)
+    function _tryResolveYieldToken(address protocolToken)
         internal
         view
         virtual

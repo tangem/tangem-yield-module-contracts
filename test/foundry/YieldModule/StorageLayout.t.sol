@@ -23,7 +23,7 @@ contract StorageLayoutStub is YieldModuleLiquidUpgradeable {
         return 0;
     }
 
-    function _getYieldTokenByProtocolToken(address) internal pure override returns (address) {
+    function _tryResolveYieldToken(address) internal pure override returns (address) {
         return address(0);
     }
 

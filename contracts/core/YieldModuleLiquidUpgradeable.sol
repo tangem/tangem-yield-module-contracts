@@ -533,7 +533,7 @@ abstract contract YieldModuleLiquidUpgradeable is
 
     function _pullFromProtocolToModule(address yieldToken, uint amount) internal virtual returns (uint);
 
-    function _getYieldTokenByProtocolToken(address protocolToken) internal virtual view returns (address);
+    function _tryResolveYieldToken(address protocolToken) internal virtual view returns (address);
 
     function _getProtocolToken(address yieldToken) internal virtual view returns (address);
 
@@ -628,20 +628,20 @@ abstract contract YieldModuleLiquidUpgradeable is
         }
     }
 
-    function _getYieldToken(address protocolToken) internal returns (address) {
+    function _resolveYieldToken(address protocolToken) internal returns (address) {
         address yieldToken = yieldTokenByProtocolToken[protocolToken];
 
         if (yieldToken != address(0)) {
             return yieldToken;
         }
         
-        return _updateYieldTokenByProtocolToken(protocolToken);
+        return _resolveAndSetYieldTokenByProtocolToken(protocolToken);
     }
 
-    function _updateYieldTokenByProtocolToken(address protocolToken) internal returns (address yieldToken) {
+    function _resolveAndSetYieldTokenByProtocolToken(address protocolToken) internal returns (address yieldToken) {
         require(isProtocolToken[protocolToken], ProtocolTokenNotSet(protocolToken));
 
-        yieldToken = _getYieldTokenByProtocolToken(protocolToken);
+        yieldToken = _tryResolveYieldToken(protocolToken);
         require(yieldTokensData[yieldToken].initialized, YieldTokenNotInitialized(yieldToken));
 
         yieldTokenByProtocolToken[protocolToken] = yieldToken;

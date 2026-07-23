@@ -96,7 +96,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         route.recipient = address(this);
 
         if (isProtocolToken[rewardToken]) {
-            route.yieldToken = _getYieldToken(rewardToken);
+            route.yieldToken = _resolveYieldToken(rewardToken);
             route.tokenAction = yieldTokensData[route.yieldToken].active
                 ? TokenAction.KEEP_IN_MODULE
                 : TokenAction.UNWRAP_TO_OWNER;
