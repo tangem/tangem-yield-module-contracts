@@ -146,18 +146,6 @@ contract RewardRouteTest is MerklIncentivesBase {
         _claimSingleAsOwner(address(yieldToken), YIELD_AMOUNT);
     }
 
-    function test_claim_Reverts_WhenProtocolDepositFailed() public {
-        _fundMerklDistributor(address(yieldToken), YIELD_AMOUNT);
-
-        // tax equal to the full mint amount makes the aToken mint credit nothing,
-        // so the supply has zero effect on the protocol balance
-        protocolToken.setFixedTax(YIELD_AMOUNT);
-
-        vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.ProtocolDepositFailed.selector, address(yieldToken)));
-
-        _claimSingleAsOwner(address(yieldToken), YIELD_AMOUNT);
-    }
-
     /* KEEP_IN_MODULE */
 
     function testFuzz_claim_KeepsInModule_WhenRewardTokenIsProtocolTokenOfActiveYieldToken(uint amount) public {

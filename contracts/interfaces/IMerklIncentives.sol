@@ -6,7 +6,6 @@ interface IMerklIncentives {
     error MerklClaimedNoReward(address rewardToken, address finalRecipient);
     error RewardTokensEmpty();
     error RewardTokensLengthsMismatch();
-    error ProtocolDepositFailed(address rewardToken);
 
     event MerklClaimed(
         address indexed distributor,
