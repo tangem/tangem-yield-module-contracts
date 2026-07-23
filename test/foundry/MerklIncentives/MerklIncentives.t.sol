@@ -109,11 +109,8 @@ contract MerklIncentivesTest is MerklIncentivesBase {
 
         _fundMerklDistributor(address(yieldToken), YIELD_AMOUNT);
 
-        (
-            address[] memory rewardTokens,
-            uint[] memory cumulativeAmounts,
-            bytes32[][] memory proofs
-        ) = _singleClaimArgs(address(yieldToken), YIELD_AMOUNT);
+        (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) =
+            _singleClaimArgs(address(yieldToken), YIELD_AMOUNT);
 
         vm.prank(owner);
         vm.resumeGasMetering();
@@ -123,11 +120,7 @@ contract MerklIncentivesTest is MerklIncentivesBase {
     /* Access control */
 
     function test_claimMerklRewardsOwner_Reverts_WhenNotOwner() public {
-        (
-            address[] memory rewardTokens,
-            uint[] memory cumulativeAmounts,
-            bytes32[][] memory proofs
-        ) = _claimArgs(0);
+        (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) = _claimArgs(0);
 
         vm.expectRevert(IYieldModule.OnlyOwner.selector);
 
@@ -135,11 +128,7 @@ contract MerklIncentivesTest is MerklIncentivesBase {
     }
 
     function test_claimMerklRewardsBE_Reverts_WhenNotProcessor() public {
-        (
-            address[] memory rewardTokens,
-            uint[] memory cumulativeAmounts,
-            bytes32[][] memory proofs
-        ) = _claimArgs(0);
+        (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) = _claimArgs(0);
 
         vm.expectRevert(IYieldModule.OnlyProcessor.selector);
 
@@ -149,11 +138,7 @@ contract MerklIncentivesTest is MerklIncentivesBase {
     /* Entry Errors */
 
     function test_claimMerklRewardsOwner_Reverts_WhenRewardTokensEmpty() public {
-        (
-            address[] memory rewardTokens,
-            uint[] memory cumulativeAmounts,
-            bytes32[][] memory proofs
-        ) = _claimArgs(0);
+        (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) = _claimArgs(0);
 
         vm.expectRevert(IMerklIncentives.RewardTokensEmpty.selector);
 
@@ -182,11 +167,7 @@ contract MerklIncentivesTest is MerklIncentivesBase {
     }
 
     function test_claimMerklRewardsOwner_Reverts_WhenRewardTokenIsZero() public {
-        (
-            address[] memory rewardTokens,
-            uint[] memory cumulativeAmounts,
-            bytes32[][] memory proofs
-        ) = _claimArgs(1);
+        (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) = _claimArgs(1);
 
         vm.expectRevert(abi.encodeWithSelector(Requires.ZeroAddress.selector));
 
@@ -195,11 +176,7 @@ contract MerklIncentivesTest is MerklIncentivesBase {
     }
 
     function test_claimMerklRewardsOwner_Reverts_WhenRewardAmountIsZero() public {
-        (
-            address[] memory rewardTokens,
-            uint[] memory cumulativeAmounts,
-            bytes32[][] memory proofs
-        ) = _claimArgs(1);
+        (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) = _claimArgs(1);
         rewardTokens[0] = makeAddr("rewardToken");
 
         vm.expectRevert(abi.encodeWithSelector(Requires.ZeroAmount.selector));
@@ -226,38 +203,24 @@ contract MerklIncentivesTest is MerklIncentivesBase {
     function test_claimMerklRewardsOwner_Reverts_WhenDuplicateRewardToken() public {
         TestERC20 rewardToken = _createRewardToken();
 
-        (
-            address[] memory rewardTokens,
-            uint[] memory cumulativeAmounts,
-            bytes32[][] memory proofs
-        ) = _claimArgs(2);
+        (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) = _claimArgs(2);
         rewardTokens[0] = address(rewardToken);
         rewardTokens[1] = address(rewardToken);
         cumulativeAmounts[0] = AMOUNT;
         cumulativeAmounts[1] = AMOUNT;
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IMerklIncentives.DuplicateRewardToken.selector, address(rewardToken)
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.DuplicateRewardToken.selector, address(rewardToken)));
 
         vm.prank(owner);
         ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
     }
 
-    function testFuzz_claimMerklRewardsOwner_Reverts_WhenDuplicateRewardToken(
-        uint numTokens,
-        uint dupIndex
-    ) public {
+    function testFuzz_claimMerklRewardsOwner_Reverts_WhenDuplicateRewardToken(uint numTokens, uint dupIndex) public {
         numTokens = bound(numTokens, 2, 10);
 
         TestERC20[] memory tokens = _createRewardTokens(numTokens);
-        (
-            address[] memory rewardTokens,
-            uint[] memory cumulativeAmounts,
-            bytes32[][] memory proofs
-        ) = _claimArgs(numTokens);
+        (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) =
+            _claimArgs(numTokens);
         for (uint i; i < numTokens; ++i) {
             rewardTokens[i] = address(tokens[i]);
             cumulativeAmounts[i] = AMOUNT;
@@ -267,9 +230,7 @@ contract MerklIncentivesTest is MerklIncentivesBase {
         address duplicate = rewardTokens[dupIndex];
         rewardTokens[numTokens - 1] = duplicate;
 
-        vm.expectRevert(
-            abi.encodeWithSelector(IMerklIncentives.DuplicateRewardToken.selector, duplicate)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.DuplicateRewardToken.selector, duplicate));
 
         vm.prank(owner);
         ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);

@@ -25,11 +25,7 @@ contract SwapExecutionRegistryTest is BaseTest {
 
     function _expectUnauthorized(address account) internal {
         bytes32 role = registry.ALLOWLIST_ADMIN_ROLE();
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, account, role
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, account, role));
     }
 
     /* constructor */
@@ -320,10 +316,7 @@ contract SwapExecutionRegistryTest is BaseTest {
 
     /* helpers */
 
-    function _twoAddresses(
-        address first,
-        address second
-    ) internal pure returns (address[] memory arr) {
+    function _twoAddresses(address first, address second) internal pure returns (address[] memory arr) {
         arr = new address[](2);
         arr[0] = first;
         arr[1] = second;

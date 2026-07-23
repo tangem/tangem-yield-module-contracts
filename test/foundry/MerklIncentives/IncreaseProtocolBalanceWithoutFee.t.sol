@@ -14,9 +14,7 @@ contract IncreaseProtocolBalanceWithoutFeeTest is MerklIncentivesBase {
     }
 
     function testFuzz_claim_MovesFeeCheckpoint_OnPushToProtocol(uint amount) public {
-        amount = bound(
-            amount, 1, type(uint).max - yieldToken.totalSupply() - protocolToken.totalSupply()
-        );
+        amount = bound(amount, 1, type(uint).max - yieldToken.totalSupply() - protocolToken.totalSupply());
 
         (uint checkpointBefore,) = ym.latestFeePaymentStates(address(yieldToken));
         uint feeBefore = ym.calculateServiceFee(address(yieldToken));
@@ -51,9 +49,7 @@ contract IncreaseProtocolBalanceWithoutFeeTest is MerklIncentivesBase {
     function test_claim_Reverts_WhenFeeCheckpointExceedsBalance() public {
         // checkpoint above the real protocol balance, e.g. after a position loss
         uint protocolBalance = ym.protocolBalance(address(yieldToken));
-        ym.exposed_setLatestFeePaymentState(
-            address(yieldToken), protocolBalance + 1, SERVICE_FEE_RATE
-        );
+        ym.exposed_setLatestFeePaymentState(address(yieldToken), protocolBalance + 1, SERVICE_FEE_RATE);
 
         _fundMerklDistributor(address(protocolToken), YIELD_AMOUNT);
 

@@ -38,9 +38,7 @@ contract WeirdRewardTokensTest is MerklIncentivesBase {
         assertEq(ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + YIELD_AMOUNT - tax);
     }
 
-    function test_claim_PushesToProtocol_MovesFeeCheckpointByProtocolDelta_WhenProtocolTokenHasMintTax()
-        public
-    {
+    function test_claim_PushesToProtocol_MovesFeeCheckpointByProtocolDelta_WhenProtocolTokenHasMintTax() public {
         uint tax = YIELD_AMOUNT / 10;
         protocolToken.setFixedTax(tax);
         _fundMerklDistributor(address(yieldToken), YIELD_AMOUNT);

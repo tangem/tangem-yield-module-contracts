@@ -58,8 +58,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
     ) private {
         require(rewardTokens.length > 0, RewardTokensEmpty());
         require(
-            rewardTokens.length == cumulativeAmounts.length
-                && cumulativeAmounts.length == proofs.length,
+            rewardTokens.length == cumulativeAmounts.length && cumulativeAmounts.length == proofs.length,
             RewardTokensLengthsMismatch()
         );
 
@@ -85,9 +84,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             recipients[i] = route.recipient;
         }
 
-        distributor.claimWithRecipient(
-            users, rewardTokens, cumulativeAmounts, proofs, recipients, emptyDatas
-        );
+        distributor.claimWithRecipient(users, rewardTokens, cumulativeAmounts, proofs, recipients, emptyDatas);
 
         _processClaimedRewards(rewardTokens, routes);
     }
@@ -97,9 +94,8 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
 
         if (isProtocolToken[rewardToken]) {
             route.yieldToken = _resolveYieldToken(rewardToken);
-            route.tokenAction = yieldTokensData[route.yieldToken].active
-                ? TokenAction.KEEP_IN_MODULE
-                : TokenAction.UNWRAP_TO_OWNER;
+            route.tokenAction =
+                yieldTokensData[route.yieldToken].active ? TokenAction.KEEP_IN_MODULE : TokenAction.UNWRAP_TO_OWNER;
         } else if (yieldTokensData[rewardToken].active) {
             route.yieldToken = rewardToken;
             route.tokenAction = TokenAction.PUSH_TO_PROTOCOL;
@@ -109,17 +105,11 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         }
     }
 
-    function _processClaimedRewards(
-        address[] calldata rewardTokens,
-        RewardRoute[] memory routes
-    ) private {
+    function _processClaimedRewards(address[] calldata rewardTokens, RewardRoute[] memory routes) private {
         for (uint i; i < rewardTokens.length; ++i) {
             uint balanceAfter = IERC20(rewardTokens[i]).balanceOf(routes[i].recipient);
 
-            require(
-                balanceAfter > routes[i].balanceBefore,
-                MerklClaimedNoReward(rewardTokens[i], routes[i].recipient)
-            );
+            require(balanceAfter > routes[i].balanceBefore, MerklClaimedNoReward(rewardTokens[i], routes[i].recipient));
 
             routes[i].received = balanceAfter - routes[i].balanceBefore;
         }
@@ -139,9 +129,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             _pushToProtocol(rewardToken, route.received);
             uint protocolBalanceAfter = _protocolBalance(rewardToken);
 
-            require(
-                protocolBalanceAfter > protocolBalanceBefore, ProtocolDepositFailed(rewardToken)
-            );
+            require(protocolBalanceAfter > protocolBalanceBefore, ProtocolDepositFailed(rewardToken));
 
             finalToken = address(protocolTokens[rewardToken]);
             finalAmount = protocolBalanceAfter - protocolBalanceBefore;

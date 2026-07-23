@@ -23,9 +23,7 @@ contract YieldModuleGeneralHarness is YieldModuleHarness {
         address swapExecutionRegistry_
     )
         MerklIncentives(distributor_)
-        YieldModuleLiquidUpgradeable(
-            yieldProcessor_, factory_, trustedForwarder_, swapExecutionRegistry_
-        )
+        YieldModuleLiquidUpgradeable(yieldProcessor_, factory_, trustedForwarder_, swapExecutionRegistry_)
     {
         pool = GeneralPoolMock(pool_);
 
@@ -44,12 +42,7 @@ contract YieldModuleGeneralHarness is YieldModuleHarness {
         return address(pool.protocolTokens(yieldToken));
     }
 
-    function _tryResolveYieldToken(address protocolToken)
-        internal
-        view
-        override
-        returns (address)
-    {
+    function _tryResolveYieldToken(address protocolToken) internal view override returns (address) {
         return pool.yieldTokensByProtocolToken(protocolToken);
     }
 
@@ -58,17 +51,11 @@ contract YieldModuleGeneralHarness is YieldModuleHarness {
         pool.deposit(yieldToken, amount);
     }
 
-    function _pullFromProtocolToOwner(
-        address yieldToken,
-        uint amount
-    ) internal override returns (uint) {
+    function _pullFromProtocolToOwner(address yieldToken, uint amount) internal override returns (uint) {
         return pool.withdraw(yieldToken, amount, owner);
     }
 
-    function _pullFromProtocolToModule(
-        address yieldToken,
-        uint amount
-    ) internal override returns (uint) {
+    function _pullFromProtocolToModule(address yieldToken, uint amount) internal override returns (uint) {
         return pool.withdraw(yieldToken, amount, address(this));
     }
 }

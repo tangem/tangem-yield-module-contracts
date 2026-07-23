@@ -5,7 +5,7 @@ interface IMerklDistributor {
     function claimWithRecipient(
         address[] calldata users,
         address[] calldata tokens,
-        uint256[] calldata amounts,
+        uint[] calldata amounts,
         bytes32[][] calldata proofs,
         address[] calldata recipients,
         bytes[] memory datas

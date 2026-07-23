@@ -84,19 +84,13 @@ contract RewardRouteTest is MerklIncentivesBase {
         assertEq(ym.protocolBalance(address(yieldToken)), protocolBalanceBefore);
     }
 
-    function testFuzz_claim_SendsToOwner_ManyUnknownTokens(
-        uint numTokens,
-        uint[10] memory rawAmounts
-    ) public {
+    function testFuzz_claim_SendsToOwner_ManyUnknownTokens(uint numTokens, uint[10] memory rawAmounts) public {
         numTokens = bound(numTokens, 1, 10);
 
         TestERC20[] memory tokens = _createRewardTokens(numTokens);
 
-        (
-            address[] memory rewardTokens,
-            uint[] memory cumulativeAmounts,
-            bytes32[][] memory proofs
-        ) = _claimArgs(numTokens);
+        (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) =
+            _claimArgs(numTokens);
 
         for (uint i; i < numTokens; ++i) {
             rewardTokens[i] = address(tokens[i]);
@@ -117,9 +111,7 @@ contract RewardRouteTest is MerklIncentivesBase {
     /* PUSH_TO_PROTOCOL */
 
     function testFuzz_claim_PushesToProtocol_WhenRewardTokenIsActiveYieldToken(uint amount) public {
-        amount = bound(
-            amount, 1, type(uint).max - yieldToken.totalSupply() - protocolToken.totalSupply()
-        );
+        amount = bound(amount, 1, type(uint).max - yieldToken.totalSupply() - protocolToken.totalSupply());
 
         uint poolBalanceBefore = yieldToken.balanceOf(address(pool));
 
@@ -161,20 +153,14 @@ contract RewardRouteTest is MerklIncentivesBase {
         // so the supply has zero effect on the protocol balance
         protocolToken.setFixedTax(YIELD_AMOUNT);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IMerklIncentives.ProtocolDepositFailed.selector, address(yieldToken)
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.ProtocolDepositFailed.selector, address(yieldToken)));
 
         _claimSingleAsOwner(address(yieldToken), YIELD_AMOUNT);
     }
 
     /* KEEP_IN_MODULE */
 
-    function testFuzz_claim_KeepsInModule_WhenRewardTokenIsProtocolTokenOfActiveYieldToken(uint amount)
-        public
-    {
+    function testFuzz_claim_KeepsInModule_WhenRewardTokenIsProtocolTokenOfActiveYieldToken(uint amount) public {
         amount = bound(amount, 1, type(uint).max - protocolToken.totalSupply() - PROTOCOL_BALANCE);
 
         uint poolBalanceBefore = yieldToken.balanceOf(address(pool));
@@ -272,9 +258,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         _claimSingleAsOwner(address(rewardToken), AMOUNT);
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IMerklIncentives.MerklClaimedNoReward.selector, address(rewardToken), owner
-            )
+            abi.encodeWithSelector(IMerklIncentives.MerklClaimedNoReward.selector, address(rewardToken), owner)
         );
 
         _claimSingleAsOwner(address(rewardToken), AMOUNT);
@@ -286,9 +270,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         _claimSingleAsOwner(address(yieldToken), YIELD_AMOUNT);
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IMerklIncentives.MerklClaimedNoReward.selector, address(yieldToken), address(ym)
-            )
+            abi.encodeWithSelector(IMerklIncentives.MerklClaimedNoReward.selector, address(yieldToken), address(ym))
         );
 
         _claimSingleAsOwner(address(yieldToken), YIELD_AMOUNT);
@@ -296,11 +278,7 @@ contract RewardRouteTest is MerklIncentivesBase {
 
     /* Mixed routes — multiple reward tokens in one claim */
 
-    function testFuzz_claim_RoutesEachToken_WhenMixedRoutes(
-        uint sendAmount,
-        uint pushAmount,
-        uint keepAmount
-    ) public {
+    function testFuzz_claim_RoutesEachToken_WhenMixedRoutes(uint sendAmount, uint pushAmount, uint keepAmount) public {
         uint poolBalanceBefore = yieldToken.balanceOf(address(pool));
 
         sendAmount = bound(sendAmount, 1, type(uint).max / 4);
@@ -312,11 +290,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         _fundMerklDistributor(address(yieldToken), pushAmount);
         _fundMerklDistributor(address(protocolToken), keepAmount);
 
-        (
-            address[] memory rewardTokens,
-            uint[] memory cumulativeAmounts,
-            bytes32[][] memory proofs
-        ) = _claimArgs(3);
+        (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) = _claimArgs(3);
         rewardTokens[0] = address(unknownToken);
         rewardTokens[1] = address(yieldToken);
         rewardTokens[2] = address(protocolToken);
@@ -337,9 +311,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         assertEq(yieldToken.balanceOf(owner), 0);
 
         // KEEP_IN_MODULE:
-        assertEq(
-            ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + pushAmount + keepAmount
-        );
+        assertEq(ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + pushAmount + keepAmount);
         assertEq(protocolToken.balanceOf(owner), 0);
 
         // rewards are fee-free regardless of the route

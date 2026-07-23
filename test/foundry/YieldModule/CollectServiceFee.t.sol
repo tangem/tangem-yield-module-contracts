@@ -24,8 +24,7 @@ contract CollectServiceFeeTest is YieldModuleBase {
         uint newFeeRate = 2_000;
         _setServiceFeeRate(newFeeRate);
 
-        uint expectedProtocolBalance =
-            INITIAL_OWNER_BALANCE + ACCUMULATED_REVENUE - ACCUMULATED_SERVICE_FEE;
+        uint expectedProtocolBalance = INITIAL_OWNER_BALANCE + ACCUMULATED_REVENUE - ACCUMULATED_SERVICE_FEE;
 
         _assertLatestFeePaymentState(yieldModule, INITIAL_OWNER_BALANCE, SERVICE_FEE_RATE);
 
@@ -51,11 +50,7 @@ contract CollectServiceFeeTest is YieldModuleBase {
 
     function test_collectServiceFee_EmitsFeePaymentProcessed() public {
         vm.expectEmit(address(yieldModule));
-        emit IYieldModule.FeePaymentProcessed(
-            address(yieldToken),
-            ACCUMULATED_SERVICE_FEE,
-            feeReceiver
-        );
+        emit IYieldModule.FeePaymentProcessed(address(yieldToken), ACCUMULATED_SERVICE_FEE, feeReceiver);
 
         _collectViaProcessor(yieldModule);
     }

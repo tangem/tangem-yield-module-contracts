@@ -26,9 +26,8 @@ contract MerklDistributorMock is IMerklDistributor {
         bytes[] memory datas
     ) external {
         require(
-            users.length == tokens.length && tokens.length == amounts.length
-                && amounts.length == proofs.length && proofs.length == recipients.length
-                && recipients.length == datas.length,
+            users.length == tokens.length && tokens.length == amounts.length && amounts.length == proofs.length
+                && proofs.length == recipients.length && recipients.length == datas.length,
             ArraysLengthsMismatch()
         );
 

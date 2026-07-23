@@ -40,11 +40,7 @@ abstract contract MerklIncentivesBase is AaveV3YieldModuleBase {
     function _singleClaimArgs(
         address rewardToken,
         uint amount
-    )
-        internal
-        pure
-        returns (address[] memory tokens, uint[] memory amounts, bytes32[][] memory proofs)
-    {
+    ) internal pure returns (address[] memory tokens, uint[] memory amounts, bytes32[][] memory proofs) {
         (tokens, amounts, proofs) = _claimArgs(1);
         tokens[0] = rewardToken;
         amounts[0] = amount;
@@ -72,8 +68,7 @@ abstract contract MerklIncentivesBase is AaveV3YieldModuleBase {
         (address[] memory tokens, uint[] memory amounts, bytes32[][] memory proofs) =
             _singleClaimArgs(rewardToken, amount);
 
-        bytes memory data =
-            abi.encodeCall(IMerklIncentives.claimMerklRewardsOwner, (tokens, amounts, proofs));
+        bytes memory data = abi.encodeCall(IMerklIncentives.claimMerklRewardsOwner, (tokens, amounts, proofs));
 
         _executeViaForwarder(address(ym), data, 0);
     }

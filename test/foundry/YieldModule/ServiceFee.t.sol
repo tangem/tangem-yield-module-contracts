@@ -50,9 +50,7 @@ contract ServiceFeeTest is YieldModuleBase {
         feeDebt_ = bound(feeDebt_, 0, 1_000_000e6);
 
         // the fee is computed with the rate stored at the latest fee payment
-        yieldModule.exposed_setLatestFeePaymentState(
-            address(yieldToken), SF_INITIAL_OWNER_BALANCE, feeRate
-        );
+        yieldModule.exposed_setLatestFeePaymentState(address(yieldToken), SF_INITIAL_OWNER_BALANCE, feeRate);
         yieldModule.exposed_setFeeDebt(address(yieldToken), feeDebt_);
         _generateRevenue(address(yieldToken), address(yieldModule), revenue);
 
@@ -67,9 +65,7 @@ contract ServiceFeeTest is YieldModuleBase {
         // large debts make the fee exceed the protocol balance => clamping branch
         feeDebt_ = bound(feeDebt_, 0, 2 * SF_INITIAL_OWNER_BALANCE);
 
-        yieldModule.exposed_setLatestFeePaymentState(
-            address(yieldToken), SF_INITIAL_OWNER_BALANCE, feeRate
-        );
+        yieldModule.exposed_setLatestFeePaymentState(address(yieldToken), SF_INITIAL_OWNER_BALANCE, feeRate);
         yieldModule.exposed_setFeeDebt(address(yieldToken), feeDebt_);
         _generateRevenue(address(yieldToken), address(yieldModule), revenue);
 
@@ -78,10 +74,7 @@ contract ServiceFeeTest is YieldModuleBase {
         uint expectedEffective = protocolBalance > fee ? protocolBalance - fee : 0;
 
         assertEq(yieldModule.effectiveProtocolBalance(address(yieldToken)), expectedEffective);
-        assertEq(
-            yieldModule.effectiveBalance(address(yieldToken)),
-            yieldToken.balanceOf(owner) + expectedEffective
-        );
+        assertEq(yieldModule.effectiveBalance(address(yieldToken)), yieldToken.balanceOf(owner) + expectedEffective);
     }
 
     /*  Fee debt repayment  */
@@ -97,9 +90,7 @@ contract ServiceFeeTest is YieldModuleBase {
         assertEq(yieldModule.protocolBalance(address(yieldToken)), 0);
     }
 
-    function testFuzz_enterProtocolByOwner_FullyRepaysFeeDebtWhenDepositCoversIt(uint reEnterDeposit)
-        public
-    {
+    function testFuzz_enterProtocolByOwner_FullyRepaysFeeDebtWhenDepositCoversIt(uint reEnterDeposit) public {
         reEnterDeposit = bound(reEnterDeposit, feeDebt, FEE_DEBT_SCENARIO_DEPOSIT);
 
         (YieldModuleHarness yieldModule,) = _createFeeDebtState(otherAccount, reEnterDeposit);
@@ -111,10 +102,7 @@ contract ServiceFeeTest is YieldModuleBase {
 
     /*  Fee debt & effective balances  */
 
-    function test_calculateServiceFee_ReturnsPersistedDebtWhenProtocolBalanceIsNotAboveBaseline()
-        public
-        view
-    {
+    function test_calculateServiceFee_ReturnsPersistedDebtWhenProtocolBalanceIsNotAboveBaseline() public view {
         // partial fee payment during re-enter reduced the debt by the small deposit
         assertEq(debtModule.calculateServiceFee(address(yieldToken)), remainingFeeDebt);
     }

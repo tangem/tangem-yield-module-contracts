@@ -87,9 +87,7 @@ contract WeirdTokensTest is AaveV3YieldModuleBase {
 
     /*  negative rebase / balance slashing  */
 
-    function test_withdrawAndDeactivate_ChargesNoFeeWhenProtocolBalanceDropsBelowCheckpoint()
-        public
-    {
+    function test_withdrawAndDeactivate_ChargesNoFeeWhenProtocolBalanceDropsBelowCheckpoint() public {
         // simulate a negative rebase: burn the revenue plus part of the principal
         protocolToken.forceBurn(address(yieldModule), ACCUMULATED_REVENUE + BALANCE_DROP);
         uint remaining = INITIAL_OWNER_BALANCE - BALANCE_DROP;

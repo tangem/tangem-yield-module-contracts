@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import {AccessControlEnumerable} from "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
+import { AccessControlEnumerable } from "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
 
-import {ISwapExecutionRegistry} from "../interfaces/ISwapExecutionRegistry.sol";
+import { ISwapExecutionRegistry } from "../interfaces/ISwapExecutionRegistry.sol";
 
 contract SwapExecutionRegistry is AccessControlEnumerable, ISwapExecutionRegistry {
     bytes32 public constant ALLOWLIST_ADMIN_ROLE = keccak256("ALLOWLIST_ADMIN_ROLE");
@@ -30,69 +30,63 @@ contract SwapExecutionRegistry is AccessControlEnumerable, ISwapExecutionRegistr
     }
 
     function setTargetsAllowed(address[] calldata targets, bool allowed) external onlyRole(ALLOWLIST_ADMIN_ROLE) {
-        uint256 length = targets.length;
-        for (uint256 i; i < length; ) {
+        uint length = targets.length;
+        for (uint i; i < length;) {
             address target = targets[i];
             require(target != address(0), ZeroAddress());
             allowedTargets[target] = allowed;
             emit TargetAllowedSet(target, allowed);
-            unchecked { 
-                ++i; 
+            unchecked {
+                ++i;
             }
         }
     }
 
     function setSpendersAllowed(address[] calldata spenders, bool allowed) external onlyRole(ALLOWLIST_ADMIN_ROLE) {
-        uint256 length = spenders.length;
-        for (uint256 i; i < length; ) {
+        uint length = spenders.length;
+        for (uint i; i < length;) {
             address spender = spenders[i];
             require(spender != address(0), ZeroAddress());
             allowedSpenders[spender] = allowed;
             emit SpenderAllowedSet(spender, allowed);
-            unchecked { 
-                ++i; 
+            unchecked {
+                ++i;
             }
         }
     }
 
     function setTargetsAllowedMany(
-        address[] calldata targets, 
+        address[] calldata targets,
         bool[] calldata allowed
-    )
-        external
-        onlyRole(ALLOWLIST_ADMIN_ROLE)
-    {
-        uint256 length = targets.length;
+    ) external onlyRole(ALLOWLIST_ADMIN_ROLE) {
+        uint length = targets.length;
         require(length == allowed.length, LengthMismatch());
-        for (uint256 i; i < length; ) {
+        for (uint i; i < length;) {
             address target = targets[i];
             require(target != address(0), ZeroAddress());
             bool status = allowed[i];
             allowedTargets[target] = status;
             emit TargetAllowedSet(target, status);
-            unchecked { 
-                ++i; 
+            unchecked {
+                ++i;
             }
         }
     }
 
     function setSpendersAllowedMany(
-        address[] calldata spenders, 
+        address[] calldata spenders,
         bool[] calldata allowed
-    )
-        external
-        onlyRole(ALLOWLIST_ADMIN_ROLE)
-    {
-        uint256 length = spenders.length;
+    ) external onlyRole(ALLOWLIST_ADMIN_ROLE) {
+        uint length = spenders.length;
         require(length == allowed.length, LengthMismatch());
-        for (uint256 i; i < length; ) {
+        for (uint i; i < length;) {
             address spender = spenders[i];
             require(spender != address(0), ZeroAddress());
             bool status = allowed[i];
             allowedSpenders[spender] = status;
             emit SpenderAllowedSet(spender, status);
-            unchecked { 
-                ++i; 
+            unchecked {
+                ++i;
             }
         }
     }

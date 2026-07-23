@@ -9,11 +9,9 @@ import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
 contract TangemAaveV3YieldModuleTest is AaveV3YieldModuleBase {
     function test_deployYieldModule_InitializesYieldToken() public {
-        YieldModuleHarness yieldModule =
-            _deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
+        YieldModuleHarness yieldModule = _deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
 
-        (bool initialized, bool active, uint240 maxNetworkFee) =
-            yieldModule.yieldTokensData(address(yieldToken));
+        (bool initialized, bool active, uint240 maxNetworkFee) = yieldModule.yieldTokensData(address(yieldToken));
         assertTrue(initialized);
         assertTrue(active);
         assertEq(maxNetworkFee, DEFAULT_MAX_NETWORK_FEE);
@@ -26,11 +24,7 @@ contract TangemAaveV3YieldModuleTest is AaveV3YieldModuleBase {
         address expectedYieldModule = factory.calculateYieldModuleAddress(owner);
 
         vm.expectEmit(expectedYieldModule);
-        emit IYieldModule.YieldTokenInitialized(
-            address(yieldToken),
-            address(protocolToken),
-            DEFAULT_MAX_NETWORK_FEE
-        );
+        emit IYieldModule.YieldTokenInitialized(address(yieldToken), address(protocolToken), DEFAULT_MAX_NETWORK_FEE);
 
         _deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
     }
