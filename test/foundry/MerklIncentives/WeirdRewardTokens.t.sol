@@ -2,13 +2,16 @@
 /* solhint-disable func-name-mixedcase */
 pragma solidity ^0.8.29;
 
-import { ReentrancyGuardUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import { ReentrancyGuardTransientUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
 
 import { MerklIncentivesBase, YieldModuleHarness } from "./MerklIncentivesBase.sol";
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 import { ReentrantERC20 } from "contracts/test/ReentrantERC20.sol";
 
 contract WeirdRewardTokensTest is MerklIncentivesBase {
+    bytes32 internal constant REENTRANCY_GUARD_SLOT =
+        0x9b779b17422d0df92223018b32b4d1fa46e071723d6817e2486d003becc55f00;
+
     function setUp() public override {
         super.setUp();
 
@@ -64,8 +67,20 @@ contract WeirdRewardTokensTest is MerklIncentivesBase {
         bytes memory claimCall = _claimCalldata(address(token));
         token.setHook(address(attackedModule), claimCall);
 
-        vm.expectRevert(ReentrancyGuardUpgradeable.ReentrancyGuardReentrantCall.selector);
+        vm.expectRevert(ReentrancyGuardTransientUpgradeable.ReentrancyGuardReentrantCall.selector);
         token.execute(address(attackedModule), claimCall);
+    }
+
+    function test_claim_ReentrancyGuardUsesTransientStorage() public {
+        _fundMerklDistributor(address(yieldToken), YIELD_AMOUNT);
+
+        vm.record();
+        _claimSingleAsOwner(address(yieldToken), YIELD_AMOUNT);
+        (, bytes32[] memory writes) = vm.accesses(address(ym));
+
+        for (uint i; i < writes.length; ++i) {
+            assertTrue(writes[i] != REENTRANCY_GUARD_SLOT, "reentrancy guard must not use persistent storage");
+        }
     }
 
     /*  helpers  */
