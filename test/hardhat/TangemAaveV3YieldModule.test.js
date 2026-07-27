@@ -1,6 +1,6 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const { deployTestSetup } = require("../../scripts/TestDeploy");
+const { deployTestSetup } = require("./fixtures/testDeploy");
 
 describe("TangemBridgeProcessor", function () {
   const PRECISION = 10000;
@@ -1108,7 +1108,6 @@ describe("TangemBridgeProcessor", function () {
 
   describe("collectServiceFee", function () {
     const maxNetworkFee = 12345;
-    const networkFee = 1234;
     const initialOwnerBalance = 464263;
     const accumulatedRevenue = 11435;
     let yieldModule, serviceFee, initialFeeRate, feeReceiver;
