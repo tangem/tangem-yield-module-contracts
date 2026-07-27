@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 /* solhint-disable func-name-mixedcase */
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
 import { IERC1967 } from "@openzeppelin/contracts/interfaces/IERC1967.sol";
 

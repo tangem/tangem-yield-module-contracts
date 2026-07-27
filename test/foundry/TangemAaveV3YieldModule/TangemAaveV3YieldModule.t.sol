@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 /* solhint-disable func-name-mixedcase */
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
 import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 import { AaveV3YieldModuleBase } from "./AaveV3YieldModuleBase.sol";

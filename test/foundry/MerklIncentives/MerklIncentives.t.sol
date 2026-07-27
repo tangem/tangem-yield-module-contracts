@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 /* solhint-disable func-name-mixedcase */
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
 import { MerklIncentivesBase, TestERC20 } from "./MerklIncentivesBase.sol";
 import { Requires } from "contracts/common/Requires.sol";
