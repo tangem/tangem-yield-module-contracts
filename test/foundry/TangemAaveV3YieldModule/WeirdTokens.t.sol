@@ -8,7 +8,6 @@ import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 import { AaveV3YieldModuleBase } from "./AaveV3YieldModuleBase.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
-import { TestERC20 } from "contracts/test/TestERC20.sol";
 
 /// Non-standard ERC20 behavior at the module boundaries.
 contract WeirdTokensTest is AaveV3YieldModuleBase {

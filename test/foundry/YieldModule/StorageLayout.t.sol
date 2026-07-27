@@ -8,11 +8,14 @@ import { YieldModuleLiquidUpgradeable } from "contracts/core/YieldModuleLiquidUp
 contract StorageLayoutStub is YieldModuleLiquidUpgradeable {
     constructor() YieldModuleLiquidUpgradeable(address(1), address(2), address(3), address(4)) { }
 
+    /* solhint-disable no-empty-blocks */
     function initialize(address) external { }
 
     function _initProtocolToken(address) internal pure override returns (address) {
         return address(0);
     }
+
+    /* solhint-disable no-empty-blocks */
     function _pushToProtocol(address, uint) internal override { }
 
     function _pullFromProtocolToOwner(address, uint) internal pure override returns (uint) {
