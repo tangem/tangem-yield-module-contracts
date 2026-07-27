@@ -4,7 +4,9 @@
   "description": "EVM smart contracts for Tangem Yield Module",
   "main": "index.js",
   "scripts": {
-    "format:sol": "forge fmt"
+    "format:sol": "forge fmt",
+    "lint:sol": "solhint --disc --noPoster 'contracts/**/*.sol' 'test/**/*.sol'",
+    "lint:sol:fix": "solhint --disc --noPoster --fix --noPrompt 'contracts/**/*.sol' 'test/**/*.sol'"
   },
   "repository": {
     "type": "git",
@@ -38,6 +40,7 @@
     "eslint": "^9.24.0",
     "forge-std": "github:foundry-rs/forge-std#v1.9.7",
     "hardhat": "^2.23.0",
-    "hardhat-abi-exporter": "^2.11.0"
+    "hardhat-abi-exporter": "^2.11.0",
+    "solhint": "^6.2.3"
   }
 }
