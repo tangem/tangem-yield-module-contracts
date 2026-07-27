@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 import { TestERC20 } from "contracts/test/TestERC20.sol";

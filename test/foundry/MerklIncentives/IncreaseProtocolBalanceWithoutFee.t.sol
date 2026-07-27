@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 /* solhint-disable func-name-mixedcase */
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
 import { MerklIncentivesBase } from "./MerklIncentivesBase.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
