@@ -8,9 +8,11 @@ import { TestERC20 } from "contracts/test/TestERC20.sol";
 
 /// Shared test helpers reused across feature suites via multiple inheritance.
 abstract contract TestHelpers is BaseTest {
+    error EventNotEmitted(bytes32 eventSig);
+
     function _assertEventNotEmitted(Vm.Log[] memory entries, bytes32 eventSig) internal pure {
         for (uint i; i < entries.length; i++) {
-            require(entries[i].topics[0] != eventSig, "expected event not to be emitted");
+            require(entries[i].topics[0] != eventSig, EventNotEmitted(eventSig));
         }
     }
 

@@ -9,7 +9,6 @@ import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 import { AaveV3YieldModuleBase } from "./AaveV3YieldModuleBase.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
-import { PRECISION } from "contracts/resources/Constants.sol";
 import { AaveV3PoolMock } from "contracts/test/AaveV3PoolMock.sol";
 
 contract SendTest is AaveV3YieldModuleBase {

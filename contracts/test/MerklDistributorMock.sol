@@ -17,6 +17,7 @@ contract MerklDistributorMock is IMerklDistributor {
 
     mapping(address user => mapping(address token => uint)) public claimed;
 
+    /* solhint-disable gas-calldata-parameters */
     function claimWithRecipient(
         address[] calldata users,
         address[] calldata tokens,

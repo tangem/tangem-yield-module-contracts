@@ -6,7 +6,6 @@ import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
 import { IYieldModule } from "../interfaces/IYieldModule.sol";
-import { IYieldProcessor } from "../interfaces/IYieldProcessor.sol";
 
 contract TangemYieldModuleFactory is AccessControlEnumerable, Pausable {
     bytes32 public constant IMPLEMENTATION_SETTER_ROLE = keccak256("IMPLEMENTATION_SETTER_ROLE");
