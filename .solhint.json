@@ -1,0 +1,16 @@
+{
+  "rules": {
+    "no-unused-import": "error",
+    "no-unused-vars": "error",
+    "no-unused-private-funcs": "error",
+    "duplicated-imports": "error",
+    "no-console": "error",
+    "gas-custom-errors": "error",
+    "gas-calldata-parameters": "error",
+    "reason-string": ["error", { "maxLength": 64 }],
+    "max-line-length": ["warn", 160],
+    "no-global-import": "warn",
+    "imports-on-top": "warn",
+    "no-empty-blocks": "warn"
+  }
+}
