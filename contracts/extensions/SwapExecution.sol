@@ -14,11 +14,11 @@ abstract contract SwapExecution is YieldModuleLiquidUpgradeable {
 
     struct SwapContext {
         IERC20 tokenIn;
-        address tokenInAddr;
         address spenderEffective;
         uint amountIn;
         uint feeIn;
-        bool protocolTouched;
+        uint protocolBalBefore;
+        uint pulledFromProtocol;
     }
 
     ISwapExecutionRegistry public immutable swapExecutionRegistry;
@@ -118,50 +118,37 @@ abstract contract SwapExecution is YieldModuleLiquidUpgradeable {
         require(swapExecutionRegistry.allowedTargets(target), TargetNotAllowed());
         require(swapExecutionRegistry.allowedSpenders(spenderEffective), SpenderNotAllowed());
 
-        uint feeIn = calculateServiceFee(tokenIn);
-
-        IERC20 tokenInErc20 = IERC20(tokenIn);
+        context.spenderEffective = spenderEffective;
+        context.tokenIn = IERC20(tokenIn);
+        context.amountIn = amountIn;
+        context.feeIn = calculateServiceFee(tokenIn);
 
         // use any stuck funds on the module
-        uint moduleBal = tokenInErc20.balanceOf(address(this));
-        uint collected = moduleBal >= amountIn ? amountIn : moduleBal;
-        uint needed = amountIn - collected;
+        uint moduleBal = context.tokenIn.balanceOf(address(this));
+        uint needed = moduleBal >= amountIn ? 0 : amountIn - moduleBal;
 
         // take from owner if needed
-        bool protocolTouched;
         if (needed > 0) {
-            uint ownerBal = tokenInErc20.balanceOf(owner);
+            uint ownerBal = context.tokenIn.balanceOf(owner);
             uint fromOwner = ownerBal >= needed ? needed : ownerBal;
             if (fromOwner > 0) {
-                tokenInErc20.safeTransferFrom(owner, address(this), fromOwner);
+                context.tokenIn.safeTransferFrom(owner, address(this), fromOwner);
             }
             needed -= fromOwner;
         }
 
         // pull from protocol directly to module if still needed
         if (needed > 0) {
-            uint protocolBal = _protocolBalance(tokenIn);
-
-            require(protocolBal >= needed + feeIn, InsufficientFunds());
-            if (protocolBal == needed + feeIn) {
-                // avoid protocol rounding errors on withdrawing all available funds
-                feeIn = type(uint).max; // use whole balance left as fee
-            }
+            uint protocolBalBefore = _protocolBalance(tokenIn);
+            require(protocolBalBefore >= needed + context.feeIn, InsufficientFunds());
 
             _pullFromProtocolToModule(tokenIn, needed);
-            protocolTouched = true;
+
+            context.protocolBalBefore = protocolBalBefore;
+            context.pulledFromProtocol = needed;
         }
 
-        tokenInErc20.forceApprove(spenderEffective, amountIn);
-
-        context = SwapContext({
-            tokenIn: tokenInErc20,
-            tokenInAddr: tokenIn,
-            spenderEffective: spenderEffective,
-            amountIn: amountIn,
-            feeIn: feeIn,
-            protocolTouched: protocolTouched
-        });
+        context.tokenIn.forceApprove(spenderEffective, amountIn);
     }
 
     function _callProvider(address target, bytes calldata data) internal {
@@ -179,12 +166,11 @@ abstract contract SwapExecution is YieldModuleLiquidUpgradeable {
     function _finalizeSwap(SwapContext memory context) internal {
         context.tokenIn.forceApprove(context.spenderEffective, 0);
 
-        // process fee before handling residue to avoid inflating fee when feeIn == type(uint).max
-        if (context.protocolTouched) {
-            address tokenIn = context.tokenInAddr;
-            uint feeIn = context.feeIn == type(uint).max ? _protocolBalance(tokenIn) : context.feeIn;
-
-            _tryProcessFee(tokenIn, feeIn, true);
+        // process fee before handling residue to avoid inflating fee when the whole balance left is charged
+        if (context.pulledFromProtocol > 0) {
+            _processFeeAfterProtocolPull(
+                address(context.tokenIn), context.feeIn, context.protocolBalBefore, context.pulledFromProtocol
+            );
         }
     }
 }

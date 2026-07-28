@@ -19,6 +19,17 @@ abstract contract FeeAccounting is YieldModuleBase {
         return _calculateServiceFee(yieldToken, _protocolBalance(yieldToken));
     }
 
+    function _processFeeAfterProtocolPull(
+        address yieldToken,
+        uint fee,
+        uint protocolBalanceBefore,
+        uint pulledAmount
+    ) internal returns (bool success) {
+        uint feeToCharge = protocolBalanceBefore == pulledAmount + fee ? _protocolBalance(yieldToken) : fee;
+
+        return _tryProcessFee(yieldToken, feeToCharge, true);
+    }
+
     function _tryProcessFee(address yieldToken, uint amount, bool useProtocolToken) internal returns (bool success) {
         if (amount == 0) {
             _processFeePaymentSuccess(yieldToken, 0, processor.feeReceiver());
