@@ -2,11 +2,11 @@
 /* solhint-disable func-name-mixedcase */
 pragma solidity 0.8.29;
 
-import { MerklIncentivesBase } from "./MerklIncentivesBase.sol";
+import { MerklIncentivesFixture } from "./MerklIncentivesFixture.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
 /// Covers _increaseProtocolBalanceWithoutFee, driven through Merkl claims
-contract IncreaseProtocolBalanceWithoutFeeTest is MerklIncentivesBase {
+contract IncreaseProtocolBalanceWithoutFeeTest is MerklIncentivesFixture {
     function setUp() public override {
         super.setUp();
 

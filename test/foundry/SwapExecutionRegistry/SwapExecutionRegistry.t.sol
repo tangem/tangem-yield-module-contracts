@@ -4,7 +4,7 @@ pragma solidity 0.8.29;
 
 import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
 
-import { SwapExecutionRegistry } from "contracts/core/SwapExecutionRegistry.sol";
+import { SwapExecutionRegistry } from "contracts/infra/SwapExecutionRegistry.sol";
 import { ISwapExecutionRegistry } from "contracts/interfaces/ISwapExecutionRegistry.sol";
 
 import { BaseTest } from "../BaseTest.sol";

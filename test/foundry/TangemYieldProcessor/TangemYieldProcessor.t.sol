@@ -5,13 +5,13 @@ pragma solidity 0.8.29;
 import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
-import { YieldModuleBase } from "../YieldModuleBase.sol";
+import { YieldModuleFixture } from "../YieldModuleFixture.sol";
 import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 
-import { TangemYieldProcessor } from "contracts/core/TangemYieldProcessor.sol";
-import { PRECISION } from "contracts/resources/Constants.sol";
+import { PRECISION } from "contracts/common/Constants.sol";
+import { TangemYieldProcessor } from "contracts/infra/TangemYieldProcessor.sol";
 
-contract TangemYieldProcessorTest is YieldModuleBase {
+contract TangemYieldProcessorTest is YieldModuleFixture {
     address internal newFeeReceiver = makeAddr("newFeeReceiver");
 
     /*  setFeeReceiver  */

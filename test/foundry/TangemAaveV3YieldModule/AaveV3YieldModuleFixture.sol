@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import { YieldModuleBase } from "test/foundry/YieldModuleBase.sol";
+import { YieldModuleFixture } from "test/foundry/YieldModuleFixture.sol";
 import { TangemAaveV3YieldModuleHarness } from "test/foundry/harnesses/TangemAaveV3YieldModuleHarness.sol";
 
 import { AaveV3PoolMock } from "contracts/test/AaveV3PoolMock.sol";
 import { TestERC20 } from "contracts/test/TestERC20.sol";
 
-abstract contract AaveV3YieldModuleBase is YieldModuleBase {
+abstract contract AaveV3YieldModuleFixture is YieldModuleFixture {
     uint internal constant INITIAL_MODULE_BALANCE = 50_000e6;
     uint internal constant TOTAL_ENTER_AMOUNT = INITIAL_OWNER_BALANCE + INITIAL_MODULE_BALANCE;
     uint internal constant FRESH_OWNER_BALANCE = 50_000e6;

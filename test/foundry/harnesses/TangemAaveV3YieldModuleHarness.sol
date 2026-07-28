@@ -2,7 +2,7 @@
 pragma solidity 0.8.29;
 
 import { YieldModuleHarness } from "./YieldModuleHarness.sol";
-import { TangemAaveV3YieldModule } from "contracts/aave/TangemAaveV3YieldModule.sol";
+import { TangemAaveV3YieldModule } from "contracts/adapters/aave/TangemAaveV3YieldModule.sol";
 
 contract TangemAaveV3YieldModuleHarness is TangemAaveV3YieldModule, YieldModuleHarness {
     constructor(

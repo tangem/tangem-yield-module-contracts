@@ -2,14 +2,14 @@
 /* solhint-disable func-name-mixedcase */
 pragma solidity 0.8.29;
 
-import { MerklIncentivesBase, TestERC20 } from "./MerklIncentivesBase.sol";
+import { MerklIncentivesFixture, TestERC20 } from "./MerklIncentivesFixture.sol";
 import { Requires } from "contracts/common/Requires.sol";
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 import { MerklDistributorMock } from "contracts/test/MerklDistributorMock.sol";
 import { TangemAaveV3YieldModuleHarness } from "test/foundry/harnesses/TangemAaveV3YieldModuleHarness.sol";
 
-contract MerklIncentivesTest is MerklIncentivesBase {
+contract MerklIncentivesTest is MerklIncentivesFixture {
     function setUp() public override {
         super.setUp();
 

@@ -1,106 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import { ERC2771ContextUpgradeable } from "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
-import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import { ReentrancyGuardTransientUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import { Requires } from "../common/Requires.sol";
-import { ISwapExecutionRegistry } from "../interfaces/ISwapExecutionRegistry.sol";
-import { IYieldFactory } from "../interfaces/IYieldFactory.sol";
-import { IYieldModule } from "../interfaces/IYieldModule.sol";
-import { IYieldProcessor } from "../interfaces/IYieldProcessor.sol";
-import { PRECISION } from "../resources/Constants.sol";
+import { FeeAccounting } from "./FeeAccounting.sol";
+import { YieldModuleBase } from "./YieldModuleBase.sol";
 
-abstract contract YieldModuleLiquidUpgradeable is
-    Initializable,
-    ERC2771ContextUpgradeable,
-    IYieldModule,
-    UUPSUpgradeable,
-    ReentrancyGuardTransientUpgradeable
-{
+abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting {
     using SafeERC20 for IERC20;
     using Requires for uint;
     using Requires for address;
-
-    struct YieldTokenData {
-        bool initialized;
-        bool active;
-        uint240 maxNetworkFee;
-    }
-
-    struct LatestFeePaymentState {
-        uint protocolBalance;
-        uint serviceFeeRate;
-    }
-
-    struct SwapContext {
-        IERC20 tokenIn;
-        address tokenInAddr;
-        address spenderEffective;
-        uint amountIn;
-        uint feeIn;
-        bool protocolTouched;
-    }
-
-    IYieldProcessor public immutable processor;
-    IYieldFactory public immutable factory;
-    ISwapExecutionRegistry public immutable swapExecutionRegistry;
-    address public owner;
-
-    // yield token => yield token data
-    mapping(address => YieldTokenData) public yieldTokensData;
-    // yield token => protocol token
-    mapping(address => IERC20) public protocolTokens;
-    // yield token => latest fee payment state
-    mapping(address => LatestFeePaymentState) public latestFeePaymentStates;
-    // yield token => fee debt
-    mapping(address => uint) public feeDebts;
-    mapping(address => bool) public isProtocolToken;
-
-    // protocol token => yield token
-    mapping(address => address) public yieldTokenByProtocolToken;
-
-    modifier onlyOwner() {
-        require(_msgSender() == owner, OnlyOwner());
-        _;
-    }
-
-    modifier onlyOwnerOrFactory() {
-        address msgSender = _msgSender();
-        require(msgSender == owner || msgSender == address(factory), OnlyOwnerOrFactory());
-        _;
-    }
-
-    modifier onlyProcessor() {
-        require(_msgSender() == address(processor), OnlyProcessor());
-        _;
-    }
-
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor(
-        address processor_,
-        address factory_,
-        address trustedForwarder_,
-        address swapExecutionRegistry_
-    ) ERC2771ContextUpgradeable(trustedForwarder_) {
-        processor = IYieldProcessor(processor_);
-        factory = IYieldFactory(factory_);
-        swapExecutionRegistry = ISwapExecutionRegistry(swapExecutionRegistry_);
-    }
-
-    receive() external payable { }
-
-    function __YieldModule_init(address owner_) internal onlyInitializing {
-        __ReentrancyGuardTransient_init();
-        __YieldModule_init_unchained(owner_);
-    }
-
-    function __YieldModule_init_unchained(address owner_) internal onlyInitializing {
-        owner = owner_;
-    }
 
     /* PROCESSOR FUNCTIONS */
 
@@ -149,6 +59,14 @@ abstract contract YieldModuleLiquidUpgradeable is
         yieldTokenByProtocolToken[protocolToken] = yieldToken;
 
         emit YieldTokenInitialized(yieldToken, protocolToken, maxNetworkFee);
+    }
+
+    function enterProtocolByOwner(address yieldToken) external onlyOwner {
+        _enterProtocol(yieldToken, type(uint).max, 0); // enter with all funds available
+    }
+
+    function enterProtocolByOwner(address yieldToken, uint amount) external onlyOwner {
+        _enterProtocol(yieldToken, amount, 0);
     }
 
     function send(address yieldToken, address to, uint amount) external onlyOwner {
@@ -259,14 +177,6 @@ abstract contract YieldModuleLiquidUpgradeable is
         emit WithdrawNativeProcessed(to, amount);
     }
 
-    function enterProtocolByOwner(address yieldToken) external onlyOwner {
-        _enterProtocol(yieldToken, type(uint).max, 0); // enter with all funds available
-    }
-
-    function enterProtocolByOwner(address yieldToken, uint amount) external onlyOwner {
-        _enterProtocol(yieldToken, amount, 0);
-    }
-
     // used to reactivate token after exitProtocol and withdrawAndDeactivate
     function reactivateToken(address yieldToken, uint240 maxNetworkFee) external onlyOwner {
         YieldTokenData storage yieldTokenData = yieldTokensData[yieldToken];
@@ -287,77 +197,6 @@ abstract contract YieldModuleLiquidUpgradeable is
         yieldTokenData.maxNetworkFee = maxNetworkFee;
 
         emit TokenMaxNetworkFeeSet(yieldToken, maxNetworkFee);
-    }
-
-    function swap(
-        address tokenIn,
-        uint amountIn,
-        address target,
-        address spender,
-        bytes calldata data
-    ) external payable onlyOwner nonReentrant {
-        SwapContext memory context = _prepareSwap(tokenIn, amountIn, target, spender, data);
-
-        _callProvider(target, data);
-
-        _finalizeSwap(context);
-
-        emit SwapInitiated(tokenIn, amountIn, target, context.spenderEffective, msg.value, keccak256(data));
-    }
-
-    function swapAndReceive(
-        address tokenIn,
-        address tokenOut,
-        address to,
-        uint amountIn,
-        address target,
-        address spender,
-        bytes calldata data
-    ) external payable onlyOwner nonReentrant {
-        tokenOut.requireNotZero();
-        require(tokenOut != tokenIn, TokenInEqualsTokenOut());
-        require(!isProtocolToken[tokenOut], WithdrawingProtocolToken());
-
-        uint outBefore = IERC20(tokenOut).balanceOf(address(this));
-
-        SwapContext memory context = _prepareSwap(tokenIn, amountIn, target, spender, data);
-
-        _callProvider(target, data);
-
-        _finalizeSwap(context);
-
-        uint outAfter = IERC20(tokenOut).balanceOf(address(this));
-        uint received = (outAfter > outBefore) ? (outAfter - outBefore) : 0;
-        require(received > 0, SwapPayoutNotReceived());
-
-        emit SwapAndReceiveInitiated(
-            tokenIn,
-            tokenOut,
-            to,
-            amountIn,
-            target,
-            context.spenderEffective,
-            msg.value,
-            keccak256(data)
-        );
-
-        bool deposited;
-        if (yieldTokensData[tokenOut].active) {
-            uint feeOut = calculateServiceFee(tokenOut);
-
-            _pushToProtocol(tokenOut, outAfter);
-            _tryProcessFee(tokenOut, feeOut, true);
-
-            deposited = true;
-        } else {
-            to.requireNotZero();
-            require(to != address(this), SendingToThis());
-
-            IERC20(tokenOut).safeTransfer(to, received);
-            deposited = false;
-        }
-
-        emit SwapAndReceiveCompleted(tokenOut, to, received, deposited);
     }
 
     /* VIEW FUNCTIONS */
@@ -381,62 +220,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         return IERC20(yieldToken).balanceOf(owner) + effectiveProtocolBal;
     }
 
-    function calculateFee(address yieldToken, uint networkFee) public view returns (uint) {
-        require(networkFee <= yieldTokensData[yieldToken].maxNetworkFee, NetworkFeeExceedsMax());
-
-        return calculateServiceFee(yieldToken) + networkFee;
-    }
-
-    function calculateServiceFee(address yieldToken) public view returns (uint) {
-        return _calculateServiceFee(yieldToken, _protocolBalance(yieldToken));
-    }
-
-    /* PRIVATE AND INTERNAL FUNCTIONS */
-
-    function _tryProcessFee(address yieldToken, uint amount, bool useProtocolToken) private returns (bool success) {
-        if (amount == 0) {
-            _processFeePaymentSuccess(yieldToken, 0, processor.feeReceiver());
-            return true;
-        }
-
-        uint balance;
-        if (useProtocolToken) {
-            balance = _protocolBalance(yieldToken);
-        } else {
-            balance = IERC20(yieldToken).balanceOf(owner);
-        }
-
-        uint transferAmount = amount > balance ? balance : amount;
-        uint debt = amount - transferAmount;
-
-        if (transferAmount == 0) {
-            _processFeePaymentFailure(yieldToken, amount);
-            return false;
-        }
-
-        address feeReceiver = processor.feeReceiver();
-        bool transferSuccess;
-        if (useProtocolToken) {
-            transferSuccess = protocolTokens[yieldToken].trySafeTransfer(feeReceiver, transferAmount);
-        } else {
-            transferSuccess = IERC20(yieldToken).trySafeTransferFrom(owner, feeReceiver, transferAmount);
-        }
-
-        if (transferSuccess) {
-            if (debt > 0) {
-                feeDebts[yieldToken] = debt;
-                _updateLatestFeePaymentState(yieldToken);
-                emit FeePaymentPartial(yieldToken, transferAmount, debt, feeReceiver);
-            } else {
-                _processFeePaymentSuccess(yieldToken, transferAmount, feeReceiver);
-            }
-        } else {
-            // shouldn't happen with proper fee receiver
-            _processFeePaymentFailure(yieldToken, amount);
-        }
-
-        return transferSuccess;
-    }
+    /* PRIVATE FUNCTIONS */
 
     function _enterProtocol(address yieldToken, uint amount, uint networkFee) private {
         require(yieldTokensData[yieldToken].active, TokenNotActive());
@@ -460,184 +244,5 @@ abstract contract YieldModuleLiquidUpgradeable is
         _tryProcessFee(yieldToken, fee, true);
 
         emit ProtocolEntered(yieldToken, amountToEnter, networkFee);
-    }
-
-    function _processFeePaymentSuccess(address token, uint amount, address receiver) private {
-        feeDebts[token] = 0;
-        _updateLatestFeePaymentState(token);
-
-        emit FeePaymentProcessed(token, amount, receiver);
-    }
-
-    function _processFeePaymentFailure(address token, uint amount) private {
-        feeDebts[token] = amount;
-        _updateLatestFeePaymentState(token);
-
-        emit FeePaymentFailed(token, amount);
-    }
-
-    function _updateLatestFeePaymentState(address token) private {
-        uint protocolBalance_ = _protocolBalance(token);
-        uint serviceFeeRate = processor.serviceFeeRate();
-        latestFeePaymentStates[token] = LatestFeePaymentState(protocolBalance_, serviceFeeRate);
-
-        emit LatestFeePaymentStateUpdated(token, protocolBalance_, serviceFeeRate);
-    }
-
-    function _increaseProtocolBalanceWithoutFee(address token, uint amount) internal {
-        LatestFeePaymentState storage latestFeePaymentState = latestFeePaymentStates[token];
-        uint newFeeCheckpoint = latestFeePaymentState.protocolBalance + amount;
-
-        require(newFeeCheckpoint <= _protocolBalance(token), FeeCheckpointExceedsBalance());
-
-        latestFeePaymentState.protocolBalance = newFeeCheckpoint;
-
-        emit LatestFeePaymentStateUpdated(token, newFeeCheckpoint, latestFeePaymentState.serviceFeeRate);
-    }
-
-    function _calculateServiceFee(address yieldToken, uint protocolBalance_) private view returns (uint) {
-        LatestFeePaymentState storage latestFeePaymentState = latestFeePaymentStates[yieldToken];
-        uint latestFeePaymentProtocolBalance = latestFeePaymentState.protocolBalance;
-        uint latestFeePaymentServiceFeeRate = latestFeePaymentState.serviceFeeRate;
-
-        // even if balance dropped, outstanding debt must still be collected.
-        if (protocolBalance_ <= latestFeePaymentProtocolBalance) return feeDebts[yieldToken];
-
-        uint revenue;
-        unchecked { // checked with last if
-            revenue = protocolBalance_ - latestFeePaymentProtocolBalance;
-        }
-        uint currentServiceFee = revenue * latestFeePaymentServiceFeeRate / PRECISION;
-
-        return currentServiceFee + feeDebts[yieldToken];
-    }
-
-    function _protocolBalance(address yieldToken) internal view returns (uint) {
-        return protocolTokens[yieldToken].balanceOf(address(this));
-    }
-
-    function _initProtocolToken(address yieldToken) internal virtual returns (address);
-
-    function _pushToProtocol(address yieldToken, uint amount) internal virtual;
-
-    function _pullFromProtocolToOwner(address yieldToken, uint amount) internal virtual returns (uint);
-
-    function _pullFromProtocolToModule(address yieldToken, uint amount) internal virtual returns (uint);
-
-    function _tryResolveYieldToken(address protocolToken) internal view virtual returns (address);
-
-    function _getProtocolToken(address yieldToken) internal view virtual returns (address);
-
-    function _prepareSwap(
-        address tokenIn,
-        uint amountIn,
-        address target,
-        address spender,
-        bytes calldata data
-    ) internal returns (SwapContext memory context) {
-        require(yieldTokensData[tokenIn].active, TokenNotActive());
-
-        amountIn.requireNotZero();
-        target.requireNotZero();
-        require(target.code.length > 0, TargetHasNoCode());
-        require(data.length >= 4, DataTooShort());
-
-        address spenderEffective = (spender == address(0)) ? target : spender;
-
-        require(swapExecutionRegistry.allowedTargets(target), TargetNotAllowed());
-        require(swapExecutionRegistry.allowedSpenders(spenderEffective), SpenderNotAllowed());
-
-        uint feeIn = calculateServiceFee(tokenIn);
-
-        IERC20 tokenInErc20 = IERC20(tokenIn);
-
-        // use any stuck funds on the module
-        uint moduleBal = tokenInErc20.balanceOf(address(this));
-        uint collected = moduleBal >= amountIn ? amountIn : moduleBal;
-        uint needed = amountIn - collected;
-
-        // take from owner if needed
-        bool protocolTouched;
-        if (needed > 0) {
-            uint ownerBal = tokenInErc20.balanceOf(owner);
-            uint fromOwner = ownerBal >= needed ? needed : ownerBal;
-            if (fromOwner > 0) {
-                tokenInErc20.safeTransferFrom(owner, address(this), fromOwner);
-            }
-            needed -= fromOwner;
-        }
-
-        // pull from protocol directly to module if still needed
-        if (needed > 0) {
-            uint protocolBal = _protocolBalance(tokenIn);
-
-            require(protocolBal >= needed + feeIn, InsufficientFunds());
-            if (protocolBal == needed + feeIn) {
-                // avoid protocol rounding errors on withdrawing all available funds
-                feeIn = type(uint).max; // use whole balance left as fee
-            }
-
-            _pullFromProtocolToModule(tokenIn, needed);
-            protocolTouched = true;
-        }
-
-        tokenInErc20.forceApprove(spenderEffective, amountIn);
-
-        context = SwapContext({
-            tokenIn: tokenInErc20,
-            tokenInAddr: tokenIn,
-            spenderEffective: spenderEffective,
-            amountIn: amountIn,
-            feeIn: feeIn,
-            protocolTouched: protocolTouched
-        });
-    }
-
-    function _callProvider(address target, bytes calldata data) internal {
-        (bool success, bytes memory ret) = target.call{ value: msg.value }(data);
-        if (!success) {
-            if (ret.length > 0) {
-                assembly {
-                    revert(add(ret, 0x20), mload(ret))
-                }
-            }
-            revert ProviderCallFailed();
-        }
-    }
-
-    function _finalizeSwap(SwapContext memory context) internal {
-        context.tokenIn.forceApprove(context.spenderEffective, 0);
-
-        // process fee before handling residue to avoid inflating fee when feeIn == type(uint).max
-        if (context.protocolTouched) {
-            address tokenIn = context.tokenInAddr;
-            uint feeIn = context.feeIn == type(uint).max ? _protocolBalance(tokenIn) : context.feeIn;
-
-            _tryProcessFee(tokenIn, feeIn, true);
-        }
-    }
-
-    function _resolveYieldToken(address protocolToken) internal returns (address) {
-        address yieldToken = yieldTokenByProtocolToken[protocolToken];
-
-        if (yieldToken != address(0)) {
-            return yieldToken;
-        }
-
-        return _resolveAndSetYieldTokenByProtocolToken(protocolToken);
-    }
-
-    function _resolveAndSetYieldTokenByProtocolToken(address protocolToken) internal returns (address yieldToken) {
-        require(isProtocolToken[protocolToken], ProtocolTokenNotSet(protocolToken));
-
-        yieldToken = _tryResolveYieldToken(protocolToken);
-        require(yieldTokensData[yieldToken].initialized, YieldTokenNotInitialized(yieldToken));
-
-        yieldTokenByProtocolToken[protocolToken] = yieldToken;
-        emit YieldTokensByProtocolTokensSet(yieldToken);
-    }
-
-    function _authorizeUpgrade(address newImplementation) internal view override onlyOwner {
-        require(factory.isValidImplementation(newImplementation), UnauthorizedImplementation());
     }
 }
