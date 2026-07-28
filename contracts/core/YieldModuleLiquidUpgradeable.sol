@@ -94,12 +94,7 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
         ierc20Token.safeTransferFrom(owner, to, amount);
 
         if (ownerBalance < amount) {
-            // no need to process fee if the protocol balance hasn't changed
-            if (protocolBal == pullAmount + fee) {
-                // avoid protocol rounding errors on sending all available funds
-                fee = _protocolBalance(yieldToken);
-            }
-            _tryProcessFee(yieldToken, fee, true);
+            _processFeeAfterProtocolPull(yieldToken, fee, protocolBal, pullAmount);
         }
 
         emit SendProcessed(yieldToken, to, amount);
@@ -116,11 +111,7 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
 
         _pullFromProtocolToOwner(yieldToken, amount);
 
-        if (protocolBal == amount + fee) {
-            // avoid protocol rounding errors on withdrawing all available funds
-            fee = _protocolBalance(yieldToken);
-        }
-        _tryProcessFee(yieldToken, fee, true);
+        _processFeeAfterProtocolPull(yieldToken, fee, protocolBal, amount);
 
         emit WithdrawProcessed(yieldToken, amount);
     }
@@ -133,16 +124,18 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
         // calculate service fee before changing funds in a protocol
         uint fee = _calculateServiceFee(yieldToken, protocolBal);
 
-        uint amountToExit = protocolBal >= fee ? protocolBal - fee : 0; // we should still allow to deactivate token even if there is some error
+        // we should still allow to deactivate token even if there is some error
+        uint feeToCharge = fee > protocolBal ? protocolBal : fee;
+        uint amountToExit = protocolBal - feeToCharge;
 
         if (amountToExit > 0) {
             _pullFromProtocolToOwner(yieldToken, amountToExit);
         }
 
-        // get protocol balance again to avoid protocol rounding errors
+        // the whole balance left is charged as fee
         // we can lose debt if the balance were less than the debt due to some error, but we have no means to get it anyway,
         // since not enough funds left, but we'll catch this behaviour with data collection
-        _tryProcessFee(yieldToken, _protocolBalance(yieldToken), true);
+        _processFeeAfterProtocolPull(yieldToken, feeToCharge, protocolBal, amountToExit);
 
         // disable token to avoid abuse by processor
         yieldTokenData.active = false;
