@@ -12,9 +12,15 @@ contract AaveV3PoolMock {
     event GenerateRevenue(address account, uint amount);
 
     TestERC20 public aToken;
+    uint public withdrawBurnShortfall;
 
     constructor() {
         aToken = new TestERC20("AaveV3MockAToken", "aTST", 6);
+    }
+
+    // simulates aToken index rounding: burns slightly less than withdrawn, leaving dust on the account
+    function setWithdrawBurnShortfall(uint shortfall) external {
+        withdrawBurnShortfall = shortfall;
     }
 
     function getReserveData(address) external view returns (DataTypes.ReserveData memory) {
@@ -49,7 +55,9 @@ contract AaveV3PoolMock {
             amount = aToken.balanceOf(msg.sender);
         }
 
-        aToken.forceBurn(msg.sender, amount);
+        uint burnAmount = amount > withdrawBurnShortfall ? amount - withdrawBurnShortfall : 0;
+
+        aToken.forceBurn(msg.sender, burnAmount);
         IERC20(asset).transfer(to, amount); // make sure there is enough balance
 
         emit Withdraw(asset, amount, to);
