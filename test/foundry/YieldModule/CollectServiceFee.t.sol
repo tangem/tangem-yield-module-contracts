@@ -4,13 +4,13 @@ pragma solidity 0.8.29;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import { YieldModuleBase } from "../YieldModuleBase.sol";
+import { YieldModuleFixture } from "../YieldModuleFixture.sol";
 import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 
+import { PRECISION } from "contracts/common/Constants.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
-import { PRECISION } from "contracts/resources/Constants.sol";
 
-contract CollectServiceFeeTest is YieldModuleBase {
+contract CollectServiceFeeTest is YieldModuleFixture {
     YieldModuleHarness internal yieldModule;
 
     function setUp() public override {

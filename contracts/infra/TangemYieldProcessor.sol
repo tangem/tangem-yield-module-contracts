@@ -5,9 +5,9 @@ import { AccessControlEnumerable } from "@openzeppelin/contracts/access/extensio
 import { Arrays } from "@openzeppelin/contracts/utils/Arrays.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
+import { PRECISION } from "../common/Constants.sol";
 import { IYieldModule } from "../interfaces/IYieldModule.sol";
 import { IYieldProcessor } from "../interfaces/IYieldProcessor.sol";
-import { PRECISION } from "../resources/Constants.sol";
 
 contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausable {
     using Arrays for uint[];

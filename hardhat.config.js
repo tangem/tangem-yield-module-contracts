@@ -32,13 +32,15 @@ module.exports = {
   abiExporter: {
     path: "./abi",
     clear: true,
-    flat: true
+    flat: true,
+    except: ["contracts/test/"]
   },
   bytecodeExporter: {
     path: "./bin",
     runOnCompile: true,
     clear: true,
-    flat: true
+    flat: true,
+    except: ["contracts/test/"]
   },
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY

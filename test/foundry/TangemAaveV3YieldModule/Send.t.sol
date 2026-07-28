@@ -6,12 +6,12 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Vm } from "forge-std/src/Test.sol";
 
 import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
-import { AaveV3YieldModuleBase } from "./AaveV3YieldModuleBase.sol";
+import { AaveV3YieldModuleFixture } from "./AaveV3YieldModuleFixture.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 import { AaveV3PoolMock } from "contracts/test/AaveV3PoolMock.sol";
 
-contract SendTest is AaveV3YieldModuleBase {
+contract SendTest is AaveV3YieldModuleFixture {
     uint internal constant SEND_FRESH_OWNER_BALANCE = 5_000e6;
     uint internal constant SEND_AMOUNT = 25_000e6;
 

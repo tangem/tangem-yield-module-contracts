@@ -3,10 +3,10 @@ pragma solidity 0.8.29;
 
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 import { TestERC20 } from "contracts/test/TestERC20.sol";
-import { AaveV3YieldModuleBase } from "test/foundry/TangemAaveV3YieldModule/AaveV3YieldModuleBase.sol";
+import { AaveV3YieldModuleFixture } from "test/foundry/TangemAaveV3YieldModule/AaveV3YieldModuleFixture.sol";
 import { YieldModuleHarness } from "test/foundry/harnesses/YieldModuleHarness.sol";
 
-abstract contract MerklIncentivesBase is AaveV3YieldModuleBase {
+abstract contract MerklIncentivesFixture is AaveV3YieldModuleFixture {
     YieldModuleHarness ym;
 
     function _createRewardToken() internal returns (TestERC20 token) {

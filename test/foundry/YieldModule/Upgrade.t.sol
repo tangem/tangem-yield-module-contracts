@@ -4,13 +4,13 @@ pragma solidity 0.8.29;
 
 import { IERC1967 } from "@openzeppelin/contracts/interfaces/IERC1967.sol";
 
-import { YieldModuleBase } from "../YieldModuleBase.sol";
+import { YieldModuleFixture } from "../YieldModuleFixture.sol";
 import { YieldModuleGeneralHarness } from "../harnesses/YieldModuleGeneralHarness.sol";
 import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
-contract UpgradeTest is YieldModuleBase {
+contract UpgradeTest is YieldModuleFixture {
     address internal constant NEW_FORWARDER = address(0);
 
     YieldModuleHarness internal yieldModule;

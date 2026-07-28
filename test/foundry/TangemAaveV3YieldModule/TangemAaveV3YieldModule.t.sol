@@ -3,11 +3,11 @@
 pragma solidity 0.8.29;
 
 import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
-import { AaveV3YieldModuleBase } from "./AaveV3YieldModuleBase.sol";
+import { AaveV3YieldModuleFixture } from "./AaveV3YieldModuleFixture.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
-contract TangemAaveV3YieldModuleTest is AaveV3YieldModuleBase {
+contract TangemAaveV3YieldModuleTest is AaveV3YieldModuleFixture {
     function test_deployYieldModule_InitializesYieldToken() public {
         YieldModuleHarness yieldModule = _deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
 

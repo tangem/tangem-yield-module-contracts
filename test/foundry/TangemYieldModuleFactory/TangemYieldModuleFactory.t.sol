@@ -2,12 +2,12 @@
 /* solhint-disable func-name-mixedcase */
 pragma solidity 0.8.29;
 
-import { YieldModuleBase } from "../YieldModuleBase.sol";
+import { YieldModuleFixture } from "../YieldModuleFixture.sol";
 import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 
-import { TangemYieldModuleFactory } from "contracts/core/TangemYieldModuleFactory.sol";
+import { TangemYieldModuleFactory } from "contracts/infra/TangemYieldModuleFactory.sol";
 
-contract TangemYieldModuleFactoryTest is YieldModuleBase {
+contract TangemYieldModuleFactoryTest is YieldModuleFixture {
     function setUp() public override {
         super.setUp();
         _registerGeneralImplementation();

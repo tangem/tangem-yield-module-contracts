@@ -2,12 +2,12 @@
 /* solhint-disable func-name-mixedcase */
 pragma solidity 0.8.29;
 
-import { YieldModuleBase } from "../YieldModuleBase.sol";
+import { YieldModuleFixture } from "../YieldModuleFixture.sol";
 import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
-contract NetworkFeeTest is YieldModuleBase {
+contract NetworkFeeTest is YieldModuleFixture {
     uint240 internal constant NEW_MAX_NETWORK_FEE = 5e6;
 
     YieldModuleHarness internal yieldModule;

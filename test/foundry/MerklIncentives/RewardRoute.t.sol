@@ -2,11 +2,11 @@
 /* solhint-disable func-name-mixedcase */
 pragma solidity 0.8.29;
 
-import { MerklIncentivesBase, TestERC20 } from "./MerklIncentivesBase.sol";
+import { MerklIncentivesFixture, TestERC20 } from "./MerklIncentivesFixture.sol";
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 
 /// Reward routing tests: how claimed Merkl rewards are classified and processed
-contract RewardRouteTest is MerklIncentivesBase {
+contract RewardRouteTest is MerklIncentivesFixture {
     function setUp() public override {
         super.setUp();
 
