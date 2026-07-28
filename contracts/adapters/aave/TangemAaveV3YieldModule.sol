@@ -5,12 +5,13 @@ import { IPool } from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import { YieldModuleBase } from "../../core/YieldModuleBase.sol";
-import { MerklIncentives } from "../../extensions/MerklIncentives.sol";
-import { SwapExecution } from "../../extensions/SwapExecution.sol";
-import { IAToken } from "../../interfaces/IAToken.sol";
+import { YieldModuleBase } from "contracts/core/YieldModuleBase.sol";
+import { YieldModuleLiquidUpgradeable } from "contracts/core/YieldModuleLiquidUpgradeable.sol";
+import { MerklIncentives } from "contracts/extensions/MerklIncentives.sol";
+import { SwapExecution } from "contracts/extensions/SwapExecution.sol";
+import { IAToken } from "contracts/interfaces/IAToken.sol";
 
-contract TangemAaveV3YieldModule is SwapExecution, MerklIncentives {
+contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable, SwapExecution, MerklIncentives {
     using SafeERC20 for IERC20;
 
     IPool public immutable pool;
