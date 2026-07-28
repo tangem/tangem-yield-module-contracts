@@ -205,19 +205,17 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
         return _protocolBalance(yieldToken);
     }
 
-    function effectiveProtocolBalance(address yieldToken) external view returns (uint) {
+    function effectiveBalance(address yieldToken) external view returns (uint) {
+        uint effectiveProtocolBal = effectiveProtocolBalance(yieldToken);
+
+        return IERC20(yieldToken).balanceOf(owner) + effectiveProtocolBal;
+    }
+
+    function effectiveProtocolBalance(address yieldToken) public view returns (uint) {
         uint protocolBalance_ = _protocolBalance(yieldToken);
         uint fee = _calculateServiceFee(yieldToken, protocolBalance_);
 
         return protocolBalance_ > fee ? (protocolBalance_ - fee) : 0;
-    }
-
-    function effectiveBalance(address yieldToken) external view returns (uint) {
-        uint protocolBalance_ = _protocolBalance(yieldToken);
-        uint fee = _calculateServiceFee(yieldToken, protocolBalance_);
-        uint effectiveProtocolBal = protocolBalance_ > fee ? (protocolBalance_ - fee) : 0;
-
-        return IERC20(yieldToken).balanceOf(owner) + effectiveProtocolBal;
     }
 
     /* PRIVATE FUNCTIONS */
