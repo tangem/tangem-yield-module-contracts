@@ -40,7 +40,7 @@ interface IYieldModule {
         bool depositedToProtocol
     );
     event WithdrawNativeProcessed(address indexed to, uint amount);
-    event SoftExitTriggered(address indexed yieldToken, uint moduleBalance, uint amount);
+    event SoftExitTriggered(address indexed yieldToken, uint protocolBalance, uint amount);
     event RiskSuspensionSet(address indexed yieldToken, bool suspended);
 
     error OnlyOwner();

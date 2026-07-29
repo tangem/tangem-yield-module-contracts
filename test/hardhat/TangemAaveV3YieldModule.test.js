@@ -2358,11 +2358,43 @@ describe("TangemBridgeProcessor", function () {
           .to.be.revertedWithCustomError(yieldModule, "ZeroAmount");
       });
 
-      it("Should revert with InsufficientFunds when amount plus fee exceeds the protocol balance", async function () {
+      it("Should clamp the amount to what is available instead of reverting", async function () {
         const protocolBal = await yieldModule.protocolBalance(yieldToken);
 
+        // a risk exit must never fail because the backend asked for a stale amount
         await expect(processor["softExit(address,address,uint256)"](yieldModule, yieldToken, protocolBal + 1n))
-          .to.be.revertedWithCustomError(yieldModule, "InsufficientFunds");
+          .to.emit(pool, "Withdraw")
+          .withArgs(yieldToken, protocolBal, owner); // fee is 0 here, so everything is withdrawable
+
+        expect(await yieldModule.protocolBalance(yieldToken)).to.equal(0);
+        expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
+      });
+
+      it("Should clamp to the balance left after the fee and still charge it in full", async function () {
+        await (await pool.generateRevenue(yieldModule, accumulatedRevenue)).wait();
+
+        const protocolBal = await yieldModule.protocolBalance(yieldToken);
+        const feeRate = await processor.serviceFeeRate();
+        const expectedFee = (BigInt(accumulatedRevenue) * feeRate) / BigInt(PRECISION);
+        const feeReceiver = await processor.feeReceiver();
+
+        // the clamp must not let the exit eat into the funds reserved for the fee
+        await expect(processor["softExit(address,address,uint256)"](yieldModule, yieldToken, protocolBal * 2n))
+          .to.emit(pool, "Withdraw")
+          .withArgs(yieldToken, protocolBal - expectedFee, owner)
+          .and.to.emit(yieldModule, "FeePaymentProcessed")
+          .withArgs(yieldToken, expectedFee, feeReceiver);
+
+        expect(await yieldModule.protocolBalance(yieldToken)).to.equal(0);
+      });
+
+      it("Should not withdraw anything when the protocol balance is already empty", async function () {
+        await (await processor.softExit(yieldModule, yieldToken)).wait(); // drains the position
+        expect(await yieldModule.protocolBalance(yieldToken)).to.equal(0);
+
+        await expect(processor["softExit(address,address,uint256)"](yieldModule, yieldToken, exitAmount))
+          .to.emit(yieldModule, "SoftExitTriggered")
+          .withArgs(yieldToken, 0, 0);
       });
 
       it("Should charge the service fee on accrued revenue", async function () {

@@ -282,42 +282,24 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
     function _softExit(address yieldToken, uint amount) private {
         require(yieldTokensData[yieldToken].active, TokenNotActive());
 
-        // softExit is not rate-limited: escalation after suspend and chunked withdrawals must not
-        // wait. this is safe only while the service fee stays watermark-based on a non-decreasing
-        // protocol balance — that invariant is the only thing preventing repeated exits from
-        // charging more than one full exit would, so it must hold for any future fee change
-        bool startingSuspension = !entrySuspended[yieldToken];
+        if (!entrySuspended[yieldToken]) {
+            entrySuspended[yieldToken] = true;
+            emit RiskSuspensionSet(yieldToken, true);
+        }
 
         uint protocolBal = _protocolBalance(yieldToken);
-        // calculate service fee before changing funds in a protocol
         uint fee = _calculateServiceFee(yieldToken, protocolBal);
 
-        if (amount == type(uint).max) {
-            // exit with everything except the fee
-            amount = protocolBal >= fee ? protocolBal - fee : 0;
-        } else {
-            require(protocolBal >= amount + fee, InsufficientFunds());
-        }
-
-        if (startingSuspension) {
-            entrySuspended[yieldToken] = true;
-        }
+        uint available = protocolBal > fee ? protocolBal - fee : 0;
+        amount = amount > available ? available : amount;
 
         if (amount > 0) {
-            // recipient is hardcoded to the owner
             _pullFromProtocolToOwner(yieldToken, amount);
         }
 
-        if (protocolBal == amount + fee) {
-            // avoid protocol rounding errors on withdrawing all available funds
-            fee = _protocolBalance(yieldToken);
-        }
-        _tryProcessFee(yieldToken, fee, true);
+        _processFeeAfterProtocolPull(yieldToken, fee, protocolBal, amount);
 
         emit SoftExitTriggered(yieldToken, protocolBal, amount);
-        if (startingSuspension) {
-            emit RiskSuspensionSet(yieldToken, true);
-        }
     }
 
     // true when the token accepts new deposits (active and not risk-suspended)
