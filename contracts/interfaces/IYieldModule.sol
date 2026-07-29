@@ -69,7 +69,6 @@ interface IYieldModule {
     error TokenInEqualsTokenOut();
     error SendingToThis();
     error TokenRiskSuspended();
-    error RiskActionRateLimited();
     error NotSuspended();
     error AlreadySuspended();
 

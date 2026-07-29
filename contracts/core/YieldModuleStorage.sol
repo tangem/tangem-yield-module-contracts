@@ -29,6 +29,4 @@ abstract contract YieldModuleStorage {
 
     // yield token => entry into the protocol paused by the risk service
     mapping(address => bool) public entrySuspended;
-    // yield token => timestamp of the start of the last suspension episode (softExit / suspendToken)
-    mapping(address => uint) public lastSuspensionAt;
 }

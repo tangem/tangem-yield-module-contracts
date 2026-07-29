@@ -3,7 +3,6 @@ pragma solidity 0.8.29;
 
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import { SUSPENSION_COOLDOWN } from "../common/Constants.sol";
 import { Requires } from "../common/Requires.sol";
 import { FeeAccounting } from "./FeeAccounting.sol";
 import { YieldModuleBase } from "./YieldModuleBase.sol";
@@ -212,8 +211,6 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
         require(yieldTokensData[yieldToken].active, TokenNotActive());
         require(!entrySuspended[yieldToken], AlreadySuspended());
 
-        _enforceSuspensionRateLimit(yieldToken);
-
         entrySuspended[yieldToken] = true;
 
         emit RiskSuspensionSet(yieldToken, true);
@@ -285,14 +282,11 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
     function _softExit(address yieldToken, uint amount) private {
         require(yieldTokensData[yieldToken].active, TokenNotActive());
 
-        // the cooldown only gates starting a new suspension episode; further softExits of an
-        // already-suspended token (escalation after suspend, chunked withdraw) are not limited.
-        // this is safe only while the service fee stays watermark-based on a non-decreasing
-        // protocol balance: then repeated exits never charge more than one full exit would
+        // softExit is not rate-limited: escalation after suspend and chunked withdrawals must not
+        // wait. this is safe only while the service fee stays watermark-based on a non-decreasing
+        // protocol balance — that invariant is the only thing preventing repeated exits from
+        // charging more than one full exit would, so it must hold for any future fee change
         bool startingSuspension = !entrySuspended[yieldToken];
-        if (startingSuspension) {
-            _enforceSuspensionRateLimit(yieldToken);
-        }
 
         uint protocolBal = _protocolBalance(yieldToken);
         // calculate service fee before changing funds in a protocol
@@ -329,11 +323,5 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
     // true when the token accepts new deposits (active and not risk-suspended)
     function _isDepositable(address yieldToken) internal view returns (bool) {
         return yieldTokensData[yieldToken].active && !entrySuspended[yieldToken];
-    }
-
-    // at most one new suspension episode (softExit or suspendToken) per token per cooldown
-    function _enforceSuspensionRateLimit(address yieldToken) private {
-        require(block.timestamp >= lastSuspensionAt[yieldToken] + SUSPENSION_COOLDOWN, RiskActionRateLimited());
-        lastSuspensionAt[yieldToken] = block.timestamp;
     }
 }
