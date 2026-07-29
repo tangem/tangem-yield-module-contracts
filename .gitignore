@@ -6,9 +6,14 @@ node_modules
 /cache
 /artifacts
 
+# foundry
+/foundry-artifacts
+
 # solidity-coverage files
 /coverage
 /coverage.json
+/coverage_report
+lcov.info
 
 # Exporters files
 abi

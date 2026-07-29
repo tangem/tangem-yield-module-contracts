@@ -4,7 +4,17 @@
   "description": "EVM smart contracts for Tangem Yield Module",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "compile": "hardhat compile",
+    "clean": "hardhat clean && forge clean",
+    "test": "npm run test:foundry && npm run test:hardhat",
+    "test:foundry": "forge test",
+    "test:hardhat": "hardhat test",
+    "coverage": "make coverage",
+    "gas": "make gas_snapshot",
+    "format:sol": "forge fmt",
+    "lint": "npm run lint:sol",
+    "lint:sol": "solhint --disc --noPoster 'contracts/**/*.sol' 'test/**/*.sol'",
+    "lint:sol:fix": "solhint --disc --noPoster --fix --noPrompt 'contracts/**/*.sol' 'test/**/*.sol'"
   },
   "repository": {
     "type": "git",
@@ -27,16 +37,15 @@
   },
   "homepage": "https://github.com/tangem/tangem-yield-module-contracts#readme",
   "devDependencies": {
-    "@0xsequence/create3": "github:0xsequence/create3",
-    "@aave/core-v3": "^1.19.3",
-    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
-    "@openzeppelin/contracts": "^5.3.0",
-    "@openzeppelin/contracts-upgradeable": "^5.3.0",
-    "@openzeppelin/hardhat-upgrades": "^3.9.0",
-    "@solidstate/hardhat-bytecode-exporter": "^1.1.1",
-    "dotenv": "^16.5.0",
-    "eslint": "^9.24.0",
-    "hardhat": "^2.23.0",
-    "hardhat-abi-exporter": "^2.11.0"
+    "@aave/core-v3": "1.19.3",
+    "@nomicfoundation/hardhat-toolbox": "5.0.0",
+    "@openzeppelin/contracts": "5.3.0",
+    "@openzeppelin/contracts-upgradeable": "5.3.0",
+    "@solidstate/hardhat-bytecode-exporter": "1.1.1",
+    "dotenv": "16.5.0",
+    "forge-std": "github:foundry-rs/forge-std#v1.9.7",
+    "hardhat": "2.26.3",
+    "hardhat-abi-exporter": "2.11.0",
+    "solhint": "6.2.3"
   }
 }

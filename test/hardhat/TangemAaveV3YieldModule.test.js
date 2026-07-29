@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
-const { deployTestSetup } = require("../scripts/TestDeploy");
+const { deployTestSetup } = require("./fixtures/testDeploy");
 
 describe("TangemBridgeProcessor", function () {
   const PRECISION = 10000;
@@ -1109,7 +1109,6 @@ describe("TangemBridgeProcessor", function () {
 
   describe("collectServiceFee", function () {
     const maxNetworkFee = 12345;
-    const networkFee = 1234;
     const initialOwnerBalance = 464263;
     const accumulatedRevenue = 11435;
     let yieldModule, serviceFee, initialFeeRate, feeReceiver;
@@ -1616,7 +1615,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should fail with correct error if called not by owner", async function () {
       const TestERC20 = await ethers.getContractFactory("TestERC20");
-      const outToken = await TestERC20.deploy();
+      const outToken = await TestERC20.deploy("TestToken", "TST", 18);
       await outToken.waitForDeployment();
 
       const tokenOut = await outToken.getAddress();
@@ -1694,7 +1693,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should fail with correct error if swap payout is not received", async function () {
       const TestERC20 = await ethers.getContractFactory("TestERC20");
-      const outToken = await TestERC20.deploy();
+      const outToken = await TestERC20.deploy("TestToken", "TST", 18);
       await outToken.waitForDeployment();
 
       const tokenOut = await outToken.getAddress();
@@ -1720,7 +1719,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should revert when tokenOut is not active and receiver is zero address", async function () {
       const TestERC20 = await ethers.getContractFactory("TestERC20");
-      const outToken = await TestERC20.deploy();
+      const outToken = await TestERC20.deploy("TestToken", "TST", 18);
       await outToken.waitForDeployment();
 
       const tokenOut = await outToken.getAddress();
@@ -1748,7 +1747,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should fail with correct error when tokenOut is not active and receiver is this contract", async function () {
       const TestERC20 = await ethers.getContractFactory("TestERC20");
-      const outToken = await TestERC20.deploy();
+      const outToken = await TestERC20.deploy("TestToken", "TST", 18);
       await outToken.waitForDeployment();
 
       const tokenOut = await outToken.getAddress();
@@ -1776,7 +1775,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should execute swap, clear allowance, transfer tokenOut to receiver, and emit SwapAndReceive events when tokenOut is not active", async function () {
       const TestERC20 = await ethers.getContractFactory("TestERC20");
-      const outToken = await TestERC20.deploy();
+      const outToken = await TestERC20.deploy("TestToken", "TST", 18);
       await outToken.waitForDeployment();
 
       const tokenOut = await outToken.getAddress();
@@ -1819,7 +1818,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should deposit tokenOut to protocol and sync latest fee state when tokenOut is active and fee is zero", async function () {
       const TestERC20 = await ethers.getContractFactory("TestERC20");
-      const outToken = await TestERC20.deploy();
+      const outToken = await TestERC20.deploy("TestToken", "TST", 18);
       await outToken.waitForDeployment();
 
       const tokenOut = await outToken.getAddress();
@@ -1857,7 +1856,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should deposit tokenOut to protocol and process service fee when tokenOut is active and revenue exists", async function () {
       const TestERC20 = await ethers.getContractFactory("TestERC20");
-      const outToken = await TestERC20.deploy();
+      const outToken = await TestERC20.deploy("TestToken", "TST", 18);
       await outToken.waitForDeployment();
 
       const tokenOut = await outToken.getAddress();
@@ -2150,6 +2149,7 @@ describe("TangemBridgeProcessor", function () {
       // Protocol component should be clamped to zero
       expect(await yieldModule.effectiveBalance(yieldToken)).to.equal(ownerBal);
     });
+
 
     it("Should preserve the residual fee debt when softExit cannot cover it in full", async function () {
       // protocol balance is zero here, so calculateServiceFee returns the pure debt
@@ -2792,7 +2792,7 @@ describe("TangemBridgeProcessor", function () {
 
     it("Should route tokenOut to the owner instead of depositing when tokenOut is risk-suspended", async function () {
       const TestERC20 = await ethers.getContractFactory("TestERC20");
-      const outToken = await TestERC20.deploy();
+      const outToken = await TestERC20.deploy("OutToken", "OUT", 18);
       await outToken.waitForDeployment();
       const tokenOut = await outToken.getAddress();
 

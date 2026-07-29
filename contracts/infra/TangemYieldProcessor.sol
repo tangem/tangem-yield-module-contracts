@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.29;
 
-import "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
-import "@openzeppelin/contracts/utils/Arrays.sol";
-import "../interfaces/IYieldProcessor.sol";
-import "../interfaces/IYieldModule.sol";
-import "../resources/Constants.sol";
+import { AccessControlEnumerable } from "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
+import { Arrays } from "@openzeppelin/contracts/utils/Arrays.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
+
+import { PRECISION } from "../common/Constants.sol";
+import { IYieldModule } from "../interfaces/IYieldModule.sol";
+import { IYieldProcessor } from "../interfaces/IYieldProcessor.sol";
 
 contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausable {
     using Arrays for uint[];
@@ -32,10 +33,7 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
 
     error InvalidFeeRate();
 
-    constructor(
-        address feeReceiver_,
-        uint serviceFeeRate_
-    ) {
+    constructor(address feeReceiver_, uint serviceFeeRate_) {
         feeReceiver = feeReceiver_;
         _setServiceFeeRate(serviceFeeRate_);
 
@@ -62,48 +60,10 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
         emit ProtocolExited(yieldModule);
     }
 
-    function softExit(
+    function collectServiceFee(
         address yieldModule,
         address yieldToken
-    ) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
-        IYieldModule(yieldModule).softExit(yieldToken);
-
-        emit SoftExited(yieldModule);
-    }
-
-    function softExit(
-        address yieldModule,
-        address yieldToken,
-        uint amount
-    ) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
-        IYieldModule(yieldModule).softExit(yieldToken, amount);
-
-        emit SoftExited(yieldModule);
-    }
-
-    function suspendToken(
-        address yieldModule,
-        address yieldToken
-    ) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
-        IYieldModule(yieldModule).suspendToken(yieldToken);
-
-        emit TokenSuspended(yieldModule);
-    }
-
-    function resumeAndEnterProtocol(
-        address yieldModule,
-        address yieldToken
-    ) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
-        IYieldModule(yieldModule).resumeAndEnterProtocol(yieldToken);
-
-        emit ProtocolResumed(yieldModule);
-    }
-
-    function collectServiceFee(address yieldModule, address yieldToken)
-        external
-        whenNotPaused
-        onlyRole(SERVICE_FEE_COLLECTOR_ROLE)
-    {
+    ) external whenNotPaused onlyRole(SERVICE_FEE_COLLECTOR_ROLE) {
         IYieldModule(yieldModule).collectServiceFee(yieldToken);
 
         emit ServiceFeeCollected(yieldModule);
@@ -119,6 +79,37 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
         _setServiceFeeRate(feeRate_);
 
         emit FeeRateSet(feeRate_);
+    }
+
+    function softExit(address yieldModule, address yieldToken) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
+        IYieldModule(yieldModule).softExit(yieldToken);
+
+        emit SoftExited(yieldModule);
+    }
+
+    function softExit(
+        address yieldModule,
+        address yieldToken,
+        uint amount
+    ) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
+        IYieldModule(yieldModule).softExit(yieldToken, amount);
+
+        emit SoftExited(yieldModule);
+    }
+
+    function suspendToken(address yieldModule, address yieldToken) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
+        IYieldModule(yieldModule).suspendToken(yieldToken);
+
+        emit TokenSuspended(yieldModule);
+    }
+
+    function resumeAndEnterProtocol(
+        address yieldModule,
+        address yieldToken
+    ) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
+        IYieldModule(yieldModule).resumeAndEnterProtocol(yieldToken);
+
+        emit ProtocolResumed(yieldModule);
     }
 
     function pause() external onlyRole(PAUSER_ROLE) {
