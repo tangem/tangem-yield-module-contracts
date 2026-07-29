@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract SwapProviderMock {
     error MockRevert();
@@ -9,13 +9,10 @@ contract SwapProviderMock {
     function swapExactIn(
         address tokenIn,
         address tokenOut,
-        uint256 amountIn,
-        uint256 amountOut,
+        uint amountIn,
+        uint amountOut,
         address sink
-    ) 
-        external 
-        payable 
-    {
+    ) external payable {
         IERC20(tokenIn).transferFrom(msg.sender, sink, amountIn);
 
         if (tokenOut != address(0) && amountOut > 0) {
@@ -23,25 +20,13 @@ contract SwapProviderMock {
         }
     }
 
-    function spendPartial(
-        address tokenIn,
-        uint256 amountIn,
-        address sink
-    ) 
-        external 
-    {
+    function spendPartial(address tokenIn, uint amountIn, address sink) external {
+        /* solhint-disable gas-custom-errors */
         require(amountIn > 0, "amountIn=0");
         IERC20(tokenIn).transferFrom(msg.sender, sink, amountIn - 1);
     }
 
-    function swapNoPayout(
-        address tokenIn,
-        uint256 amountIn,
-        address sink
-    ) 
-        external 
-        payable 
-    {
+    function swapNoPayout(address tokenIn, uint amountIn, address sink) external payable {
         IERC20(tokenIn).transferFrom(msg.sender, sink, amountIn);
     }
 
@@ -50,6 +35,8 @@ contract SwapProviderMock {
     }
 
     function revertEmpty() external pure {
+        /* solhint-disable reason-string */
+        /* solhint-disable gas-custom-errors */
         revert();
     }
 }

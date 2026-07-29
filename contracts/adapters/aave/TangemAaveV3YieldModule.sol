@@ -1,15 +1,20 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@aave/core-v3/contracts/interfaces/IPool.sol";
-import "../core/YieldModuleLiquidUpgradeable.sol";
+import { IPool } from "@aave/core-v3/contracts/interfaces/IPool.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable {
+import { YieldModuleBase } from "contracts/core/YieldModuleBase.sol";
+import { YieldModuleLiquidUpgradeable } from "contracts/core/YieldModuleLiquidUpgradeable.sol";
+import { SwapExecution } from "contracts/extensions/SwapExecution.sol";
+import { IAToken } from "contracts/interfaces/IAToken.sol";
+
+contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable, SwapExecution {
     using SafeERC20 for IERC20;
 
     IPool public immutable pool;
-    
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor(
         address pool_,
@@ -17,14 +22,7 @@ contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable {
         address factory_,
         address trustedForwarder_,
         address swapExecutionRegistry_
-    )
-        YieldModuleLiquidUpgradeable(
-            yieldProcessor_,
-            factory_,
-            trustedForwarder_,
-            swapExecutionRegistry_
-        )
-    {
+    ) SwapExecution(swapExecutionRegistry_) YieldModuleBase(yieldProcessor_, factory_, trustedForwarder_) {
         pool = IPool(pool_);
 
         _disableInitializers();

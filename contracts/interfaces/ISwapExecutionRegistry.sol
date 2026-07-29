@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
 interface ISwapExecutionRegistry {
     error ZeroAddress();
     error LengthMismatch();
-    
+
     event TargetAllowedSet(address indexed target, bool allowed);
     event SpenderAllowedSet(address indexed spender, bool allowed);
 

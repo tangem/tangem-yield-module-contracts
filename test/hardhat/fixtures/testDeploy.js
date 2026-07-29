@@ -1,10 +1,10 @@
 const { ethers } = require("hardhat");
 
 async function deployTestSetup() {
-    const msgSender = (await hre.ethers.getSigners())[0].address
+    const msgSender = (await ethers.getSigners())[0].address
 
     const TestERC20 = await ethers.getContractFactory("TestERC20");
-    const yieldToken = await TestERC20.deploy();
+    const yieldToken = await TestERC20.deploy("TestToken", "TST", 18);
     await yieldToken.waitForDeployment();
 
     const TangemERC2771Forwarder = await ethers.getContractFactory("TangemERC2771Forwarder");
