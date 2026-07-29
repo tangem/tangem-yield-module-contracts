@@ -82,7 +82,7 @@ abstract contract SwapExecution is YieldModuleLiquidUpgradeable {
 
         bool deposited;
         // don't auto-deposit into a risk-suspended pool; send output to the user instead
-        if (_isDepositable(tokenOut)) {
+        if (yieldTokensData[tokenOut].active && !entrySuspended[tokenOut]) {
             uint feeOut = calculateServiceFee(tokenOut);
 
             _pushToProtocol(tokenOut, outAfter);
