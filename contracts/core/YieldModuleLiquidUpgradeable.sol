@@ -209,7 +209,7 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
     // pause new deposits without withdrawing any funds
     function suspendToken(address yieldToken) external onlyProcessor {
         require(yieldTokensData[yieldToken].active, TokenNotActive());
-        require(!entrySuspended[yieldToken], AlreadySuspended());
+        require(!entrySuspended[yieldToken], TokenRiskSuspended());
 
         entrySuspended[yieldToken] = true;
 
@@ -300,10 +300,5 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
         _processFeeAfterProtocolPull(yieldToken, fee, protocolBal, amount);
 
         emit SoftExitTriggered(yieldToken, protocolBal, amount);
-    }
-
-    // true when the token accepts new deposits (active and not risk-suspended)
-    function _isDepositable(address yieldToken) internal view returns (bool) {
-        return yieldTokensData[yieldToken].active && !entrySuspended[yieldToken];
     }
 }

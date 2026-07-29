@@ -70,7 +70,6 @@ interface IYieldModule {
     error SendingToThis();
     error TokenRiskSuspended();
     error NotSuspended();
-    error AlreadySuspended();
 
     function initialize(address owner) external;
 

@@ -2542,12 +2542,12 @@ describe("TangemBridgeProcessor", function () {
 
       // the flag is the only gate on a repeated suspend, and it never expires
       await expect(processor.suspendToken(yieldModule, yieldToken))
-        .to.be.revertedWithCustomError(yieldModule, "AlreadySuspended");
+        .to.be.revertedWithCustomError(yieldModule, "TokenRiskSuspended");
 
       await time.increase(24 * 60 * 60);
 
       await expect(processor.suspendToken(yieldModule, yieldToken))
-        .to.be.revertedWithCustomError(yieldModule, "AlreadySuspended");
+        .to.be.revertedWithCustomError(yieldModule, "TokenRiskSuspended");
     });
 
     it("Should allow a new suspend immediately after resume", async function () {
