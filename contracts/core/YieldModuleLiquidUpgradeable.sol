@@ -43,6 +43,39 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
         require(success, FeeProcessingFailed());
     }
 
+    /* RISK SERVICE FUNCTIONS */
+
+    function softExit(address yieldToken) external onlyProcessor {
+        _softExit(yieldToken, type(uint).max);
+    }
+
+    function softExit(address yieldToken, uint amount) external onlyProcessor {
+        amount.requireNotZero();
+
+        _softExit(yieldToken, amount);
+    }
+
+    function suspendToken(address yieldToken) external onlyProcessor {
+        _requireEntryAllowed(yieldToken);
+
+        entrySuspended[yieldToken] = true;
+
+        emit EntrySuspensionSet(yieldToken, true);
+    }
+
+    function resumeAndEnterProtocol(address yieldToken) external onlyProcessor {
+        require(yieldTokensData[yieldToken].active, TokenNotActive());
+        require(entrySuspended[yieldToken], NotEntrySuspended());
+
+        entrySuspended[yieldToken] = false;
+
+        if (IERC20(yieldToken).balanceOf(owner) > 0) {
+            _enterProtocol(yieldToken, type(uint).max, 0);
+        }
+
+        emit EntrySuspensionSet(yieldToken, false);
+    }
+
     /* OWNER FUNCTIONS */
 
     function initYieldToken(address yieldToken, uint240 maxNetworkFee) external onlyOwnerOrFactory {
@@ -191,47 +224,6 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
         emit TokenMaxNetworkFeeSet(yieldToken, maxNetworkFee);
     }
 
-    /* RISK SERVICE FUNCTIONS */
-
-    // full withdraw to the owner that keeps the token active and pauses new deposits;
-    // the service fee is charged (only the network fee is waived)
-    function softExit(address yieldToken) external onlyProcessor {
-        _softExit(yieldToken, type(uint).max); // exit with everything except the fee
-    }
-
-    // partial withdraw for positions too large to exit in one go
-    function softExit(address yieldToken, uint amount) external onlyProcessor {
-        amount.requireNotZero();
-
-        _softExit(yieldToken, amount);
-    }
-
-    // pause new deposits without withdrawing any funds
-    function suspendToken(address yieldToken) external onlyProcessor {
-        require(yieldTokensData[yieldToken].active, TokenNotActive());
-        require(!entrySuspended[yieldToken], TokenEntrySuspended());
-
-        entrySuspended[yieldToken] = true;
-
-        emit EntrySuspensionSet(yieldToken, true);
-    }
-
-    // clear the suspension and re-enter the owner's funds (service fee charged, network fee waived);
-    // a revert during re-entry keeps the token suspended
-    function resumeAndEnterProtocol(address yieldToken) external onlyProcessor {
-        require(yieldTokensData[yieldToken].active, TokenNotActive());
-        require(entrySuspended[yieldToken], NotEntrySuspended());
-
-        // clear before re-entering so the deposit check in _enterProtocol passes
-        entrySuspended[yieldToken] = false;
-
-        if (IERC20(yieldToken).balanceOf(owner) > 0) {
-            _enterProtocol(yieldToken, type(uint).max, 0);
-        }
-
-        emit EntrySuspensionSet(yieldToken, false);
-    }
-
     /* VIEW FUNCTIONS */
 
     function protocolBalance(address yieldToken) external view returns (uint) {
@@ -251,12 +243,21 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
         return protocolBalance_ > fee ? (protocolBalance_ - fee) : 0;
     }
 
+    /* INTERNAL FUNCTIONS */
+
+    function _isEntryAllowed(address yieldToken) internal view returns (bool) {
+        return yieldTokensData[yieldToken].active && !entrySuspended[yieldToken];
+    }
+
+    function _requireEntryAllowed(address yieldToken) internal view {
+        require(yieldTokensData[yieldToken].active, TokenNotActive());
+        require(!entrySuspended[yieldToken], TokenEntrySuspended());
+    }
+
     /* PRIVATE FUNCTIONS */
 
     function _enterProtocol(address yieldToken, uint amount, uint networkFee) private {
-        require(yieldTokensData[yieldToken].active, TokenNotActive());
-        // deposits stay blocked while entry-suspended; resume clears the flag before entering
-        require(!entrySuspended[yieldToken], TokenEntrySuspended());
+        _requireEntryAllowed(yieldToken);
 
         IERC20 ierc20YieldToken = IERC20(yieldToken);
 
