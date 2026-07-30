@@ -209,18 +209,18 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
     // pause new deposits without withdrawing any funds
     function suspendToken(address yieldToken) external onlyProcessor {
         require(yieldTokensData[yieldToken].active, TokenNotActive());
-        require(!entrySuspended[yieldToken], TokenRiskSuspended());
+        require(!entrySuspended[yieldToken], TokenEntrySuspended());
 
         entrySuspended[yieldToken] = true;
 
-        emit RiskSuspensionSet(yieldToken, true);
+        emit EntrySuspensionSet(yieldToken, true);
     }
 
     // clear the suspension and re-enter the owner's funds (service fee charged, network fee waived);
     // a revert during re-entry keeps the token suspended
     function resumeAndEnterProtocol(address yieldToken) external onlyProcessor {
         require(yieldTokensData[yieldToken].active, TokenNotActive());
-        require(entrySuspended[yieldToken], NotSuspended());
+        require(entrySuspended[yieldToken], NotEntrySuspended());
 
         // clear before re-entering so the deposit check in _enterProtocol passes
         entrySuspended[yieldToken] = false;
@@ -229,7 +229,7 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
             _enterProtocol(yieldToken, type(uint).max, 0);
         }
 
-        emit RiskSuspensionSet(yieldToken, false);
+        emit EntrySuspensionSet(yieldToken, false);
     }
 
     /* VIEW FUNCTIONS */
@@ -255,8 +255,8 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
 
     function _enterProtocol(address yieldToken, uint amount, uint networkFee) private {
         require(yieldTokensData[yieldToken].active, TokenNotActive());
-        // deposits stay blocked while risk-suspended; resume clears the flag before entering
-        require(!entrySuspended[yieldToken], TokenRiskSuspended());
+        // deposits stay blocked while entry-suspended; resume clears the flag before entering
+        require(!entrySuspended[yieldToken], TokenEntrySuspended());
 
         IERC20 ierc20YieldToken = IERC20(yieldToken);
 
@@ -284,7 +284,7 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
 
         if (!entrySuspended[yieldToken]) {
             entrySuspended[yieldToken] = true;
-            emit RiskSuspensionSet(yieldToken, true);
+            emit EntrySuspensionSet(yieldToken, true);
         }
 
         uint protocolBal = _protocolBalance(yieldToken);
