@@ -2537,7 +2537,7 @@ describe("TangemBridgeProcessor", function () {
         .to.be.revertedWithCustomError(yieldModule, "TokenEntrySuspended");
     });
 
-    it("Should revert with AlreadySuspended on a repeated suspend", async function () {
+    it("Should revert with TokenEntrySuspended on a repeated suspend", async function () {
       await (await processor.suspendToken(yieldModule, yieldToken)).wait();
 
       // the flag is the only gate on a repeated suspend, and it never expires

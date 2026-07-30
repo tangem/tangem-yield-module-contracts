@@ -87,4 +87,9 @@ contract StorageLayoutTest is Test {
         vm.store(address(module), _mappingSlot(key, 5), bytes32(uint(1)));
         assertTrue(module.isProtocolToken(key));
     }
+
+    function test_slot6_entrySuspended() public {
+        vm.store(address(module), _mappingSlot(key, 6), bytes32(uint(1)));
+        assertTrue(module.entrySuspended(key));
+    }
 }

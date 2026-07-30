@@ -52,6 +52,7 @@ abstract contract YieldModuleFixture is BaseTest, TestHelpers {
         processor.grantRole(processor.SERVICE_FEE_COLLECTOR_ROLE(), backend);
         processor.grantRole(processor.PROPERTY_SETTER_ROLE(), backend);
         processor.grantRole(processor.PAUSER_ROLE(), backend);
+        processor.grantRole(processor.RISK_SERVICE_ROLE(), backend);
 
         factory = new TangemYieldModuleFactory();
         swapExecutionRegistry = new SwapExecutionRegistry(backend);
@@ -144,6 +145,30 @@ abstract contract YieldModuleFixture is BaseTest, TestHelpers {
 
     function _collectViaProcessor(YieldModuleHarness yieldModule) internal {
         _collectViaProcessor(IYieldModule(address(yieldModule)), address(yieldToken));
+    }
+
+    function _softExitViaProcessor(YieldModuleHarness yieldModule) internal {
+        vm.prank(backend);
+        processor.softExit(address(yieldModule), address(yieldToken));
+    }
+
+    function _softExitViaProcessor(YieldModuleHarness yieldModule, uint amount) internal {
+        vm.prank(backend);
+        processor.softExit(address(yieldModule), address(yieldToken), amount);
+    }
+
+    function _suspendViaProcessor(YieldModuleHarness yieldModule) internal {
+        _suspendViaProcessor(yieldModule, address(yieldToken));
+    }
+
+    function _suspendViaProcessor(YieldModuleHarness yieldModule, address yieldTokenAddr) internal {
+        vm.prank(backend);
+        processor.suspendToken(address(yieldModule), yieldTokenAddr);
+    }
+
+    function _resumeViaProcessor(YieldModuleHarness yieldModule) internal {
+        vm.prank(backend);
+        processor.resumeAndEnterProtocol(address(yieldModule), address(yieldToken));
     }
 
     function _enterViaProcessor(IYieldModule yieldModule, address yieldTokenAddr, uint networkFee) internal {
