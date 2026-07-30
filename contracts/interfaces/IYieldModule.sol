@@ -41,7 +41,7 @@ interface IYieldModule {
     );
     event WithdrawNativeProcessed(address indexed to, uint amount);
     event SoftExitTriggered(address indexed yieldToken, uint protocolBalance, uint amount);
-    event RiskSuspensionSet(address indexed yieldToken, bool suspended);
+    event EntrySuspensionSet(address indexed yieldToken, bool suspended);
 
     error OnlyOwner();
     error OnlyOwnerOrFactory();
@@ -68,8 +68,8 @@ interface IYieldModule {
     error NativeTransferFailed();
     error TokenInEqualsTokenOut();
     error SendingToThis();
-    error TokenRiskSuspended();
-    error NotSuspended();
+    error TokenEntrySuspended();
+    error NotEntrySuspended();
 
     function initialize(address owner) external;
 

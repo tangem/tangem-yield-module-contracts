@@ -2263,13 +2263,13 @@ describe("TangemBridgeProcessor", function () {
       expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
     });
 
-    it("Should emit SoftExitTriggered and RiskSuspensionSet with correct parameters", async function () {
+    it("Should emit SoftExitTriggered and EntrySuspensionSet with correct parameters", async function () {
       const moduleBalanceBefore = await yieldModule.protocolBalance(yieldToken);
 
       await expect(processor.softExit(yieldModule, yieldToken))
         .to.emit(yieldModule, "SoftExitTriggered")
         .withArgs(yieldToken, moduleBalanceBefore, moduleBalanceBefore) // fee is 0 without revenue
-        .and.to.emit(yieldModule, "RiskSuspensionSet")
+        .and.to.emit(yieldModule, "EntrySuspensionSet")
         .withArgs(yieldToken, true);
     });
 
@@ -2295,7 +2295,7 @@ describe("TangemBridgeProcessor", function () {
 
       await (await yieldToken.mint(owner, 1000)).wait();
       await expect(processor.enterProtocol(yieldModule, yieldToken, 0))
-        .to.be.revertedWithCustomError(yieldModule, "TokenRiskSuspended");
+        .to.be.revertedWithCustomError(yieldModule, "TokenEntrySuspended");
     });
 
     it("Should NOT block owner withdraw after softExit", async function () {
@@ -2310,7 +2310,7 @@ describe("TangemBridgeProcessor", function () {
       await (await processor.softExit(yieldModule, yieldToken)).wait();
 
       await expect(yieldModule.connect(owner).enterProtocolByOwner(yieldToken))
-        .to.be.revertedWithCustomError(yieldModule, "TokenRiskSuspended");
+        .to.be.revertedWithCustomError(yieldModule, "TokenEntrySuspended");
     });
 
     it("Should allow a repeated softExit while the token is still suspended", async function () {
@@ -2325,7 +2325,7 @@ describe("TangemBridgeProcessor", function () {
 
       // no cooldown: re-suspending right after a resume must work and re-emit the event
       await expect(processor.softExit(yieldModule, yieldToken))
-        .to.emit(yieldModule, "RiskSuspensionSet")
+        .to.emit(yieldModule, "EntrySuspensionSet")
         .withArgs(yieldToken, true);
       expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
     });
@@ -2443,13 +2443,13 @@ describe("TangemBridgeProcessor", function () {
         expect(await yieldModule.protocolBalance(yieldToken)).to.equal(initialOwnerBalance - 2 * exitAmount);
       });
 
-      it("Should emit RiskSuspensionSet only on the first chunk", async function () {
+      it("Should emit EntrySuspensionSet only on the first chunk", async function () {
         await (await processor["softExit(address,address,uint256)"](yieldModule, yieldToken, exitAmount)).wait();
 
         const tx = await processor["softExit(address,address,uint256)"](yieldModule, yieldToken, exitAmount);
 
         await expect(tx).to.emit(yieldModule, "SoftExitTriggered");
-        await expect(tx).to.not.emit(yieldModule, "RiskSuspensionSet");
+        await expect(tx).to.not.emit(yieldModule, "EntrySuspensionSet");
       });
 
       it("Should charge the fee once across back-to-back chunks (no amplification)", async function () {
@@ -2515,9 +2515,9 @@ describe("TangemBridgeProcessor", function () {
       expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
     });
 
-    it("Should emit RiskSuspensionSet(token, true)", async function () {
+    it("Should emit EntrySuspensionSet(token, true)", async function () {
       await expect(processor.suspendToken(yieldModule, yieldToken))
-        .to.emit(yieldModule, "RiskSuspensionSet")
+        .to.emit(yieldModule, "EntrySuspensionSet")
         .withArgs(yieldToken, true);
     });
 
@@ -2526,7 +2526,7 @@ describe("TangemBridgeProcessor", function () {
 
       await (await yieldToken.mint(owner, 1000)).wait();
       await expect(processor.enterProtocol(yieldModule, yieldToken, 0))
-        .to.be.revertedWithCustomError(yieldModule, "TokenRiskSuspended");
+        .to.be.revertedWithCustomError(yieldModule, "TokenEntrySuspended");
     });
 
     it("Should block owner enterProtocolByOwner while suspended", async function () {
@@ -2534,7 +2534,7 @@ describe("TangemBridgeProcessor", function () {
 
       await (await yieldToken.mint(owner, 1000)).wait();
       await expect(yieldModule.connect(owner).enterProtocolByOwner(yieldToken))
-        .to.be.revertedWithCustomError(yieldModule, "TokenRiskSuspended");
+        .to.be.revertedWithCustomError(yieldModule, "TokenEntrySuspended");
     });
 
     it("Should revert with AlreadySuspended on a repeated suspend", async function () {
@@ -2542,12 +2542,12 @@ describe("TangemBridgeProcessor", function () {
 
       // the flag is the only gate on a repeated suspend, and it never expires
       await expect(processor.suspendToken(yieldModule, yieldToken))
-        .to.be.revertedWithCustomError(yieldModule, "TokenRiskSuspended");
+        .to.be.revertedWithCustomError(yieldModule, "TokenEntrySuspended");
 
       await time.increase(24 * 60 * 60);
 
       await expect(processor.suspendToken(yieldModule, yieldToken))
-        .to.be.revertedWithCustomError(yieldModule, "TokenRiskSuspended");
+        .to.be.revertedWithCustomError(yieldModule, "TokenEntrySuspended");
     });
 
     it("Should allow a new suspend immediately after resume", async function () {
@@ -2555,7 +2555,7 @@ describe("TangemBridgeProcessor", function () {
       await (await processor.resumeAndEnterProtocol(yieldModule, yieldToken)).wait();
 
       await expect(processor.suspendToken(yieldModule, yieldToken))
-        .to.emit(yieldModule, "RiskSuspensionSet")
+        .to.emit(yieldModule, "EntrySuspensionSet")
         .withArgs(yieldToken, true);
       expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
     });
@@ -2637,7 +2637,7 @@ describe("TangemBridgeProcessor", function () {
       await expect(processor.resumeAndEnterProtocol(yieldModule, yieldToken))
         .to.emit(pool, "Supply")
         .withArgs(yieldToken, initialOwnerBalance, yieldModule, 0) // fee was 0, owner got the full balance
-        .and.to.emit(yieldModule, "RiskSuspensionSet")
+        .and.to.emit(yieldModule, "EntrySuspensionSet")
         .withArgs(yieldToken, false);
 
       expect(await yieldModule.entrySuspended(yieldToken)).to.be.false;
@@ -2703,9 +2703,9 @@ describe("TangemBridgeProcessor", function () {
       await expect(processor.enterProtocol(yieldModule, yieldToken, 0)).to.not.be.reverted;
     });
 
-    it("Should fail with NotSuspended if the token is not suspended", async function () {
+    it("Should fail with NotEntrySuspended if the token is not suspended", async function () {
       await expect(processor.resumeAndEnterProtocol(yieldModule, yieldToken))
-        .to.be.revertedWithCustomError(yieldModule, "NotSuspended");
+        .to.be.revertedWithCustomError(yieldModule, "NotEntrySuspended");
     });
 
     it("Should fail with correct error if token is not active", async function () {
