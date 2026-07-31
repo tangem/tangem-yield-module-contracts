@@ -13,6 +13,8 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
     using Requires for uint;
     using Requires for address;
 
+    uint public constant MAX_MERKL_SERVICE_FEE_RATE = 1500;
+
     IMerklDistributor public immutable distributor;
 
     enum TokenAction {
@@ -38,28 +40,38 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
     function claimMerklRewardsOwner(
         address[] calldata rewardTokens,
         uint[] calldata cumulativeAmounts,
-        bytes32[][] calldata proofs
+        bytes32[][] calldata proofs,
+        uint maxServiceFeeRate
     ) external onlyOwner nonReentrant {
-        _claimMerklRewards(rewardTokens, cumulativeAmounts, proofs);
+        _claimMerklRewards(rewardTokens, cumulativeAmounts, proofs, maxServiceFeeRate);
     }
 
     function claimMerklRewardsBE(
         address[] calldata rewardTokens,
         uint[] calldata cumulativeAmounts,
-        bytes32[][] calldata proofs
+        bytes32[][] calldata proofs,
+        uint maxServiceFeeRate
     ) external onlyProcessor nonReentrant {
-        _claimMerklRewards(rewardTokens, cumulativeAmounts, proofs);
+        _claimMerklRewards(rewardTokens, cumulativeAmounts, proofs, maxServiceFeeRate);
     }
 
     function _claimMerklRewards(
         address[] calldata rewardTokens,
         uint[] calldata cumulativeAmounts,
-        bytes32[][] calldata proofs
+        bytes32[][] calldata proofs,
+        uint maxServiceFeeRate
     ) private {
         require(rewardTokens.length > 0, RewardTokensEmpty());
         require(
             rewardTokens.length == cumulativeAmounts.length && cumulativeAmounts.length == proofs.length,
             RewardTokensLengthsMismatch()
+        );
+
+        uint serviceFeeRate = processor.serviceFeeRate();
+
+        require(
+            serviceFeeRate <= maxServiceFeeRate && serviceFeeRate <= MAX_MERKL_SERVICE_FEE_RATE,
+            ServiceFeeRateExceedsMax(serviceFeeRate)
         );
 
         RewardRoute[] memory routes = new RewardRoute[](rewardTokens.length);

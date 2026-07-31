@@ -114,7 +114,7 @@ contract MerklIncentivesTest is MerklIncentivesBase {
 
         vm.prank(owner);
         vm.resumeGasMetering();
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE);
     }
 
     /* Access control */
@@ -124,7 +124,7 @@ contract MerklIncentivesTest is MerklIncentivesBase {
 
         vm.expectRevert(IYieldModule.OnlyOwner.selector);
 
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE);
     }
 
     function test_claimMerklRewardsBE_Reverts_WhenNotProcessor() public {
@@ -132,7 +132,7 @@ contract MerklIncentivesTest is MerklIncentivesBase {
 
         vm.expectRevert(IYieldModule.OnlyProcessor.selector);
 
-        ym.claimMerklRewardsBE(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsBE(rewardTokens, cumulativeAmounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE);
     }
 
     /* Entry Errors */
@@ -143,7 +143,7 @@ contract MerklIncentivesTest is MerklIncentivesBase {
         vm.expectRevert(IMerklIncentives.RewardTokensEmpty.selector);
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE);
     }
 
     function test_claimMerklRewardsOwner_Reverts_WhenAmountsLengthMismatches() public {
@@ -153,7 +153,7 @@ contract MerklIncentivesTest is MerklIncentivesBase {
         vm.expectRevert(IMerklIncentives.RewardTokensLengthsMismatch.selector);
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE);
     }
 
     function test_claimMerklRewardsOwner_Reverts_WhenProofsLengthMismatches() public {
@@ -163,7 +163,7 @@ contract MerklIncentivesTest is MerklIncentivesBase {
         vm.expectRevert(IMerklIncentives.RewardTokensLengthsMismatch.selector);
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE);
     }
 
     function test_claimMerklRewardsOwner_Reverts_WhenRewardTokenIsZero() public {
@@ -172,7 +172,7 @@ contract MerklIncentivesTest is MerklIncentivesBase {
         vm.expectRevert(abi.encodeWithSelector(Requires.ZeroAddress.selector));
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE);
     }
 
     function test_claimMerklRewardsOwner_Reverts_WhenRewardAmountIsZero() public {
@@ -182,7 +182,7 @@ contract MerklIncentivesTest is MerklIncentivesBase {
         vm.expectRevert(abi.encodeWithSelector(Requires.ZeroAmount.selector));
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE);
     }
 
     function test_claimMerklRewardsOwner_Reverts_WhenDistributorRejectsProof() public {
@@ -212,7 +212,7 @@ contract MerklIncentivesTest is MerklIncentivesBase {
         vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.DuplicateRewardToken.selector, address(rewardToken)));
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE);
     }
 
     function testFuzz_claimMerklRewardsOwner_Reverts_WhenDuplicateRewardToken(uint numTokens, uint dupIndex) public {
@@ -233,6 +233,6 @@ contract MerklIncentivesTest is MerklIncentivesBase {
         vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.DuplicateRewardToken.selector, duplicate));
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE);
     }
 }

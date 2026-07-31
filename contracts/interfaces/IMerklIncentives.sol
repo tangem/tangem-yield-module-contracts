@@ -6,6 +6,7 @@ interface IMerklIncentives {
     error MerklClaimedNoReward(address rewardToken, address finalRecipient);
     error RewardTokensEmpty();
     error RewardTokensLengthsMismatch();
+    error ServiceFeeRateExceedsMax(uint serviceFeeRate);
 
     event MerklClaimed(
         address indexed distributor,
@@ -20,12 +21,14 @@ interface IMerklIncentives {
     function claimMerklRewardsOwner(
         address[] calldata rewardTokens,
         uint[] calldata cumulativeAmounts,
-        bytes32[][] calldata proofs
+        bytes32[][] calldata proofs,
+        uint maxServiceFeeRate
     ) external;
 
     function claimMerklRewardsBE(
         address[] calldata rewardTokens,
         uint[] calldata cumulativeAmounts,
-        bytes32[][] calldata proofs
+        bytes32[][] calldata proofs,
+        uint maxServiceFeeRate
     ) external;
 }
