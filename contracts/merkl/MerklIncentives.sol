@@ -8,6 +8,7 @@ import { IMerklIncentives } from "../interfaces/IMerklIncentives.sol";
 
 import { Requires } from "../common/Requires.sol";
 import { YieldModuleLiquidUpgradeable } from "../core/YieldModuleLiquidUpgradeable.sol";
+import { PRECISION } from "../resources/Constants.sol";
 
 abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradeable {
     using SafeERC20 for IERC20;
@@ -96,7 +97,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
 
         distributor.claimWithRecipient(users, rewardTokens, cumulativeAmounts, proofs, users, emptyDatas);
 
-        _processClaimedRewards(rewardTokens, routes);
+        _processClaimedRewards(rewardTokens, routes, serviceFeeRate);
     }
 
     function _classifyRewardRoute(address rewardToken) private returns (RewardRoute memory route) {
@@ -112,7 +113,11 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         }
     }
 
-    function _processClaimedRewards(address[] calldata rewardTokens, RewardRoute[] memory routes) private {
+    function _processClaimedRewards(
+        address[] calldata rewardTokens,
+        RewardRoute[] memory routes,
+        uint serviceFeeRate
+    ) private {
         for (uint i; i < rewardTokens.length; ++i) {
             uint balanceAfter = IERC20(rewardTokens[i]).balanceOf(address(this));
 
@@ -122,28 +127,30 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         }
 
         for (uint i; i < rewardTokens.length; ++i) {
-            _routeClaimedReward(rewardTokens[i], routes[i]);
+            _routeClaimedReward(rewardTokens[i], routes[i], serviceFeeRate);
         }
     }
 
-    function _routeClaimedReward(address rewardToken, RewardRoute memory route) private {
+    function _routeClaimedReward(address rewardToken, RewardRoute memory route, uint serviceFeeRate) private {
+        uint netAmount = route.received - _takeServiceFee(rewardToken, route.received, serviceFeeRate);
+
         address finalToken = rewardToken;
-        uint finalAmount = route.received;
+        uint finalAmount = netAmount;
         address finalRecipient = address(this);
 
         if (route.tokenAction == TokenAction.PUSH_TO_PROTOCOL) {
-            _pushToProtocol(rewardToken, route.received);
+            _pushToProtocol(rewardToken, netAmount);
             finalToken = address(protocolTokens[rewardToken]);
 
-            _increaseProtocolBalanceWithoutFee(rewardToken, finalAmount);
+            _increaseProtocolBalanceWithoutFee(rewardToken, netAmount);
         } else if (route.tokenAction == TokenAction.UNWRAP_TO_OWNER) {
             finalToken = route.yieldToken;
-            finalAmount = _pullFromProtocolToOwner(route.yieldToken, route.received);
+            finalAmount = _pullFromProtocolToOwner(route.yieldToken, netAmount);
             finalRecipient = owner;
         } else if (route.tokenAction == TokenAction.KEEP_IN_MODULE) {
-            _increaseProtocolBalanceWithoutFee(route.yieldToken, route.received);
+            _increaseProtocolBalanceWithoutFee(route.yieldToken, netAmount);
         } else {
-            IERC20(rewardToken).safeTransfer(owner, route.received);
+            IERC20(rewardToken).safeTransfer(owner, netAmount);
             finalRecipient = owner;
         }
 
@@ -156,5 +163,16 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             finalAmount,
             _msgSender()
         );
+    }
+
+    function _takeServiceFee(address rewardToken, uint received, uint serviceFeeRate) private returns (uint fee) {
+        fee = received * serviceFeeRate / PRECISION;
+
+        if (fee == 0) return 0;
+
+        address feeReceiver = processor.feeReceiver();
+        feeReceiver.requireNotZero();
+
+        IERC20(rewardToken).safeTransfer(feeReceiver, fee);
     }
 }
