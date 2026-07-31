@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import { IMerklDistributor } from "../interfaces/IMerklDistributor.sol";
 import { IMerklIncentives } from "../interfaces/IMerklIncentives.sol";
@@ -10,6 +10,7 @@ import { Requires } from "../common/Requires.sol";
 import { YieldModuleLiquidUpgradeable } from "../core/YieldModuleLiquidUpgradeable.sol";
 
 abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradeable {
+    using SafeERC20 for IERC20;
     using Requires for uint;
     using Requires for address;
 
@@ -25,7 +26,6 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
     }
 
     struct RewardRoute {
-        address recipient;
         address yieldToken;
         TokenAction tokenAction;
         uint balanceBefore;
@@ -76,7 +76,6 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
 
         RewardRoute[] memory routes = new RewardRoute[](rewardTokens.length);
         address[] memory users = new address[](rewardTokens.length);
-        address[] memory recipients = new address[](rewardTokens.length);
         bytes[] memory emptyDatas = new bytes[](rewardTokens.length);
 
         for (uint i; i < rewardTokens.length; ++i) {
@@ -90,20 +89,17 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
 
             RewardRoute memory route = _classifyRewardRoute(rewardTokens[i]);
 
-            route.balanceBefore = IERC20(rewardTokens[i]).balanceOf(route.recipient);
+            route.balanceBefore = IERC20(rewardTokens[i]).balanceOf(address(this));
             routes[i] = route;
             users[i] = address(this);
-            recipients[i] = route.recipient;
         }
 
-        distributor.claimWithRecipient(users, rewardTokens, cumulativeAmounts, proofs, recipients, emptyDatas);
+        distributor.claimWithRecipient(users, rewardTokens, cumulativeAmounts, proofs, users, emptyDatas);
 
         _processClaimedRewards(rewardTokens, routes);
     }
 
     function _classifyRewardRoute(address rewardToken) private returns (RewardRoute memory route) {
-        route.recipient = address(this);
-
         if (isProtocolToken[rewardToken]) {
             route.yieldToken = _resolveYieldToken(rewardToken);
             route.tokenAction =
@@ -112,16 +108,15 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             route.yieldToken = rewardToken;
             route.tokenAction = TokenAction.PUSH_TO_PROTOCOL;
         } else {
-            route.recipient = owner;
             route.tokenAction = TokenAction.SEND_TO_OWNER;
         }
     }
 
     function _processClaimedRewards(address[] calldata rewardTokens, RewardRoute[] memory routes) private {
         for (uint i; i < rewardTokens.length; ++i) {
-            uint balanceAfter = IERC20(rewardTokens[i]).balanceOf(routes[i].recipient);
+            uint balanceAfter = IERC20(rewardTokens[i]).balanceOf(address(this));
 
-            require(balanceAfter > routes[i].balanceBefore, MerklClaimedNoReward(rewardTokens[i], routes[i].recipient));
+            require(balanceAfter > routes[i].balanceBefore, MerklClaimedNoReward(rewardTokens[i]));
 
             routes[i].received = balanceAfter - routes[i].balanceBefore;
         }
@@ -134,7 +129,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
     function _routeClaimedReward(address rewardToken, RewardRoute memory route) private {
         address finalToken = rewardToken;
         uint finalAmount = route.received;
-        address finalRecipient = route.recipient;
+        address finalRecipient = address(this);
 
         if (route.tokenAction == TokenAction.PUSH_TO_PROTOCOL) {
             _pushToProtocol(rewardToken, route.received);
@@ -147,6 +142,9 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             finalRecipient = owner;
         } else if (route.tokenAction == TokenAction.KEEP_IN_MODULE) {
             _increaseProtocolBalanceWithoutFee(route.yieldToken, route.received);
+        } else {
+            IERC20(rewardToken).safeTransfer(owner, route.received);
+            finalRecipient = owner;
         }
 
         emit MerklClaimed(
