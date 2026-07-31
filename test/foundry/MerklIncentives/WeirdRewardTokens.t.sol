@@ -50,6 +50,6 @@ contract WeirdRewardTokensTest is MerklIncentivesBase {
         (address[] memory tokens, uint[] memory amounts, bytes32[][] memory proofs) =
             _singleClaimArgs(rewardToken, AMOUNT);
 
-        return abi.encodeCall(ym.claimMerklRewardsOwner, (tokens, amounts, proofs));
+        return abi.encodeCall(ym.claimMerklRewardsOwner, (tokens, amounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE));
     }
 }

@@ -99,7 +99,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         }
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE);
 
         for (uint i; i < numTokens; ++i) {
             assertEq(tokens[i].balanceOf(owner), cumulativeAmounts[i]);
@@ -287,7 +287,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         cumulativeAmounts[2] = keepAmount;
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE);
 
         // SEND_TO_OWNER:
         assertEq(unknownToken.balanceOf(owner), sendAmount);
