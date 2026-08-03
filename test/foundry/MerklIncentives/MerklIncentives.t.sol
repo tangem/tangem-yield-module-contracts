@@ -4,6 +4,7 @@ pragma solidity ^0.8.29;
 
 import { MerklIncentivesBase, TestERC20 } from "./MerklIncentivesBase.sol";
 import { Requires } from "contracts/common/Requires.sol";
+import { TangemYieldProcessor } from "contracts/core/TangemYieldProcessor.sol";
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 import { MerklDistributorMock } from "contracts/test/MerklDistributorMock.sol";
@@ -75,6 +76,16 @@ contract MerklIncentivesTest is MerklIncentivesBase {
         assertEq(rewardToken.balanceOf(owner), AMOUNT - _expectedRewardFee(AMOUNT));
         assertEq(rewardToken.balanceOf(feeReceiver), _expectedRewardFee(AMOUNT));
         assertEq(rewardToken.balanceOf(address(ym)), 0);
+    }
+
+    function test_claimMerklRewards_EmitsMerklRewardsClaimed() public {
+        TestERC20 rewardToken = _createRewardToken();
+        _fundMerklDistributor(address(rewardToken), AMOUNT);
+
+        vm.expectEmit(address(processor));
+        emit TangemYieldProcessor.MerklRewardsClaimed(address(ym));
+
+        _claimSingleAsBE(address(rewardToken), AMOUNT);
     }
 
     function test_claimMerklRewardsOwner_Success_ViaForwarder() public {
