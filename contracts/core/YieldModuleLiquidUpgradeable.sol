@@ -484,15 +484,15 @@ abstract contract YieldModuleLiquidUpgradeable is
         emit LatestFeePaymentStateUpdated(token, protocolBalance_, serviceFeeRate);
     }
 
-    function _increaseProtocolBalanceWithoutFee(address token, uint amount) internal {
-        LatestFeePaymentState storage latestFeePaymentState = latestFeePaymentStates[token];
+    function _increaseProtocolBalanceWithoutFee(address yieldToken, uint amount) internal {
+        LatestFeePaymentState storage latestFeePaymentState = latestFeePaymentStates[yieldToken];
         uint newFeeCheckpoint = latestFeePaymentState.protocolBalance + amount;
 
-        require(newFeeCheckpoint <= _protocolBalance(token), FeeCheckpointExceedsBalance());
+        require(newFeeCheckpoint <= _protocolBalance(yieldToken), FeeCheckpointExceedsBalance());
 
         latestFeePaymentState.protocolBalance = newFeeCheckpoint;
 
-        emit LatestFeePaymentStateUpdated(token, newFeeCheckpoint, latestFeePaymentState.serviceFeeRate);
+        emit LatestFeePaymentStateUpdated(yieldToken, newFeeCheckpoint, latestFeePaymentState.serviceFeeRate);
     }
 
     function _calculateServiceFee(address yieldToken, uint protocolBalance_) private view returns (uint) {
