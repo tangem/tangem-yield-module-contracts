@@ -14,7 +14,7 @@ contract IncreaseProtocolBalanceWithoutFeeTest is MerklIncentivesBase {
     }
 
     function testFuzz_claim_MovesFeeCheckpoint_OnPushToProtocol(uint amount) public {
-        amount = bound(amount, 1, type(uint).max - yieldToken.totalSupply() - protocolToken.totalSupply());
+        amount = bound(amount, 1, type(uint128).max);
 
         (uint checkpointBefore,) = ym.latestFeePaymentStates(address(yieldToken));
         uint feeBefore = ym.calculateServiceFee(address(yieldToken));
@@ -23,15 +23,18 @@ contract IncreaseProtocolBalanceWithoutFeeTest is MerklIncentivesBase {
 
         _claimSingleAsOwner(address(yieldToken), amount);
 
+        // only the net reward enters the protocol, so only the net reward moves the checkpoint
+        uint netAmount = amount - _expectedRewardFee(amount);
+
         (uint checkpointAfter, uint rateAfter) = ym.latestFeePaymentStates(address(yieldToken));
-        assertEq(checkpointAfter, checkpointBefore + amount);
+        assertEq(checkpointAfter, checkpointBefore + netAmount);
         assertEq(rateAfter, SERVICE_FEE_RATE);
-        // the checkpoint moved together with the balance: the reward accrues no fee
+        // the checkpoint moved together with the balance, so the net reward is never charged twice
         assertEq(ym.calculateServiceFee(address(yieldToken)), feeBefore);
     }
 
     function testFuzz_claim_MovesFeeCheckpoint_OnKeepInModule(uint amount) public {
-        amount = bound(amount, 1, type(uint).max - protocolToken.totalSupply() - PROTOCOL_BALANCE);
+        amount = bound(amount, 1, type(uint128).max);
 
         (uint checkpointBefore,) = ym.latestFeePaymentStates(address(yieldToken));
         uint feeBefore = ym.calculateServiceFee(address(yieldToken));
@@ -40,8 +43,10 @@ contract IncreaseProtocolBalanceWithoutFeeTest is MerklIncentivesBase {
 
         _claimSingleAsOwner(address(protocolToken), amount);
 
+        uint netAmount = amount - _expectedRewardFee(amount);
+
         (uint checkpointAfter, uint rateAfter) = ym.latestFeePaymentStates(address(yieldToken));
-        assertEq(checkpointAfter, checkpointBefore + amount);
+        assertEq(checkpointAfter, checkpointBefore + netAmount);
         assertEq(rateAfter, SERVICE_FEE_RATE);
         assertEq(ym.calculateServiceFee(address(yieldToken)), feeBefore);
     }
