@@ -63,11 +63,13 @@ contract RewardRouteTest is MerklIncentivesBase {
 
         uint fee = _expectedRewardFee(AMOUNT);
 
-        vm.expectEmit(true, true, true, true, address(ym));
+        vm.expectEmit(true, true, false, true, address(ym));
         emit IMerklIncentives.MerklClaimed(
-            address(merklDistributor),
             address(rewardToken),
             AMOUNT,
+            SERVICE_FEE_RATE,
+            fee,
+            feeReceiver,
             owner,
             address(rewardToken),
             AMOUNT - fee,
@@ -89,11 +91,14 @@ contract RewardRouteTest is MerklIncentivesBase {
         uint received = AMOUNT - tax;
         uint fee = _expectedRewardFee(received);
 
-        vm.expectEmit(true, true, true, true, address(ym));
+        // every field follows the credited delta, not the cumulative amount
+        vm.expectEmit(true, true, false, true, address(ym));
         emit IMerklIncentives.MerklClaimed(
-            address(merklDistributor),
             address(rewardToken),
             received,
+            SERVICE_FEE_RATE,
+            fee,
+            feeReceiver,
             owner,
             address(rewardToken),
             received - fee,
@@ -186,11 +191,14 @@ contract RewardRouteTest is MerklIncentivesBase {
         uint fee = _expectedRewardFee(YIELD_AMOUNT);
 
         // the reward becomes a protocol position: finalToken is the aToken, kept by the module
-        vm.expectEmit(true, true, true, true, address(ym));
+        // the fee is withheld in the received underlying, before the net amount is supplied
+        vm.expectEmit(true, true, false, true, address(ym));
         emit IMerklIncentives.MerklClaimed(
-            address(merklDistributor),
             address(yieldToken),
             YIELD_AMOUNT,
+            SERVICE_FEE_RATE,
+            fee,
+            feeReceiver,
             address(ym),
             address(protocolToken),
             YIELD_AMOUNT - fee,
@@ -229,11 +237,14 @@ contract RewardRouteTest is MerklIncentivesBase {
         uint fee = _expectedRewardFee(YIELD_AMOUNT);
 
         // the aToken reward stays as-is on the module: final fields mirror the claim
-        vm.expectEmit(true, true, true, true, address(ym));
+        // and the fee leaves in the aToken itself
+        vm.expectEmit(true, true, false, true, address(ym));
         emit IMerklIncentives.MerklClaimed(
-            address(merklDistributor),
             address(protocolToken),
             YIELD_AMOUNT,
+            SERVICE_FEE_RATE,
+            fee,
+            feeReceiver,
             address(ym),
             address(protocolToken),
             YIELD_AMOUNT - fee,
@@ -281,12 +292,15 @@ contract RewardRouteTest is MerklIncentivesBase {
 
         uint fee = _expectedRewardFee(YIELD_AMOUNT);
 
-        // the aToken reward is unwrapped: the owner receives the underlying yieldToken
-        vm.expectEmit(true, true, true, true, address(ym));
+        // the aToken reward is unwrapped: the owner receives the underlying yieldToken,
+        // while the fee stays in the aToken
+        vm.expectEmit(true, true, false, true, address(ym));
         emit IMerklIncentives.MerklClaimed(
-            address(merklDistributor),
             address(protocolToken),
             YIELD_AMOUNT,
+            SERVICE_FEE_RATE,
+            fee,
+            feeReceiver,
             owner,
             address(yieldToken),
             YIELD_AMOUNT - fee,
