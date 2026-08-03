@@ -37,6 +37,9 @@ contract RewardRouteTest is MerklIncentivesBase {
         );
 
         _claimSingleAsOwner(address(rewardToken), AMOUNT);
+
+        assertEq(rewardToken.balanceOf(address(ym)), 0);
+        assertEq(rewardToken.balanceOf(owner), AMOUNT - _expectedRewardFee(AMOUNT));
     }
 
     /* SEND_TO_OWNER */
@@ -371,6 +374,67 @@ contract RewardRouteTest is MerklIncentivesBase {
 
         // each token is charged independently, and no route lets a reward be charged twice
         assertEq(ym.calculateServiceFee(address(yieldToken)), ACCUMULATED_SERVICE_FEE);
+    }
+
+    /// PUSH_TO_PROTOCOL supplies the underlying, which mints the very aToken that
+    /// KEEP_IN_MODULE was measured on, so the pair must settle the same in either order
+    function testFuzz_claim_SettlesActivePairIndependently_InEitherOrder(bool underlyingFirst) public {
+        _fundMerklDistributor(address(yieldToken), YIELD_AMOUNT);
+        _fundMerklDistributor(address(protocolToken), YIELD_AMOUNT);
+
+        (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) = _claimArgs(2);
+        rewardTokens[0] = underlyingFirst ? address(yieldToken) : address(protocolToken);
+        rewardTokens[1] = underlyingFirst ? address(protocolToken) : address(yieldToken);
+        cumulativeAmounts[0] = YIELD_AMOUNT;
+        cumulativeAmounts[1] = YIELD_AMOUNT;
+
+        uint fee = _expectedRewardFee(YIELD_AMOUNT);
+        uint net = YIELD_AMOUNT - fee;
+
+        vm.prank(owner);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE);
+
+        // both rewards land in the position, each charged once on its own delta: the aToken
+        // minted by the push is never counted as part of the aToken reward
+        assertEq(ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + 2 * net);
+        assertEq(yieldToken.balanceOf(feeReceiver), fee);
+        assertEq(protocolToken.balanceOf(feeReceiver), fee);
+        assertEq(yieldToken.balanceOf(address(ym)), 0);
+        assertEq(ym.calculateServiceFee(address(yieldToken)), ACCUMULATED_SERVICE_FEE);
+    }
+
+    /// UNWRAP_TO_OWNER pays the owner in the same token SEND_TO_OWNER forwards,
+    /// so both credits must reach the owner in full in either order
+    function testFuzz_claim_SettlesInactivePairIndependently_InEitherOrder(bool underlyingFirst) public {
+        _withdrawAndDeactivate(ym, owner, address(yieldToken));
+
+        uint ownerBalanceBefore = yieldToken.balanceOf(owner);
+        // deactivation already paid the accrued fee in aToken, so measure the delta from here
+        uint feeReceiverProtocolBefore = protocolToken.balanceOf(feeReceiver);
+
+        _fundMerklDistributor(address(yieldToken), YIELD_AMOUNT);
+        _fundMerklDistributor(address(protocolToken), YIELD_AMOUNT);
+
+        (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) = _claimArgs(2);
+        rewardTokens[0] = underlyingFirst ? address(yieldToken) : address(protocolToken);
+        rewardTokens[1] = underlyingFirst ? address(protocolToken) : address(yieldToken);
+        cumulativeAmounts[0] = YIELD_AMOUNT;
+        cumulativeAmounts[1] = YIELD_AMOUNT;
+
+        uint fee = _expectedRewardFee(YIELD_AMOUNT);
+        uint net = YIELD_AMOUNT - fee;
+
+        vm.prank(owner);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE);
+
+        // the unwrapped reward and the forwarded one both credit the owner, and each fee
+        // is withheld in the token it was received in
+        assertEq(yieldToken.balanceOf(owner), ownerBalanceBefore + 2 * net);
+        assertEq(yieldToken.balanceOf(feeReceiver), fee);
+        assertEq(protocolToken.balanceOf(feeReceiver), feeReceiverProtocolBefore + fee);
+        assertEq(yieldToken.balanceOf(address(ym)), 0);
+        assertEq(protocolToken.balanceOf(address(ym)), 0);
+        assertEq(ym.protocolBalance(address(yieldToken)), 0);
     }
 
     /* Withdrawal pre-claim flow */
