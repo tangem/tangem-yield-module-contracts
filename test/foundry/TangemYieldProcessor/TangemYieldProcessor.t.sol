@@ -2,7 +2,6 @@
 /* solhint-disable func-name-mixedcase */
 pragma solidity ^0.8.29;
 
-import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
 import { YieldModuleBase } from "../YieldModuleBase.sol";
@@ -13,6 +12,48 @@ import { PRECISION } from "contracts/resources/Constants.sol";
 
 contract TangemYieldProcessorTest is YieldModuleBase {
     address internal newFeeReceiver = makeAddr("newFeeReceiver");
+
+    /*  enterProtocol  */
+
+    function test_enterProtocol_Reverts_WhenNotProtocolEnterer() public {
+        vm.expectRevert(_accessControlError(otherAccount, processor.PROTOCOL_ENTERER_ROLE()));
+        vm.prank(otherAccount);
+        processor.enterProtocol(address(1), address(yieldToken), 0);
+    }
+
+    /*  exitProtocol  */
+
+    function test_exitProtocol_Reverts_WhenNotProtocolExiter() public {
+        vm.expectRevert(_accessControlError(otherAccount, processor.PROTOCOL_EXITER_ROLE()));
+        vm.prank(otherAccount);
+        processor.exitProtocol(address(1), address(yieldToken), 0);
+    }
+
+    /*  collectServiceFee  */
+
+    function test_collectServiceFee_EmitsServiceFeeCollected() public {
+        _registerGeneralImplementation();
+        YieldModuleHarness yieldModule = _deployEnteredRevenueModule(owner);
+
+        vm.expectEmit(address(processor));
+        emit TangemYieldProcessor.ServiceFeeCollected(address(yieldModule));
+
+        _collectViaProcessor(yieldModule);
+    }
+
+    function test_collectServiceFee_Reverts_WhenNotServiceFeeCollector() public {
+        vm.expectRevert(_accessControlError(otherAccount, processor.SERVICE_FEE_COLLECTOR_ROLE()));
+        vm.prank(otherAccount);
+        processor.collectServiceFee(address(1), address(yieldToken));
+    }
+
+    /*  claimMerklRewards  */
+
+    function test_claimMerklRewards_Reverts_WhenNotMerklClaimer() public {
+        vm.expectRevert(_accessControlError(otherAccount, processor.CLAIM_MERKL_REWARDS_ROLE()));
+        vm.prank(otherAccount);
+        processor.claimMerklRewards(address(1), new address[](0), new uint[](0), new bytes32[][](0), 0);
+    }
 
     /*  setFeeReceiver  */
 
@@ -34,11 +75,7 @@ contract TangemYieldProcessorTest is YieldModuleBase {
     }
 
     function test_setFeeReceiver_Reverts_WhenNotPropertySetter() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, otherAccount, processor.PROPERTY_SETTER_ROLE()
-            )
-        );
+        vm.expectRevert(_accessControlError(otherAccount, processor.PROPERTY_SETTER_ROLE()));
         vm.prank(otherAccount);
         processor.setFeeReceiver(newFeeReceiver);
     }
@@ -56,6 +93,14 @@ contract TangemYieldProcessorTest is YieldModuleBase {
         processor.setServiceFeeRate(PRECISION);
 
         assertEq(processor.serviceFeeRate(), PRECISION);
+    }
+
+    function test_setServiceFeeRate_EmitsFeeRateSet() public {
+        vm.expectEmit(address(processor));
+        emit TangemYieldProcessor.FeeRateSet(PRECISION);
+
+        vm.prank(backend);
+        processor.setServiceFeeRate(PRECISION);
     }
 
     function test_constructor_Reverts_WhenFeeRateExceedsPrecision() public {
@@ -83,11 +128,7 @@ contract TangemYieldProcessorTest is YieldModuleBase {
     }
 
     function test_pause_Reverts_WhenNotPauser() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, otherAccount, processor.PAUSER_ROLE()
-            )
-        );
+        vm.expectRevert(_accessControlError(otherAccount, processor.PAUSER_ROLE()));
         vm.prank(otherAccount);
         processor.pause();
     }
@@ -106,6 +147,9 @@ contract TangemYieldProcessorTest is YieldModuleBase {
 
         vm.expectRevert(Pausable.EnforcedPause.selector);
         processor.collectServiceFee(address(1), address(yieldToken));
+
+        vm.expectRevert(Pausable.EnforcedPause.selector);
+        processor.claimMerklRewards(address(1), new address[](0), new uint[](0), new bytes32[][](0), 0);
 
         vm.stopPrank();
     }
@@ -152,11 +196,7 @@ contract TangemYieldProcessorTest is YieldModuleBase {
         vm.prank(backend);
         processor.pause();
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, otherAccount, processor.PAUSER_ROLE()
-            )
-        );
+        vm.expectRevert(_accessControlError(otherAccount, processor.PAUSER_ROLE()));
         vm.prank(otherAccount);
         processor.unpause();
     }
