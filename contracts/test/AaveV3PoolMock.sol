@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./TestERC20.sol";
-import "@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol";
+import { DataTypes } from "@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import { TestERC20 } from "./TestERC20.sol";
 
 contract AaveV3PoolMock {
     event Supply(address asset, uint amount, address onBehalfOf, uint16 referralCode);

@@ -3,7 +3,6 @@
 pragma solidity ^0.8.29;
 
 import { Requires } from "contracts/common/Requires.sol";
-import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 import { PRECISION } from "contracts/resources/Constants.sol";
 
 import { MerklIncentivesBase, TestERC20 } from "./MerklIncentivesBase.sol";
