@@ -29,7 +29,9 @@ contract YieldTokenByProtocolTokenTest is MerklIncentivesBase {
         _claimSingleAsOwner(address(protocolToken), YIELD_AMOUNT);
 
         assertEq(ym.yieldTokenByProtocolToken(address(protocolToken)), address(yieldToken));
-        assertEq(ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + YIELD_AMOUNT);
+        assertEq(
+            ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + YIELD_AMOUNT - _expectedRewardFee(YIELD_AMOUNT)
+        );
     }
 
     function test_claim_Reverts_WhenResolvedYieldTokenNotInitialized() public {

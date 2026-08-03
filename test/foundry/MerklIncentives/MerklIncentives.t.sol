@@ -44,13 +44,14 @@ contract MerklIncentivesTest is MerklIncentivesBase {
             AMOUNT,
             owner,
             address(rewardToken),
-            AMOUNT,
+            AMOUNT - _expectedRewardFee(AMOUNT),
             owner
         );
 
         _claimSingleAsOwner(address(rewardToken), AMOUNT);
 
-        assertEq(rewardToken.balanceOf(owner), AMOUNT);
+        assertEq(rewardToken.balanceOf(owner), AMOUNT - _expectedRewardFee(AMOUNT));
+        assertEq(rewardToken.balanceOf(feeReceiver), _expectedRewardFee(AMOUNT));
         assertEq(rewardToken.balanceOf(address(ym)), 0);
     }
 
@@ -65,13 +66,14 @@ contract MerklIncentivesTest is MerklIncentivesBase {
             AMOUNT,
             owner,
             address(rewardToken),
-            AMOUNT,
+            AMOUNT - _expectedRewardFee(AMOUNT),
             address(processor)
         );
 
         _claimSingleAsBE(address(rewardToken), AMOUNT);
 
-        assertEq(rewardToken.balanceOf(owner), AMOUNT);
+        assertEq(rewardToken.balanceOf(owner), AMOUNT - _expectedRewardFee(AMOUNT));
+        assertEq(rewardToken.balanceOf(feeReceiver), _expectedRewardFee(AMOUNT));
         assertEq(rewardToken.balanceOf(address(ym)), 0);
     }
 
@@ -86,13 +88,14 @@ contract MerklIncentivesTest is MerklIncentivesBase {
             AMOUNT,
             owner,
             address(rewardToken),
-            AMOUNT,
+            AMOUNT - _expectedRewardFee(AMOUNT),
             owner
         );
 
         _claimSingleAsOwnerViaForwarder(address(rewardToken), AMOUNT);
 
-        assertEq(rewardToken.balanceOf(owner), AMOUNT);
+        assertEq(rewardToken.balanceOf(owner), AMOUNT - _expectedRewardFee(AMOUNT));
+        assertEq(rewardToken.balanceOf(feeReceiver), _expectedRewardFee(AMOUNT));
         assertEq(rewardToken.balanceOf(address(ym)), 0);
     }
 
