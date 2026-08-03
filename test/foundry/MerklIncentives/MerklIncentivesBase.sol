@@ -2,6 +2,7 @@
 pragma solidity ^0.8.29;
 
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
+import { PRECISION } from "contracts/resources/Constants.sol";
 import { TestERC20 } from "contracts/test/TestERC20.sol";
 import { AaveV3YieldModuleBase } from "test/foundry/TangemAaveV3YieldModule/AaveV3YieldModuleBase.sol";
 import { YieldModuleHarness } from "test/foundry/harnesses/YieldModuleHarness.sol";
@@ -10,6 +11,10 @@ abstract contract MerklIncentivesBase is AaveV3YieldModuleBase {
     uint internal constant CLAIM_MAX_SERVICE_FEE_RATE = 1500;
 
     YieldModuleHarness ym;
+
+    function _expectedRewardFee(uint received) internal pure returns (uint) {
+        return received * SERVICE_FEE_RATE / PRECISION;
+    }
 
     function _createRewardToken() internal returns (TestERC20 token) {
         token = new TestERC20("RewardToken", "RWD", 18);
@@ -70,8 +75,8 @@ abstract contract MerklIncentivesBase is AaveV3YieldModuleBase {
         (address[] memory tokens, uint[] memory amounts, bytes32[][] memory proofs) =
             _singleClaimArgs(rewardToken, amount);
 
-        vm.prank(address(processor));
-        ym.claimMerklRewardsBE(tokens, amounts, proofs, maxServiceFeeRate);
+        vm.prank(backend);
+        processor.claimMerklRewards(address(ym), tokens, amounts, proofs, maxServiceFeeRate);
     }
 
     function _claimSingleAsOwnerViaForwarder(address rewardToken, uint amount) internal {
