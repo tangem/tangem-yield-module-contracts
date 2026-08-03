@@ -26,13 +26,6 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         KEEP_IN_MODULE
     }
 
-    struct RewardRoute {
-        address yieldToken;
-        TokenAction tokenAction;
-        uint balanceBefore;
-        uint received;
-    }
-
     constructor(address distributor_) {
         distributor_.requireNotZero();
         distributor = IMerklDistributor(distributor_);
@@ -75,7 +68,8 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             ServiceFeeRateExceedsMax(serviceFeeRate)
         );
 
-        RewardRoute[] memory routes = new RewardRoute[](rewardTokens.length);
+        // holds each pre-claim balance until the claim turns it into a received delta
+        uint[] memory received = new uint[](rewardTokens.length);
         address[] memory users = new address[](rewardTokens.length);
         bytes[] memory emptyDatas = new bytes[](rewardTokens.length);
 
@@ -88,68 +82,46 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
                 require(rewardTokens[k] != rewardTokens[i], DuplicateRewardToken(rewardTokens[i]));
             }
 
-            RewardRoute memory route = _classifyRewardRoute(rewardTokens[i]);
-
-            route.balanceBefore = IERC20(rewardTokens[i]).balanceOf(address(this));
-            routes[i] = route;
+            received[i] = IERC20(rewardTokens[i]).balanceOf(address(this));
             users[i] = address(this);
         }
 
         distributor.claimWithRecipient(users, rewardTokens, cumulativeAmounts, proofs, users, emptyDatas);
 
-        _processClaimedRewards(rewardTokens, routes, serviceFeeRate);
-    }
-
-    function _classifyRewardRoute(address rewardToken) private returns (RewardRoute memory route) {
-        if (isProtocolToken[rewardToken]) {
-            route.yieldToken = _resolveYieldToken(rewardToken);
-            route.tokenAction =
-                yieldTokensData[route.yieldToken].active ? TokenAction.KEEP_IN_MODULE : TokenAction.UNWRAP_TO_OWNER;
-        } else if (yieldTokensData[rewardToken].active) {
-            route.yieldToken = rewardToken;
-            route.tokenAction = TokenAction.PUSH_TO_PROTOCOL;
-        } else {
-            route.tokenAction = TokenAction.SEND_TO_OWNER;
-        }
-    }
-
-    function _processClaimedRewards(
-        address[] calldata rewardTokens,
-        RewardRoute[] memory routes,
-        uint serviceFeeRate
-    ) private {
         for (uint i; i < rewardTokens.length; ++i) {
             uint balanceAfter = IERC20(rewardTokens[i]).balanceOf(address(this));
 
-            require(balanceAfter > routes[i].balanceBefore, MerklClaimedNoReward(rewardTokens[i]));
+            require(balanceAfter > received[i], MerklClaimedNoReward(rewardTokens[i]));
 
-            routes[i].received = balanceAfter - routes[i].balanceBefore;
+            received[i] = balanceAfter - received[i];
         }
 
         for (uint i; i < rewardTokens.length; ++i) {
-            _routeClaimedReward(rewardTokens[i], routes[i], serviceFeeRate);
+            _routeClaimedReward(rewardTokens[i], received[i], serviceFeeRate);
         }
     }
 
-    function _routeClaimedReward(address rewardToken, RewardRoute memory route, uint serviceFeeRate) private {
-        (uint serviceFee, address feeReceiver) = _takeServiceFee(rewardToken, route.received, serviceFeeRate);
-        uint netAmount = route.received - serviceFee;
+    function _routeClaimedReward(address rewardToken, uint received, uint serviceFeeRate) private {
+        (address yieldToken, TokenAction tokenAction) = _classifyRewardRoute(rewardToken);
+
+        (uint serviceFee, address feeReceiver) = _takeServiceFee(rewardToken, received, serviceFeeRate);
+        uint netAmount = received - serviceFee;
 
         address finalToken = rewardToken;
         uint finalAmount = netAmount;
         address finalRecipient = address(this);
 
-        if (route.tokenAction == TokenAction.PUSH_TO_PROTOCOL) {
+        if (tokenAction == TokenAction.PUSH_TO_PROTOCOL) {
             _pushToProtocol(rewardToken, netAmount);
             finalToken = address(protocolTokens[rewardToken]);
 
             _increaseProtocolBalanceWithoutFee(rewardToken, netAmount);
-        } else if (route.tokenAction == TokenAction.UNWRAP_TO_OWNER) {
-            finalToken = route.yieldToken;
-            finalAmount = _pullFromProtocolToOwner(route.yieldToken, netAmount);
+        } else if (tokenAction == TokenAction.UNWRAP_TO_OWNER) {
+            finalToken = yieldToken;
+            finalAmount = _pullFromProtocolToOwner(yieldToken, netAmount);
             finalRecipient = owner;
-        } else if (route.tokenAction == TokenAction.KEEP_IN_MODULE) {
-            _increaseProtocolBalanceWithoutFee(route.yieldToken, netAmount);
+        } else if (tokenAction == TokenAction.KEEP_IN_MODULE) {
+            _increaseProtocolBalanceWithoutFee(yieldToken, netAmount);
         } else {
             IERC20(rewardToken).safeTransfer(owner, netAmount);
             finalRecipient = owner;
@@ -157,7 +129,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
 
         emit MerklClaimed(
             rewardToken,
-            route.received,
+            received,
             serviceFeeRate,
             serviceFee,
             feeReceiver,
@@ -166,6 +138,18 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             finalAmount,
             _msgSender()
         );
+    }
+
+    function _classifyRewardRoute(address rewardToken) private returns (address yieldToken, TokenAction tokenAction) {
+        if (isProtocolToken[rewardToken]) {
+            yieldToken = _resolveYieldToken(rewardToken);
+            tokenAction = yieldTokensData[yieldToken].active ? TokenAction.KEEP_IN_MODULE : TokenAction.UNWRAP_TO_OWNER;
+        } else if (yieldTokensData[rewardToken].active) {
+            yieldToken = rewardToken;
+            tokenAction = TokenAction.PUSH_TO_PROTOCOL;
+        } else {
+            tokenAction = TokenAction.SEND_TO_OWNER;
+        }
     }
 
     function _takeServiceFee(
