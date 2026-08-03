@@ -9,9 +9,11 @@ interface IMerklIncentives {
     error ServiceFeeRateExceedsMax(uint serviceFeeRate);
 
     event MerklClaimed(
-        address indexed distributor,
         address indexed rewardToken,
         uint received,
+        uint serviceFeeRate,
+        uint serviceFeeAmount,
+        address feeReceiver,
         address finalRecipient,
         address finalToken,
         uint finalAmount,
