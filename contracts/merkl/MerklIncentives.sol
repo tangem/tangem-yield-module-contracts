@@ -22,8 +22,8 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
     enum TokenAction {
         PUSH_TO_PROTOCOL,
         UNWRAP_TO_OWNER,
-        SEND_TO_OWNER,
-        KEEP_IN_MODULE
+        KEEP_IN_MODULE,
+        SEND_TO_OWNER
     }
 
     constructor(address distributor_) {
