@@ -68,8 +68,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             ServiceFeeRateExceedsMax(serviceFeeRate)
         );
 
-        // holds each pre-claim balance until the claim turns it into a received delta
-        uint[] memory received = new uint[](rewardTokens.length);
+        uint[] memory balancesBefore = new uint[](rewardTokens.length);
         address[] memory users = new address[](rewardTokens.length);
         bytes[] memory emptyDatas = new bytes[](rewardTokens.length);
 
@@ -82,18 +81,28 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
                 require(rewardTokens[k] != rewardTokens[i], DuplicateRewardToken(rewardTokens[i]));
             }
 
-            received[i] = IERC20(rewardTokens[i]).balanceOf(address(this));
+            balancesBefore[i] = IERC20(rewardTokens[i]).balanceOf(address(this));
             users[i] = address(this);
         }
 
         distributor.claimWithRecipient(users, rewardTokens, cumulativeAmounts, proofs, users, emptyDatas);
 
+        _settleClaimedRewards(rewardTokens, balancesBefore, serviceFeeRate);
+    }
+
+    function _settleClaimedRewards(
+        address[] calldata rewardTokens,
+        uint[] memory balancesBefore,
+        uint serviceFeeRate
+    ) private {
+        uint[] memory received = new uint[](rewardTokens.length);
+
         for (uint i; i < rewardTokens.length; ++i) {
             uint balanceAfter = IERC20(rewardTokens[i]).balanceOf(address(this));
 
-            require(balanceAfter > received[i], MerklClaimedNoReward(rewardTokens[i]));
+            require(balanceAfter > balancesBefore[i], MerklClaimedNoReward(rewardTokens[i]));
 
-            received[i] = balanceAfter - received[i];
+            received[i] = balanceAfter - balancesBefore[i];
         }
 
         for (uint i; i < rewardTokens.length; ++i) {
