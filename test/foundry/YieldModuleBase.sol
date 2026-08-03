@@ -53,6 +53,7 @@ abstract contract YieldModuleBase is BaseTest, TestHelpers {
         processor.grantRole(processor.PROTOCOL_EXITER_ROLE(), backend);
         processor.grantRole(processor.SERVICE_FEE_COLLECTOR_ROLE(), backend);
         processor.grantRole(processor.PROPERTY_SETTER_ROLE(), backend);
+        processor.grantRole(processor.CLAIM_MERKL_REWARDS_ROLE(), backend);
         processor.grantRole(processor.PAUSER_ROLE(), backend);
 
         factory = new TangemYieldModuleFactory();
