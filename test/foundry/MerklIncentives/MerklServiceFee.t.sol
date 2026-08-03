@@ -3,6 +3,7 @@
 pragma solidity ^0.8.29;
 
 import { Requires } from "contracts/common/Requires.sol";
+import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 import { PRECISION } from "contracts/resources/Constants.sol";
 
 import { MerklIncentivesBase, TestERC20 } from "./MerklIncentivesBase.sol";
@@ -29,6 +30,19 @@ contract MerklServiceFeeTest is MerklIncentivesBase {
         uint topUp = AMOUNT / 4;
         _fundMerklDistributor(address(rewardToken), topUp);
 
+        vm.expectEmit(true, true, false, true, address(ym));
+        emit IMerklIncentives.MerklClaimed(
+            address(rewardToken),
+            topUp,
+            SERVICE_FEE_RATE,
+            _expectedRewardFee(topUp),
+            feeReceiver,
+            owner,
+            address(rewardToken),
+            topUp - _expectedRewardFee(topUp),
+            owner
+        );
+
         _claimSingleAsOwner(address(rewardToken), AMOUNT + topUp);
 
         assertEq(rewardToken.balanceOf(feeReceiver), feeAfterFirstClaim + _expectedRewardFee(topUp));
@@ -39,6 +53,20 @@ contract MerklServiceFeeTest is MerklIncentivesBase {
     function test_claim_ChargesNoFee_WhenRewardIsDust() public {
         TestERC20 rewardToken = _createRewardToken();
         _fundMerklDistributor(address(rewardToken), 1);
+
+        // no fee is transferred, so the event records no receiver even though the rate is non-zero
+        vm.expectEmit(true, true, false, true, address(ym));
+        emit IMerklIncentives.MerklClaimed(
+            address(rewardToken),
+            1,
+            SERVICE_FEE_RATE,
+            0,
+            address(0),
+            owner,
+            address(rewardToken),
+            1,
+            owner
+        );
 
         _claimSingleAsOwner(address(rewardToken), 1);
 
@@ -84,9 +112,25 @@ contract MerklServiceFeeTest is MerklIncentivesBase {
         TestERC20 rewardToken = _createRewardToken();
         _fundMerklDistributor(address(rewardToken), AMOUNT);
 
+        uint fee = _expectedRewardFee(AMOUNT);
+
+        // the receiver is read from the processor at execution time, and the event reports that one
+        vm.expectEmit(true, true, false, true, address(ym));
+        emit IMerklIncentives.MerklClaimed(
+            address(rewardToken),
+            AMOUNT,
+            SERVICE_FEE_RATE,
+            fee,
+            newFeeReceiver,
+            owner,
+            address(rewardToken),
+            AMOUNT - fee,
+            owner
+        );
+
         _claimSingleAsOwner(address(rewardToken), AMOUNT);
 
-        assertEq(rewardToken.balanceOf(newFeeReceiver), _expectedRewardFee(AMOUNT));
+        assertEq(rewardToken.balanceOf(newFeeReceiver), fee);
         assertEq(rewardToken.balanceOf(feeReceiver), 0);
     }
 
@@ -220,10 +264,27 @@ contract MerklServiceFeeTest is MerklIncentivesBase {
         TestERC20 rewardToken = _createRewardToken();
         _fundMerklDistributor(address(rewardToken), amount);
 
+        uint fee = amount * rate / PRECISION;
+
+        // the fee fields report the applied rate and exactly what leaves the module;
+        // a fee rounding to zero is transferred to nobody, so no receiver is recorded
+        vm.expectEmit(true, true, false, true, address(ym));
+        emit IMerklIncentives.MerklClaimed(
+            address(rewardToken),
+            amount,
+            rate,
+            fee,
+            fee == 0 ? address(0) : feeReceiver,
+            owner,
+            address(rewardToken),
+            amount - fee,
+            owner
+        );
+
         _claimSingleAsOwner(address(rewardToken), amount);
 
         assertEq(rewardToken.balanceOf(feeReceiver) + rewardToken.balanceOf(owner), amount);
-        assertEq(rewardToken.balanceOf(feeReceiver), amount * rate / PRECISION);
+        assertEq(rewardToken.balanceOf(feeReceiver), fee);
     }
 
     function testFuzz_claim_SplitsGrossIntoFeeAndNet_OnActiveUnderlying(uint amount, uint rate) public {
