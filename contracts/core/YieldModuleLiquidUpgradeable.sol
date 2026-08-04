@@ -487,8 +487,12 @@ abstract contract YieldModuleLiquidUpgradeable is
     function _increaseProtocolBalanceWithoutFee(address yieldToken, uint amount) internal {
         LatestFeePaymentState storage latestFeePaymentState = latestFeePaymentStates[yieldToken];
         uint newFeeCheckpoint = latestFeePaymentState.protocolBalance + amount;
+        uint protocolBalance_ = _protocolBalance(yieldToken);
 
-        require(newFeeCheckpoint <= _protocolBalance(yieldToken), FeeCheckpointExceedsBalance());
+        // avoid protocol rounding errors on crediting the amount
+        if (newFeeCheckpoint > protocolBalance_) {
+            newFeeCheckpoint = protocolBalance_;
+        }
 
         latestFeePaymentState.protocolBalance = newFeeCheckpoint;
 
