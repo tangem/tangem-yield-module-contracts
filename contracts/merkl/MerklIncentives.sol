@@ -61,13 +61,6 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             RewardTokensLengthsMismatch()
         );
 
-        uint serviceFeeRate = processor.serviceFeeRate();
-
-        require(
-            serviceFeeRate <= maxServiceFeeRate && serviceFeeRate <= MAX_MERKL_SERVICE_FEE_RATE,
-            ServiceFeeRateExceedsMax(serviceFeeRate)
-        );
-
         uint[] memory balancesBefore = new uint[](rewardTokens.length);
         address[] memory users = new address[](rewardTokens.length);
         bytes[] memory emptyDatas = new bytes[](rewardTokens.length);
@@ -87,13 +80,13 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
 
         distributor.claimWithRecipient(users, rewardTokens, cumulativeAmounts, proofs, users, emptyDatas);
 
-        _settleClaimedRewards(rewardTokens, balancesBefore, serviceFeeRate);
+        _settleClaimedRewards(rewardTokens, balancesBefore, maxServiceFeeRate);
     }
 
     function _settleClaimedRewards(
         address[] calldata rewardTokens,
         uint[] memory balancesBefore,
-        uint serviceFeeRate
+        uint maxServiceFeeRate
     ) private {
         uint[] memory received = new uint[](rewardTokens.length);
 
@@ -105,15 +98,24 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             received[i] = balanceAfter - balancesBefore[i];
         }
 
+        uint serviceFeeRate = processor.serviceFeeRate();
+        address feeReceiver = processor.feeReceiver();
+
+        require(
+            serviceFeeRate <= maxServiceFeeRate && serviceFeeRate <= MAX_MERKL_SERVICE_FEE_RATE,
+            ServiceFeeRateExceedsMax(serviceFeeRate)
+        );
+        feeReceiver.requireNotZero();
+
         for (uint i; i < rewardTokens.length; ++i) {
-            _routeClaimedReward(rewardTokens[i], received[i], serviceFeeRate);
+            _routeClaimedReward(rewardTokens[i], received[i], serviceFeeRate, feeReceiver);
         }
     }
 
-    function _routeClaimedReward(address rewardToken, uint received, uint serviceFeeRate) private {
+    function _routeClaimedReward(address rewardToken, uint received, uint serviceFeeRate, address feeReceiver) private {
         (address yieldToken, TokenAction tokenAction) = _classifyRewardRoute(rewardToken);
 
-        (uint serviceFee, address feeReceiver) = _takeServiceFee(rewardToken, received, serviceFeeRate);
+        uint serviceFee = _takeServiceFee(rewardToken, received, serviceFeeRate, feeReceiver);
         uint netAmount = received - serviceFee;
 
         address finalToken = rewardToken;
@@ -164,14 +166,12 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
     function _takeServiceFee(
         address rewardToken,
         uint received,
-        uint serviceFeeRate
-    ) private returns (uint fee, address feeReceiver) {
+        uint serviceFeeRate,
+        address feeReceiver
+    ) private returns (uint fee) {
         fee = received * serviceFeeRate / PRECISION;
 
-        if (fee == 0) return (0, address(0));
-
-        feeReceiver = processor.feeReceiver();
-        feeReceiver.requireNotZero();
+        if (fee == 0) return fee;
 
         IERC20(rewardToken).safeTransfer(feeReceiver, fee);
     }
