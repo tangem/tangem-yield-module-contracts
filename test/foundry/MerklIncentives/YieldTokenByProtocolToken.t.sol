@@ -2,10 +2,10 @@
 /* solhint-disable func-name-mixedcase */
 pragma solidity ^0.8.29;
 
+import { IAToken } from "@aave/core-v3/contracts/interfaces/IAToken.sol";
 import { DataTypes } from "@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol";
 
 import { MerklIncentivesBase } from "./MerklIncentivesBase.sol";
-import { IAToken } from "contracts/interfaces/IAToken.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
 /// Covers the lazy recovery of `yieldTokenByProtocolToken` (_resolveAndSetYieldTokenByProtocolToken)
