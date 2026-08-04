@@ -54,14 +54,14 @@ contract MerklServiceFeeTest is MerklIncentivesBase {
         TestERC20 rewardToken = _createRewardToken();
         _fundMerklDistributor(address(rewardToken), 1);
 
-        // no fee is transferred, so the event records no receiver even though the rate is non-zero
+        // the fee rounds to zero, so nothing is transferred, but the event still reports the configured receiver
         vm.expectEmit(true, true, false, true, address(ym));
         emit IMerklIncentives.MerklClaimed(
             address(rewardToken),
             1,
             SERVICE_FEE_RATE,
             0,
-            address(0),
+            feeReceiver,
             owner,
             address(rewardToken),
             1,
@@ -89,7 +89,7 @@ contract MerklServiceFeeTest is MerklIncentivesBase {
         _claimSingleAsOwner(address(rewardToken), AMOUNT);
     }
 
-    function test_claim_Succeeds_WhenFeeReceiverIsZeroAndRateIsZero() public {
+    function test_claim_Reverts_WhenFeeReceiverIsZeroAndRateIsZero() public {
         vm.prank(backend);
         processor.setFeeReceiver(address(0));
         _setServiceFeeRate(0);
@@ -97,10 +97,10 @@ contract MerklServiceFeeTest is MerklIncentivesBase {
         TestERC20 rewardToken = _createRewardToken();
         _fundMerklDistributor(address(rewardToken), AMOUNT);
 
-        // no fee means no transfer, so a misconfigured receiver cannot block the claim
-        _claimSingleAsOwner(address(rewardToken), AMOUNT);
+        // the receiver is validated once per claim, before the rate is applied, so a zero rate is no exception
+        vm.expectRevert(Requires.ZeroAddress.selector);
 
-        assertEq(rewardToken.balanceOf(owner), AMOUNT);
+        _claimSingleAsOwner(address(rewardToken), AMOUNT);
     }
 
     function test_claim_SendsFeeToUpdatedFeeReceiver() public {
@@ -266,15 +266,14 @@ contract MerklServiceFeeTest is MerklIncentivesBase {
 
         uint fee = amount * rate / PRECISION;
 
-        // the fee fields report the applied rate and exactly what leaves the module;
-        // a fee rounding to zero is transferred to nobody, so no receiver is recorded
+        // the fee fields report the applied rate, exactly what leaves the module and the configured receiver
         vm.expectEmit(true, true, false, true, address(ym));
         emit IMerklIncentives.MerklClaimed(
             address(rewardToken),
             amount,
             rate,
             fee,
-            fee == 0 ? address(0) : feeReceiver,
+            feeReceiver,
             owner,
             address(rewardToken),
             amount - fee,
