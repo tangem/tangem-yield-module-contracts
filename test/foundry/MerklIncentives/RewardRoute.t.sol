@@ -5,8 +5,8 @@ pragma solidity ^0.8.29;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import { MerklIncentivesBase, TestERC20 } from "./MerklIncentivesBase.sol";
-import { IMerklDistributor } from "contracts/interfaces/IMerklDistributor.sol";
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
+import { IMerklDistributor } from "contracts/interfaces/external/IMerklDistributor.sol";
 
 /// Reward routing tests: how claimed Merkl rewards are classified and processed
 contract RewardRouteTest is MerklIncentivesBase {

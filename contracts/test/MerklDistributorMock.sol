@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import { IMerklDistributor } from "../interfaces/IMerklDistributor.sol";
+import { IMerklDistributor } from "contracts/interfaces/external/IMerklDistributor.sol";
 
 /// Mimics Merkl Distributor claim semantics: `amounts` are lifetime cumulative amounts
 /// per (user, token), each claim transfers only the delta over what was already claimed.
