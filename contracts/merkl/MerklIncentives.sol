@@ -3,8 +3,8 @@ pragma solidity ^0.8.29;
 
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import { IMerklDistributor } from "../interfaces/external/IMerklDistributor.sol";
 import { IMerklIncentives } from "../interfaces/IMerklIncentives.sol";
+import { IMerklDistributor } from "../interfaces/external/IMerklDistributor.sol";
 
 import { Requires } from "../common/Requires.sol";
 import { YieldModuleLiquidUpgradeable } from "../core/YieldModuleLiquidUpgradeable.sol";

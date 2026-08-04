@@ -3,7 +3,6 @@
 pragma solidity ^0.8.29;
 
 import { MerklIncentivesBase } from "./MerklIncentivesBase.sol";
-import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
 /// Covers _increaseProtocolBalanceWithoutFee, driven through Merkl claims
 contract IncreaseProtocolBalanceWithoutFeeTest is MerklIncentivesBase {
@@ -51,15 +50,16 @@ contract IncreaseProtocolBalanceWithoutFeeTest is MerklIncentivesBase {
         assertEq(ym.calculateServiceFee(address(yieldToken)), feeBefore);
     }
 
-    function test_claim_Reverts_WhenFeeCheckpointExceedsBalance() public {
-        // checkpoint above the real protocol balance, e.g. after a position loss
+    function test_claim_ClampsFeeCheckpoint_ToProtocolBalance() public {
+        // checkpoint the reward cannot fit under, e.g. after protocol rounding credited less
         uint protocolBalance = ym.protocolBalance(address(yieldToken));
         ym.exposed_setLatestFeePaymentState(address(yieldToken), protocolBalance + 1, SERVICE_FEE_RATE);
 
         _fundMerklDistributor(address(protocolToken), YIELD_AMOUNT);
 
-        vm.expectRevert(IYieldModule.FeeCheckpointExceedsBalance.selector);
-
         _claimSingleAsOwner(address(protocolToken), YIELD_AMOUNT);
+
+        (uint checkpointAfter,) = ym.latestFeePaymentStates(address(yieldToken));
+        assertEq(checkpointAfter, ym.protocolBalance(address(yieldToken)));
     }
 }

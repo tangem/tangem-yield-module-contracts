@@ -70,7 +70,6 @@ interface IYieldModule {
 
     error ProtocolTokenNotSet(address protocolToken);
     error YieldTokenNotInitialized(address yieldToken);
-    error FeeCheckpointExceedsBalance();
 
     function initialize(address owner) external;
 
