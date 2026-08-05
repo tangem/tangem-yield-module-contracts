@@ -131,9 +131,9 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         emit MerklClaimed(
             rewardToken,
             received,
-            serviceFeeRate,
+            serviceFeeRate, //TODO: do we need rate in the event?
             serviceFee,
-            feeReceiver,
+            feeReceiver, //TODO: do we need feeReceiver in the event?
             finalRecipient,
             finalToken,
             finalAmount,
