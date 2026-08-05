@@ -150,7 +150,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         }
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
 
         for (uint i; i < numTokens; ++i) {
             uint fee = _expectedRewardFee(cumulativeAmounts[i]);
@@ -354,7 +354,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         uint keepNet = keepAmount - _expectedRewardFee(keepAmount);
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
 
         // SEND_TO_OWNER:
         assertEq(unknownToken.balanceOf(owner), sendNet);
@@ -392,7 +392,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         uint net = YIELD_AMOUNT - fee;
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
 
         // both rewards land in the position, each charged once on its own delta: the aToken
         // minted by the push is never counted as part of the aToken reward
@@ -425,7 +425,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         uint net = YIELD_AMOUNT - fee;
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
 
         // the unwrapped reward and the forwarded one both credit the owner, and each fee
         // is withheld in the token it was received in

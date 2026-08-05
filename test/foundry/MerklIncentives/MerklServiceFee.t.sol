@@ -221,7 +221,7 @@ contract MerklServiceFeeTest is MerklIncentivesBase {
         cumulativeAmounts[2] = YIELD_AMOUNT;
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
 
         assertEq(ym.feeDebts(address(unknownToken)), 0);
         assertEq(ym.feeDebts(address(yieldToken)), 0);
@@ -246,7 +246,7 @@ contract MerklServiceFeeTest is MerklIncentivesBase {
         _fundMerklDistributor(rewardTokens[1], secondAmount);
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
 
         // rounding is applied per token, so the total can differ from a fee on the summed amount
         assertEq(tokens[0].balanceOf(feeReceiver), _expectedRewardFee(firstAmount));

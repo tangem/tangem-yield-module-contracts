@@ -23,14 +23,12 @@ interface IMerklIncentives {
     function claimMerklRewardsOwner(
         address[] calldata rewardTokens,
         uint[] calldata cumulativeAmounts,
-        bytes32[][] calldata proofs,
-        uint maxServiceFeeRate
+        bytes32[][] calldata proofs
     ) external;
 
     function claimMerklRewardsBE(
         address[] calldata rewardTokens,
         uint[] calldata cumulativeAmounts,
-        bytes32[][] calldata proofs,
-        uint maxServiceFeeRate
+        bytes32[][] calldata proofs
     ) external;
 }

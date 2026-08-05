@@ -34,26 +34,23 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
     function claimMerklRewardsOwner(
         address[] calldata rewardTokens,
         uint[] calldata cumulativeAmounts,
-        bytes32[][] calldata proofs,
-        uint maxServiceFeeRate
+        bytes32[][] calldata proofs
     ) external onlyOwner nonReentrant {
-        _claimMerklRewards(rewardTokens, cumulativeAmounts, proofs, maxServiceFeeRate);
+        _claimMerklRewards(rewardTokens, cumulativeAmounts, proofs);
     }
 
     function claimMerklRewardsBE(
         address[] calldata rewardTokens,
         uint[] calldata cumulativeAmounts,
-        bytes32[][] calldata proofs,
-        uint maxServiceFeeRate
+        bytes32[][] calldata proofs
     ) external onlyProcessor nonReentrant {
-        _claimMerklRewards(rewardTokens, cumulativeAmounts, proofs, maxServiceFeeRate);
+        _claimMerklRewards(rewardTokens, cumulativeAmounts, proofs);
     }
 
     function _claimMerklRewards(
         address[] calldata rewardTokens,
         uint[] calldata cumulativeAmounts,
-        bytes32[][] calldata proofs,
-        uint maxServiceFeeRate
+        bytes32[][] calldata proofs
     ) private {
         require(rewardTokens.length > 0, RewardTokensEmpty());
         require(
@@ -80,14 +77,10 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
 
         distributor.claimWithRecipient(users, rewardTokens, cumulativeAmounts, proofs, users, emptyDatas);
 
-        _settleClaimedRewards(rewardTokens, balancesBefore, maxServiceFeeRate);
+        _settleClaimedRewards(rewardTokens, balancesBefore);
     }
 
-    function _settleClaimedRewards(
-        address[] calldata rewardTokens,
-        uint[] memory balancesBefore,
-        uint maxServiceFeeRate
-    ) private {
+    function _settleClaimedRewards(address[] calldata rewardTokens, uint[] memory balancesBefore) private {
         uint[] memory received = new uint[](rewardTokens.length);
 
         for (uint i; i < rewardTokens.length; ++i) {
@@ -101,10 +94,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         uint serviceFeeRate = processor.serviceFeeRate();
         address feeReceiver = processor.feeReceiver();
 
-        require(
-            serviceFeeRate <= maxServiceFeeRate && serviceFeeRate <= MAX_MERKL_SERVICE_FEE_RATE,
-            ServiceFeeRateExceedsMax(serviceFeeRate)
-        );
+        require(serviceFeeRate <= MAX_MERKL_SERVICE_FEE_RATE, ServiceFeeRateExceedsMax(serviceFeeRate));
         feeReceiver.requireNotZero();
 
         for (uint i; i < rewardTokens.length; ++i) {
