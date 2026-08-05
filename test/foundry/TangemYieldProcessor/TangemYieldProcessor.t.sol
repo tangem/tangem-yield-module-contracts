@@ -52,7 +52,7 @@ contract TangemYieldProcessorTest is YieldModuleBase {
     function test_claimMerklRewards_Reverts_WhenNotMerklClaimer() public {
         vm.expectRevert(_accessControlError(otherAccount, processor.CLAIM_MERKL_REWARDS_ROLE()));
         vm.prank(otherAccount);
-        processor.claimMerklRewards(address(1), new address[](0), new uint[](0), new bytes32[][](0), 0);
+        processor.claimMerklRewards(address(1), new address[](0), new uint[](0), new bytes32[][](0));
     }
 
     /*  setFeeReceiver  */
@@ -149,7 +149,7 @@ contract TangemYieldProcessorTest is YieldModuleBase {
         processor.collectServiceFee(address(1), address(yieldToken));
 
         vm.expectRevert(Pausable.EnforcedPause.selector);
-        processor.claimMerklRewards(address(1), new address[](0), new uint[](0), new bytes32[][](0), 0);
+        processor.claimMerklRewards(address(1), new address[](0), new uint[](0), new bytes32[][](0));
 
         vm.stopPrank();
     }

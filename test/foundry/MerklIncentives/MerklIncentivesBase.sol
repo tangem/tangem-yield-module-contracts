@@ -56,36 +56,26 @@ abstract contract MerklIncentivesBase is AaveV3YieldModuleBase {
     /* CLAIM ACTIONS */
 
     function _claimSingleAsOwner(address rewardToken, uint amount) internal {
-        _claimSingleAsOwner(rewardToken, amount, CLAIM_MAX_SERVICE_FEE_RATE);
-    }
-
-    function _claimSingleAsOwner(address rewardToken, uint amount, uint maxServiceFeeRate) internal {
         (address[] memory tokens, uint[] memory amounts, bytes32[][] memory proofs) =
             _singleClaimArgs(rewardToken, amount);
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(tokens, amounts, proofs, maxServiceFeeRate);
+        ym.claimMerklRewardsOwner(tokens, amounts, proofs);
     }
 
     function _claimSingleAsBE(address rewardToken, uint amount) internal {
-        _claimSingleAsBE(rewardToken, amount, CLAIM_MAX_SERVICE_FEE_RATE);
-    }
-
-    function _claimSingleAsBE(address rewardToken, uint amount, uint maxServiceFeeRate) internal {
         (address[] memory tokens, uint[] memory amounts, bytes32[][] memory proofs) =
             _singleClaimArgs(rewardToken, amount);
 
         vm.prank(backend);
-        processor.claimMerklRewards(address(ym), tokens, amounts, proofs, maxServiceFeeRate);
+        processor.claimMerklRewards(address(ym), tokens, amounts, proofs);
     }
 
     function _claimSingleAsOwnerViaForwarder(address rewardToken, uint amount) internal {
         (address[] memory tokens, uint[] memory amounts, bytes32[][] memory proofs) =
             _singleClaimArgs(rewardToken, amount);
 
-        bytes memory data = abi.encodeCall(
-            IMerklIncentives.claimMerklRewardsOwner, (tokens, amounts, proofs, CLAIM_MAX_SERVICE_FEE_RATE)
-        );
+        bytes memory data = abi.encodeCall(IMerklIncentives.claimMerklRewardsOwner, (tokens, amounts, proofs));
 
         _executeViaForwarder(address(ym), data, 0);
     }

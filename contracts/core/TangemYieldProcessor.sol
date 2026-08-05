@@ -72,10 +72,9 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
         address yieldModule,
         address[] calldata rewardTokens,
         uint[] calldata cumulativeAmounts,
-        bytes32[][] calldata proofs,
-        uint maxServiceFeeRate
+        bytes32[][] calldata proofs
     ) external whenNotPaused onlyRole(CLAIM_MERKL_REWARDS_ROLE) {
-        IMerklIncentives(yieldModule).claimMerklRewardsBE(rewardTokens, cumulativeAmounts, proofs, maxServiceFeeRate);
+        IMerklIncentives(yieldModule).claimMerklRewardsBE(rewardTokens, cumulativeAmounts, proofs);
 
         emit MerklRewardsClaimed(yieldModule);
     }
