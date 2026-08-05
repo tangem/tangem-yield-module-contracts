@@ -24,7 +24,7 @@ contract YieldTokenByProtocolTokenTest is MerklIncentivesBase {
         _fundMerklDistributor(address(protocolToken), YIELD_AMOUNT);
 
         vm.expectEmit(address(ym));
-        emit IYieldModule.YieldTokensByProtocolTokensSet(address(yieldToken));
+        emit IYieldModule.YieldTokensByProtocolTokensSet(address(yieldToken), address(protocolToken));
 
         _claimSingleAsOwner(address(protocolToken), YIELD_AMOUNT);
 
