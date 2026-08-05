@@ -4,7 +4,8 @@
   "description": "EVM smart contracts for Tangem Yield Module",
   "main": "index.js",
   "scripts": {
-    "format:sol": "forge fmt"
+    "format:sol": "forge fmt",
+    "export:abi": "hardhat export-abi"
   },
   "repository": {
     "type": "git",

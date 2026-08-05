@@ -297,7 +297,8 @@ module.exports = {
   abiExporter: {
     path: "./abi",
     clear: true,
-    flat: true
+    flat: true,
+    only: ["^contracts/"]
   },
   bytecodeExporter: {
     path: "./bin",
