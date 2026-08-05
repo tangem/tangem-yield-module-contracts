@@ -638,7 +638,7 @@ abstract contract YieldModuleLiquidUpgradeable is
         require(yieldTokensData[yieldToken].initialized, YieldTokenNotInitialized(yieldToken));
 
         yieldTokenByProtocolToken[protocolToken] = yieldToken;
-        emit YieldTokensByProtocolTokensSet(yieldToken);
+        emit YieldTokensByProtocolTokensSet(yieldToken, protocolToken);
     }
 
     function _authorizeUpgrade(address newImplementation) internal view override onlyOwner {
