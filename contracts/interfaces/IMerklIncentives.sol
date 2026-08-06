@@ -9,7 +9,7 @@ interface IMerklIncentives {
 
     event MerklClaimed(
         address indexed rewardToken,
-        uint received,
+        uint receivedAmount,
         uint serviceFee,
         address finalRecipient,
         address finalToken,
