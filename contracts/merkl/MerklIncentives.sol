@@ -81,14 +81,14 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
     }
 
     function _settleClaimedRewards(address[] calldata rewardTokens, uint[] memory balancesBefore) private {
-        uint[] memory received = new uint[](rewardTokens.length);
+        uint[] memory receivedAmounts = new uint[](rewardTokens.length);
 
         for (uint i; i < rewardTokens.length; ++i) {
             uint balanceAfter = IERC20(rewardTokens[i]).balanceOf(address(this));
 
             require(balanceAfter > balancesBefore[i], MerklClaimedNoReward(rewardTokens[i]));
 
-            received[i] = balanceAfter - balancesBefore[i];
+            receivedAmounts[i] = balanceAfter - balancesBefore[i];
         }
 
         uint serviceFeeRate = processor.serviceFeeRate();
@@ -98,15 +98,18 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         feeReceiver.requireNotZero();
 
         for (uint i; i < rewardTokens.length; ++i) {
-            _routeClaimedReward(rewardTokens[i], received[i], serviceFeeRate, feeReceiver);
+            address rewardToken = rewardTokens[i];
+            uint receivedAmount = receivedAmounts[i];
+
+            uint serviceFee = _takeServiceFee(rewardToken, receivedAmount, serviceFeeRate, feeReceiver);
+            _routeClaimedReward(rewardToken, receivedAmount, serviceFee);
         }
     }
 
-    function _routeClaimedReward(address rewardToken, uint received, uint serviceFeeRate, address feeReceiver) private {
+    function _routeClaimedReward(address rewardToken, uint receivedAmount, uint serviceFee) private {
         (address yieldToken, TokenAction tokenAction) = _classifyRewardRoute(rewardToken);
 
-        uint serviceFee = _takeServiceFee(rewardToken, received, serviceFeeRate, feeReceiver);
-        uint netAmount = received - serviceFee;
+        uint netAmount = receivedAmount - serviceFee;
 
         address finalToken = rewardToken;
         uint finalAmount = netAmount;
@@ -128,17 +131,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             finalRecipient = owner;
         }
 
-        emit MerklClaimed(
-            rewardToken,
-            received,
-            serviceFeeRate, //TODO: do we need rate in the event?
-            serviceFee,
-            feeReceiver, //TODO: do we need feeReceiver in the event?
-            finalRecipient,
-            finalToken,
-            finalAmount,
-            _msgSender()
-        );
+        emit MerklClaimed(rewardToken, receivedAmount, serviceFee, finalRecipient, finalToken, finalAmount, _msgSender());
     }
 
     function _classifyRewardRoute(address rewardToken) private returns (address yieldToken, TokenAction tokenAction) {
@@ -155,14 +148,12 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
 
     function _takeServiceFee(
         address rewardToken,
-        uint received,
+        uint receivedAmount,
         uint serviceFeeRate,
         address feeReceiver
     ) private returns (uint fee) {
-        fee = received * serviceFeeRate / PRECISION;
+        fee = receivedAmount * serviceFeeRate / PRECISION;
 
-        if (fee == 0) return fee;
-
-        IERC20(rewardToken).safeTransfer(feeReceiver, fee);
+        if (fee > 0) IERC20(rewardToken).safeTransfer(feeReceiver, fee);
     }
 }

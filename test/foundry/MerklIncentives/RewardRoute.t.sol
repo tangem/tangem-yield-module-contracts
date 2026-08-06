@@ -70,9 +70,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         emit IMerklIncentives.MerklClaimed(
             address(rewardToken),
             AMOUNT,
-            SERVICE_FEE_RATE,
             fee,
-            feeReceiver,
             owner,
             address(rewardToken),
             AMOUNT - fee,
@@ -99,9 +97,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         emit IMerklIncentives.MerklClaimed(
             address(rewardToken),
             received,
-            SERVICE_FEE_RATE,
             fee,
-            feeReceiver,
             owner,
             address(rewardToken),
             received - fee,
@@ -199,9 +195,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         emit IMerklIncentives.MerklClaimed(
             address(yieldToken),
             YIELD_AMOUNT,
-            SERVICE_FEE_RATE,
             fee,
-            feeReceiver,
             address(ym),
             address(protocolToken),
             YIELD_AMOUNT - fee,
@@ -245,9 +239,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         emit IMerklIncentives.MerklClaimed(
             address(protocolToken),
             YIELD_AMOUNT,
-            SERVICE_FEE_RATE,
             fee,
-            feeReceiver,
             address(ym),
             address(protocolToken),
             YIELD_AMOUNT - fee,
@@ -301,9 +293,7 @@ contract RewardRouteTest is MerklIncentivesBase {
         emit IMerklIncentives.MerklClaimed(
             address(protocolToken),
             YIELD_AMOUNT,
-            SERVICE_FEE_RATE,
             fee,
-            feeReceiver,
             owner,
             address(yieldToken),
             YIELD_AMOUNT - fee,
