@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: MIT
 /* solhint-disable func-name-mixedcase */
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
-import { AaveV3YieldModuleBase } from "./AaveV3YieldModuleBase.sol";
+import { AaveV3YieldModuleFixture } from "./AaveV3YieldModuleFixture.sol";
 
+import { PRECISION } from "contracts/common/Constants.sol";
 import { Requires } from "contracts/common/Requires.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
-import { PRECISION } from "contracts/resources/Constants.sol";
 import { AaveV3PoolMock } from "contracts/test/AaveV3PoolMock.sol";
 import { SwapProviderMock } from "contracts/test/SwapProviderMock.sol";
 import { TestERC20 } from "contracts/test/TestERC20.sol";
 
-contract SwapTest is AaveV3YieldModuleBase {
+contract SwapTest is AaveV3YieldModuleFixture {
     YieldModuleHarness internal yieldModule;
     address internal tokenIn;
 

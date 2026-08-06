@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 /* solhint-disable func-name-mixedcase */
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
 import { IERC20Errors } from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 
 import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
-import { AaveV3YieldModuleBase } from "./AaveV3YieldModuleBase.sol";
+import { AaveV3YieldModuleFixture } from "./AaveV3YieldModuleFixture.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
 /// Non-standard ERC20 behavior at the module boundaries.
-contract WeirdTokensTest is AaveV3YieldModuleBase {
+contract WeirdTokensTest is AaveV3YieldModuleFixture {
     uint internal constant WITHDRAW_AMOUNT = 2_000e6;
     uint internal constant SEND_AMOUNT = 25_000e6;
     uint internal constant TAX = 1e6;

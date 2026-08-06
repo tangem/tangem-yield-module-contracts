@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 /* solhint-disable func-name-mixedcase */
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
-import { MerklIncentivesBase } from "./MerklIncentivesBase.sol";
+import { MerklIncentivesFixture } from "./MerklIncentivesFixture.sol";
 
 /// Covers _increaseProtocolBalanceWithoutFee, driven through Merkl claims
-contract IncreaseProtocolBalanceWithoutFeeTest is MerklIncentivesBase {
+contract IncreaseProtocolBalanceWithoutFeeTest is MerklIncentivesFixture {
     function setUp() public override {
         super.setUp();
 

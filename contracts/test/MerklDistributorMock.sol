@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.29;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -17,6 +17,7 @@ contract MerklDistributorMock is IMerklDistributor {
 
     mapping(address user => mapping(address token => uint)) public claimed;
 
+    /* solhint-disable gas-calldata-parameters */
     function claimWithRecipient(
         address[] calldata users,
         address[] calldata tokens,

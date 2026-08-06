@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 /* solhint-disable func-name-mixedcase */
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
-import { PRECISION } from "contracts/resources/Constants.sol";
+import { PRECISION } from "contracts/common/Constants.sol";
 
-import { MerklIncentivesBase, TestERC20 } from "./MerklIncentivesBase.sol";
+import { MerklIncentivesFixture, TestERC20 } from "./MerklIncentivesFixture.sol";
 
-contract MerklServiceFeeRateTest is MerklIncentivesBase {
+contract MerklServiceFeeRateTest is MerklIncentivesFixture {
     TestERC20 internal rewardToken;
 
     function setUp() public override {

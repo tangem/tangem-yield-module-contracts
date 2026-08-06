@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 /* solhint-disable func-name-mixedcase */
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
-import { YieldModuleBase } from "../YieldModuleBase.sol";
+import { YieldModuleFixture } from "../YieldModuleFixture.sol";
 import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
-contract YieldTokenLifecycleTest is YieldModuleBase {
+contract YieldTokenLifecycleTest is YieldModuleFixture {
     uint240 internal constant MAX_NETWORK_FEE = 20e6;
     uint240 internal constant NEW_MAX_NETWORK_FEE = 30e6;
 

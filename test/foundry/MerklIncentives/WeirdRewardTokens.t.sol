@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 /* solhint-disable func-name-mixedcase */
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
 import { ReentrancyGuardTransientUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
 
-import { MerklIncentivesBase, YieldModuleHarness } from "./MerklIncentivesBase.sol";
+import { MerklIncentivesFixture, YieldModuleHarness } from "./MerklIncentivesFixture.sol";
 import { ReentrantERC20 } from "contracts/test/ReentrantERC20.sol";
 
-contract WeirdRewardTokensTest is MerklIncentivesBase {
+contract WeirdRewardTokensTest is MerklIncentivesFixture {
     bytes32 internal constant REENTRANCY_GUARD_SLOT =
         0x9b779b17422d0df92223018b32b4d1fa46e071723d6817e2486d003becc55f00;
 

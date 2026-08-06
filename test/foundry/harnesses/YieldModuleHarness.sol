@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
-import { MerklIncentives } from "contracts/merkl/MerklIncentives.sol";
+import { MerklIncentives } from "contracts/extensions/MerklIncentives.sol";
+import { SwapExecution } from "contracts/extensions/SwapExecution.sol";
 
-abstract contract YieldModuleHarness is MerklIncentives {
+abstract contract YieldModuleHarness is SwapExecution, MerklIncentives {
     function exposed_setFeeDebt(address yieldToken, uint amount) public {
         feeDebts[yieldToken] = amount;
     }

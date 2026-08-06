@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import { YieldModuleHarness } from "./YieldModuleHarness.sol";
-import { YieldModuleLiquidUpgradeable } from "contracts/core/YieldModuleLiquidUpgradeable.sol";
-import { MerklIncentives } from "contracts/merkl/MerklIncentives.sol";
+import { YieldModuleBase } from "contracts/core/YieldModuleBase.sol";
+import { MerklIncentives } from "contracts/extensions/MerklIncentives.sol";
+import { SwapExecution } from "contracts/extensions/SwapExecution.sol";
 import { GeneralPoolMock } from "contracts/test/GeneralPoolMock.sol";
 
 contract YieldModuleGeneralHarness is YieldModuleHarness {
@@ -23,7 +24,8 @@ contract YieldModuleGeneralHarness is YieldModuleHarness {
         address swapExecutionRegistry_
     )
         MerklIncentives(distributor_)
-        YieldModuleLiquidUpgradeable(yieldProcessor_, factory_, trustedForwarder_, swapExecutionRegistry_)
+        SwapExecution(swapExecutionRegistry_)
+        YieldModuleBase(yieldProcessor_, factory_, trustedForwarder_)
     {
         pool = GeneralPoolMock(pool_);
 

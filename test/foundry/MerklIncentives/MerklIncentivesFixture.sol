@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
+import { PRECISION } from "contracts/common/Constants.sol";
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
-import { PRECISION } from "contracts/resources/Constants.sol";
 import { TestERC20 } from "contracts/test/TestERC20.sol";
-import { AaveV3YieldModuleBase } from "test/foundry/TangemAaveV3YieldModule/AaveV3YieldModuleBase.sol";
+import { AaveV3YieldModuleFixture } from "test/foundry/TangemAaveV3YieldModule/AaveV3YieldModuleFixture.sol";
 import { YieldModuleHarness } from "test/foundry/harnesses/YieldModuleHarness.sol";
 
-abstract contract MerklIncentivesBase is AaveV3YieldModuleBase {
+abstract contract MerklIncentivesFixture is AaveV3YieldModuleFixture {
     uint internal constant CLAIM_MAX_SERVICE_FEE_RATE = 1500;
 
     YieldModuleHarness ym;

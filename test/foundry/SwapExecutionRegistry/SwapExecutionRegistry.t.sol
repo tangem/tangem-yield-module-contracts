@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 /* solhint-disable func-name-mixedcase */
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
-import { SwapExecutionRegistry } from "contracts/core/SwapExecutionRegistry.sol";
+import { SwapExecutionRegistry } from "contracts/infra/SwapExecutionRegistry.sol";
 import { ISwapExecutionRegistry } from "contracts/interfaces/ISwapExecutionRegistry.sol";
 
 import { TestHelpers } from "../utils/TestHelpers.sol";

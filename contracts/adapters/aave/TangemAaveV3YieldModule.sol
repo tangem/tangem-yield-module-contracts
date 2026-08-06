@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
 import { IAToken } from "@aave/core-v3/contracts/interfaces/IAToken.sol";
 import { IPool } from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import { YieldModuleLiquidUpgradeable } from "../core/YieldModuleLiquidUpgradeable.sol";
-import { MerklIncentives } from "../merkl/MerklIncentives.sol";
+import { YieldModuleBase } from "contracts/core/YieldModuleBase.sol";
+import { YieldModuleLiquidUpgradeable } from "contracts/core/YieldModuleLiquidUpgradeable.sol";
+import { MerklIncentives } from "contracts/extensions/MerklIncentives.sol";
+import { SwapExecution } from "contracts/extensions/SwapExecution.sol";
 
-contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable, MerklIncentives {
+contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable, SwapExecution, MerklIncentives {
     using SafeERC20 for IERC20;
 
     IPool public immutable pool;
@@ -24,7 +26,8 @@ contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable, MerklIncentive
         address swapExecutionRegistry_
     )
         MerklIncentives(distributor_)
-        YieldModuleLiquidUpgradeable(yieldProcessor_, factory_, trustedForwarder_, swapExecutionRegistry_)
+        SwapExecution(swapExecutionRegistry_)
+        YieldModuleBase(yieldProcessor_, factory_, trustedForwarder_)
     {
         pool = IPool(pool_);
 

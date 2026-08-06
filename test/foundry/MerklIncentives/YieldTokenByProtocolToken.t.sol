@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 /* solhint-disable func-name-mixedcase */
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
 import { IAToken } from "@aave/core-v3/contracts/interfaces/IAToken.sol";
 import { DataTypes } from "@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol";
 
-import { MerklIncentivesBase } from "./MerklIncentivesBase.sol";
+import { MerklIncentivesFixture } from "./MerklIncentivesFixture.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
 /// Covers the lazy recovery of `yieldTokenByProtocolToken` (_resolveAndSetYieldTokenByProtocolToken)
-contract YieldTokenByProtocolTokenTest is MerklIncentivesBase {
+contract YieldTokenByProtocolTokenTest is MerklIncentivesFixture {
     function setUp() public override {
         super.setUp();
 
