@@ -6,7 +6,6 @@ interface IMerklIncentives {
     error MerklClaimedNoReward(address rewardToken);
     error RewardTokensEmpty();
     error RewardTokensLengthsMismatch();
-    error ServiceFeeRateExceedsMax(uint serviceFeeRate);
 
     event MerklClaimed(
         address indexed rewardToken,

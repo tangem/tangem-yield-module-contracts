@@ -94,7 +94,10 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         uint serviceFeeRate = processor.serviceFeeRate();
         address feeReceiver = processor.feeReceiver();
 
-        require(serviceFeeRate <= MAX_MERKL_SERVICE_FEE_RATE, ServiceFeeRateExceedsMax(serviceFeeRate));
+        if (serviceFeeRate > MAX_MERKL_SERVICE_FEE_RATE) {
+            serviceFeeRate = MAX_MERKL_SERVICE_FEE_RATE;
+        }
+
         feeReceiver.requireNotZero();
 
         for (uint i; i < rewardTokens.length; ++i) {
@@ -131,7 +134,15 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             finalRecipient = owner;
         }
 
-        emit MerklClaimed(rewardToken, receivedAmount, serviceFee, finalRecipient, finalToken, finalAmount, _msgSender());
+        emit MerklClaimed(
+            rewardToken,
+            receivedAmount,
+            serviceFee,
+            finalRecipient,
+            finalToken,
+            finalAmount,
+            _msgSender()
+        );
     }
 
     function _classifyRewardRoute(address rewardToken) private returns (address yieldToken, TokenAction tokenAction) {
