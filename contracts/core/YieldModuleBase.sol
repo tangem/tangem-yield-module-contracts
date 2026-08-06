@@ -83,7 +83,7 @@ abstract contract YieldModuleBase is
         require(yieldTokensData[yieldToken].initialized, YieldTokenNotInitialized(yieldToken));
 
         yieldTokenByProtocolToken[protocolToken] = yieldToken;
-        emit YieldTokensByProtocolTokensSet(yieldToken);
+        emit YieldTokensByProtocolTokensSet(yieldToken, protocolToken);
     }
 
     /* PORT FOR ADAPTERS */

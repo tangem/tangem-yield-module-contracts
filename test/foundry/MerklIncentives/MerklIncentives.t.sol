@@ -4,6 +4,7 @@ pragma solidity 0.8.29;
 
 import { MerklIncentivesFixture, TestERC20 } from "./MerklIncentivesFixture.sol";
 import { Requires } from "contracts/common/Requires.sol";
+import { TangemYieldProcessor } from "contracts/infra/TangemYieldProcessor.sol";
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 import { MerklDistributorMock } from "contracts/test/MerklDistributorMock.sol";
@@ -37,20 +38,23 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
         TestERC20 rewardToken = _createRewardToken();
         _fundMerklDistributor(address(rewardToken), AMOUNT);
 
+        uint fee = _expectedRewardFee(AMOUNT);
+
         vm.expectEmit(address(ym));
         emit IMerklIncentives.MerklClaimed(
-            address(merklDistributor),
             address(rewardToken),
             AMOUNT,
+            fee,
             owner,
             address(rewardToken),
-            AMOUNT,
+            AMOUNT - fee,
             owner
         );
 
         _claimSingleAsOwner(address(rewardToken), AMOUNT);
 
-        assertEq(rewardToken.balanceOf(owner), AMOUNT);
+        assertEq(rewardToken.balanceOf(owner), AMOUNT - fee);
+        assertEq(rewardToken.balanceOf(feeReceiver), fee);
         assertEq(rewardToken.balanceOf(address(ym)), 0);
     }
 
@@ -58,41 +62,58 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
         TestERC20 rewardToken = _createRewardToken();
         _fundMerklDistributor(address(rewardToken), AMOUNT);
 
+        uint fee = _expectedRewardFee(AMOUNT);
+
         vm.expectEmit(address(ym));
         emit IMerklIncentives.MerklClaimed(
-            address(merklDistributor),
             address(rewardToken),
             AMOUNT,
+            fee,
             owner,
             address(rewardToken),
-            AMOUNT,
+            AMOUNT - fee,
             address(processor)
         );
 
         _claimSingleAsBE(address(rewardToken), AMOUNT);
 
-        assertEq(rewardToken.balanceOf(owner), AMOUNT);
+        assertEq(rewardToken.balanceOf(owner), AMOUNT - fee);
+        assertEq(rewardToken.balanceOf(feeReceiver), fee);
         assertEq(rewardToken.balanceOf(address(ym)), 0);
+    }
+
+    function test_claimMerklRewards_EmitsMerklRewardsClaimed() public {
+        TestERC20 rewardToken = _createRewardToken();
+        _fundMerklDistributor(address(rewardToken), AMOUNT);
+
+        vm.expectEmit(address(processor));
+        emit TangemYieldProcessor.MerklRewardsClaimed(address(ym));
+
+        _claimSingleAsBE(address(rewardToken), AMOUNT);
     }
 
     function test_claimMerklRewardsOwner_Success_ViaForwarder() public {
         TestERC20 rewardToken = _createRewardToken();
         _fundMerklDistributor(address(rewardToken), AMOUNT);
 
+        uint fee = _expectedRewardFee(AMOUNT);
+
+        // the forwarder must not leak into the event: caller is the owner, not the relayer
         vm.expectEmit(address(ym));
         emit IMerklIncentives.MerklClaimed(
-            address(merklDistributor),
             address(rewardToken),
             AMOUNT,
+            fee,
             owner,
             address(rewardToken),
-            AMOUNT,
+            AMOUNT - fee,
             owner
         );
 
         _claimSingleAsOwnerViaForwarder(address(rewardToken), AMOUNT);
 
-        assertEq(rewardToken.balanceOf(owner), AMOUNT);
+        assertEq(rewardToken.balanceOf(owner), AMOUNT - fee);
+        assertEq(rewardToken.balanceOf(feeReceiver), fee);
         assertEq(rewardToken.balanceOf(address(ym)), 0);
     }
 

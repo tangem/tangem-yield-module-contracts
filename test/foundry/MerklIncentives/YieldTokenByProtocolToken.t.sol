@@ -2,10 +2,10 @@
 /* solhint-disable func-name-mixedcase */
 pragma solidity 0.8.29;
 
+import { IAToken } from "@aave/core-v3/contracts/interfaces/IAToken.sol";
 import { DataTypes } from "@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol";
 
 import { MerklIncentivesFixture } from "./MerklIncentivesFixture.sol";
-import { IAToken } from "contracts/interfaces/IAToken.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
 /// Covers the lazy recovery of `yieldTokenByProtocolToken` (_resolveAndSetYieldTokenByProtocolToken)
@@ -24,12 +24,14 @@ contract YieldTokenByProtocolTokenTest is MerklIncentivesFixture {
         _fundMerklDistributor(address(protocolToken), YIELD_AMOUNT);
 
         vm.expectEmit(address(ym));
-        emit IYieldModule.YieldTokensByProtocolTokensSet(address(yieldToken));
+        emit IYieldModule.YieldTokensByProtocolTokensSet(address(yieldToken), address(protocolToken));
 
         _claimSingleAsOwner(address(protocolToken), YIELD_AMOUNT);
 
         assertEq(ym.yieldTokenByProtocolToken(address(protocolToken)), address(yieldToken));
-        assertEq(ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + YIELD_AMOUNT);
+        assertEq(
+            ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + YIELD_AMOUNT - _expectedRewardFee(YIELD_AMOUNT)
+        );
     }
 
     function test_claim_Reverts_WhenResolvedYieldTokenNotInitialized() public {

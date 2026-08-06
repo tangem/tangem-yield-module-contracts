@@ -1,13 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
+import { PRECISION } from "contracts/common/Constants.sol";
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 import { TestERC20 } from "contracts/test/TestERC20.sol";
 import { AaveV3YieldModuleFixture } from "test/foundry/TangemAaveV3YieldModule/AaveV3YieldModuleFixture.sol";
 import { YieldModuleHarness } from "test/foundry/harnesses/YieldModuleHarness.sol";
 
 abstract contract MerklIncentivesFixture is AaveV3YieldModuleFixture {
+    uint internal constant CLAIM_MAX_SERVICE_FEE_RATE = 1500;
+
     YieldModuleHarness ym;
+
+    function _expectedRewardFee(uint received) internal pure returns (uint) {
+        return received * SERVICE_FEE_RATE / PRECISION;
+    }
 
     function _createRewardToken() internal returns (TestERC20 token) {
         token = new TestERC20("RewardToken", "RWD", 18);
@@ -60,8 +67,8 @@ abstract contract MerklIncentivesFixture is AaveV3YieldModuleFixture {
         (address[] memory tokens, uint[] memory amounts, bytes32[][] memory proofs) =
             _singleClaimArgs(rewardToken, amount);
 
-        vm.prank(address(processor));
-        ym.claimMerklRewardsBE(tokens, amounts, proofs);
+        vm.prank(backend);
+        processor.claimMerklRewards(address(ym), tokens, amounts, proofs);
     }
 
     function _claimSingleAsOwnerViaForwarder(address rewardToken, uint amount) internal {

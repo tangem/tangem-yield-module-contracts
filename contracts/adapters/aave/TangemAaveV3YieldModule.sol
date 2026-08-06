@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
+import { IAToken } from "@aave/core-v3/contracts/interfaces/IAToken.sol";
 import { IPool } from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -9,7 +10,6 @@ import { YieldModuleBase } from "contracts/core/YieldModuleBase.sol";
 import { YieldModuleLiquidUpgradeable } from "contracts/core/YieldModuleLiquidUpgradeable.sol";
 import { MerklIncentives } from "contracts/extensions/MerklIncentives.sol";
 import { SwapExecution } from "contracts/extensions/SwapExecution.sol";
-import { IAToken } from "contracts/interfaces/IAToken.sol";
 
 contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable, SwapExecution, MerklIncentives {
     using SafeERC20 for IERC20;
