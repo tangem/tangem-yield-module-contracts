@@ -165,6 +165,8 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
     ) private returns (uint fee) {
         fee = receivedAmount * serviceFeeRate / PRECISION;
 
-        if (fee > 0) IERC20(rewardToken).safeTransfer(feeReceiver, fee);
+        if (fee > 0) {
+            IERC20(rewardToken).safeTransfer(feeReceiver, fee);
+        }
     }
 }
