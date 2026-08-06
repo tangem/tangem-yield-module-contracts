@@ -44,9 +44,7 @@ contract MerklIncentivesTest is MerklIncentivesBase {
         emit IMerklIncentives.MerklClaimed(
             address(rewardToken),
             AMOUNT,
-            SERVICE_FEE_RATE,
             fee,
-            feeReceiver,
             owner,
             address(rewardToken),
             AMOUNT - fee,
@@ -70,9 +68,7 @@ contract MerklIncentivesTest is MerklIncentivesBase {
         emit IMerklIncentives.MerklClaimed(
             address(rewardToken),
             AMOUNT,
-            SERVICE_FEE_RATE,
             fee,
-            feeReceiver,
             owner,
             address(rewardToken),
             AMOUNT - fee,
@@ -107,9 +103,7 @@ contract MerklIncentivesTest is MerklIncentivesBase {
         emit IMerklIncentives.MerklClaimed(
             address(rewardToken),
             AMOUNT,
-            SERVICE_FEE_RATE,
             fee,
-            feeReceiver,
             owner,
             address(rewardToken),
             AMOUNT - fee,

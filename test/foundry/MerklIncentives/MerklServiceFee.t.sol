@@ -34,9 +34,7 @@ contract MerklServiceFeeTest is MerklIncentivesBase {
         emit IMerklIncentives.MerklClaimed(
             address(rewardToken),
             topUp,
-            SERVICE_FEE_RATE,
             _expectedRewardFee(topUp),
-            feeReceiver,
             owner,
             address(rewardToken),
             topUp - _expectedRewardFee(topUp),
@@ -54,19 +52,9 @@ contract MerklServiceFeeTest is MerklIncentivesBase {
         TestERC20 rewardToken = _createRewardToken();
         _fundMerklDistributor(address(rewardToken), 1);
 
-        // the fee rounds to zero, so nothing is transferred, but the event still reports the configured receiver
+        // the fee rounds to zero, so nothing is transferred and the event reports a zero fee amount
         vm.expectEmit(true, true, false, true, address(ym));
-        emit IMerklIncentives.MerklClaimed(
-            address(rewardToken),
-            1,
-            SERVICE_FEE_RATE,
-            0,
-            feeReceiver,
-            owner,
-            address(rewardToken),
-            1,
-            owner
-        );
+        emit IMerklIncentives.MerklClaimed(address(rewardToken), 1, 0, owner, address(rewardToken), 1, owner);
 
         _claimSingleAsOwner(address(rewardToken), 1);
 
@@ -114,14 +102,12 @@ contract MerklServiceFeeTest is MerklIncentivesBase {
 
         uint fee = _expectedRewardFee(AMOUNT);
 
-        // the receiver is read from the processor at execution time, and the event reports that one
+        // the receiver is read from the processor at execution time
         vm.expectEmit(true, true, false, true, address(ym));
         emit IMerklIncentives.MerklClaimed(
             address(rewardToken),
             AMOUNT,
-            SERVICE_FEE_RATE,
             fee,
-            newFeeReceiver,
             owner,
             address(rewardToken),
             AMOUNT - fee,
@@ -266,14 +252,12 @@ contract MerklServiceFeeTest is MerklIncentivesBase {
 
         uint fee = amount * rate / PRECISION;
 
-        // the fee fields report the applied rate, exactly what leaves the module and the configured receiver
+        // the fee field reports exactly what leaves the module under the applied rate
         vm.expectEmit(true, true, false, true, address(ym));
         emit IMerklIncentives.MerklClaimed(
             address(rewardToken),
             amount,
-            rate,
             fee,
-            feeReceiver,
             owner,
             address(rewardToken),
             amount - fee,

@@ -11,9 +11,7 @@ interface IMerklIncentives {
     event MerklClaimed(
         address indexed rewardToken,
         uint received,
-        uint serviceFeeRate,
         uint serviceFeeAmount,
-        address feeReceiver,
         address finalRecipient,
         address finalToken,
         uint finalAmount,
