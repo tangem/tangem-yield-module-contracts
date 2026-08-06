@@ -2,7 +2,6 @@
 /* solhint-disable func-name-mixedcase */
 pragma solidity ^0.8.29;
 
-import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 import { PRECISION } from "contracts/resources/Constants.sol";
 
 import { MerklIncentivesBase, TestERC20 } from "./MerklIncentivesBase.sol";
@@ -50,22 +49,28 @@ contract MerklServiceFeeRateTest is MerklIncentivesBase {
         assertEq(rewardToken.balanceOf(owner), AMOUNT - fee);
     }
 
-    function test_claim_Reverts_WhenRateExceedsContractCap() public {
-        uint rate = CLAIM_MAX_SERVICE_FEE_RATE + 1;
-        _setServiceFeeRate(rate);
-
-        vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.ServiceFeeRateExceedsMax.selector, rate));
+    function test_claim_ClampsRate_WhenRateExceedsContractCap() public {
+        _setServiceFeeRate(CLAIM_MAX_SERVICE_FEE_RATE + 1);
 
         _claimSingleAsOwner(address(rewardToken), AMOUNT);
+
+        // the over-cap rate is clamped down to the cap instead of reverting the claim
+        uint fee = AMOUNT * CLAIM_MAX_SERVICE_FEE_RATE / PRECISION;
+
+        assertEq(rewardToken.balanceOf(feeReceiver), fee);
+        assertEq(rewardToken.balanceOf(owner), AMOUNT - fee);
     }
 
-    function test_claim_Reverts_WhenRateExceedsContractCap_BE() public {
-        uint rate = CLAIM_MAX_SERVICE_FEE_RATE + 1;
-        _setServiceFeeRate(rate);
-
-        vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.ServiceFeeRateExceedsMax.selector, rate));
+    function test_claim_ClampsRate_WhenRateIsMaximal_BE() public {
+        _setServiceFeeRate(PRECISION);
 
         _claimSingleAsBE(address(rewardToken), AMOUNT);
+
+        // even a 100% processor rate cannot take more than the cap
+        uint fee = AMOUNT * CLAIM_MAX_SERVICE_FEE_RATE / PRECISION;
+
+        assertEq(rewardToken.balanceOf(feeReceiver), fee);
+        assertEq(rewardToken.balanceOf(owner), AMOUNT - fee);
     }
 
     function testFuzz_claim_EnforcesContractCap(uint rate) public {
@@ -73,19 +78,12 @@ contract MerklServiceFeeRateTest is MerklIncentivesBase {
 
         _setServiceFeeRate(rate);
 
-        bool allowed = rate <= CLAIM_MAX_SERVICE_FEE_RATE;
-
-        if (!allowed) {
-            vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.ServiceFeeRateExceedsMax.selector, rate));
-        }
-
         _claimSingleAsOwner(address(rewardToken), AMOUNT);
 
-        if (allowed) {
-            uint fee = AMOUNT * rate / PRECISION;
+        uint effectiveRate = rate > CLAIM_MAX_SERVICE_FEE_RATE ? CLAIM_MAX_SERVICE_FEE_RATE : rate;
+        uint fee = AMOUNT * effectiveRate / PRECISION;
 
-            assertEq(rewardToken.balanceOf(feeReceiver), fee);
-            assertEq(rewardToken.balanceOf(owner), AMOUNT - fee);
-        }
+        assertEq(rewardToken.balanceOf(feeReceiver), fee);
+        assertEq(rewardToken.balanceOf(owner), AMOUNT - fee);
     }
 }
