@@ -2,10 +2,11 @@
 /* solhint-disable func-name-mixedcase */
 pragma solidity 0.8.29;
 
+import { PRECISION } from "contracts/common/Constants.sol";
+import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
+
 import { YieldModuleFixture } from "../YieldModuleFixture.sol";
 import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
-
-import { PRECISION } from "contracts/common/Constants.sol";
 
 contract ServiceFeeTest is YieldModuleFixture {
     uint internal constant SF_INITIAL_OWNER_BALANCE = 200_000e6;
@@ -78,6 +79,18 @@ contract ServiceFeeTest is YieldModuleFixture {
     }
 
     /*  Fee debt repayment  */
+
+    function test_collectServiceFee_EmitsFeePaymentPartial() public {
+        YieldModuleHarness yieldModule = _deployEnteredYieldModule(owner, SF_INITIAL_OWNER_BALANCE);
+        uint protocolBalance = yieldModule.protocolBalance(address(yieldToken));
+
+        yieldModule.exposed_setFeeDebt(address(yieldToken), protocolBalance + 1);
+
+        vm.expectEmit(address(yieldModule));
+        emit IYieldModule.FeePaymentPartial(address(yieldToken), protocolBalance, 1, feeReceiver);
+
+        _collectViaProcessor(yieldModule);
+    }
 
     function testFuzz_enterProtocolByOwner_PartiallyRepaysFeeDebt(uint reEnterDeposit) public {
         reEnterDeposit = bound(reEnterDeposit, 1, feeDebt - 1);

@@ -6,6 +6,7 @@ import { Arrays } from "@openzeppelin/contracts/utils/Arrays.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
 import { PRECISION } from "../common/Constants.sol";
+import { IMerklIncentives } from "../interfaces/IMerklIncentives.sol";
 import { IYieldModule } from "../interfaces/IYieldModule.sol";
 import { IYieldProcessor } from "../interfaces/IYieldProcessor.sol";
 
@@ -16,6 +17,7 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
     bytes32 public constant PROTOCOL_EXITER_ROLE = keccak256("PROTOCOL_EXITER_ROLE");
     bytes32 public constant SERVICE_FEE_COLLECTOR_ROLE = keccak256("SERVICE_FEE_COLLECTOR_ROLE");
     bytes32 public constant PROPERTY_SETTER_ROLE = keccak256("PROPERTY_SETTER_ROLE");
+    bytes32 public constant CLAIM_MERKL_REWARDS_ROLE = keccak256("CLAIM_MERKL_REWARDS_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
     address public feeReceiver;
@@ -26,6 +28,7 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
     event ServiceFeeCollected(address yieldModule);
     event FeeReceiverSet(address paymentReceiver);
     event FeeRateSet(uint feeRate);
+    event MerklRewardsClaimed(address yieldModule);
 
     error InvalidFeeRate();
 
@@ -63,6 +66,17 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
         IYieldModule(yieldModule).collectServiceFee(yieldToken);
 
         emit ServiceFeeCollected(yieldModule);
+    }
+
+    function claimMerklRewards(
+        address yieldModule,
+        address[] calldata rewardTokens,
+        uint[] calldata cumulativeAmounts,
+        bytes32[][] calldata proofs
+    ) external whenNotPaused onlyRole(CLAIM_MERKL_REWARDS_ROLE) {
+        IMerklIncentives(yieldModule).claimMerklRewardsBE(rewardTokens, cumulativeAmounts, proofs);
+
+        emit MerklRewardsClaimed(yieldModule);
     }
 
     function setFeeReceiver(address feeReceiver_) external onlyRole(PROPERTY_SETTER_ROLE) {

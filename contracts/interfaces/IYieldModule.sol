@@ -40,7 +40,7 @@ interface IYieldModule {
         bool depositedToProtocol
     );
     event WithdrawNativeProcessed(address indexed to, uint amount);
-    event YieldTokensByProtocolTokensSet(address yieldToken);
+    event YieldTokensByProtocolTokensSet(address yieldToken, address protocolToken);
 
     error OnlyOwner();
     error OnlyOwnerOrFactory();
@@ -70,7 +70,6 @@ interface IYieldModule {
 
     error ProtocolTokenNotSet(address protocolToken);
     error YieldTokenNotInitialized(address yieldToken);
-    error FeeCheckpointExceedsBalance();
 
     function initialize(address owner) external;
 
