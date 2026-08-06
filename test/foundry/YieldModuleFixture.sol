@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
 import { BaseTest } from "test/foundry/BaseTest.sol";
 import { YieldModuleGeneralHarness } from "test/foundry/harnesses/YieldModuleGeneralHarness.sol";
@@ -7,18 +7,18 @@ import { YieldModuleHarness } from "test/foundry/harnesses/YieldModuleHarness.so
 import { TestHelpers } from "test/foundry/utils/TestHelpers.sol";
 
 import { ERC2771Forwarder } from "@openzeppelin/contracts/metatx/ERC2771Forwarder.sol";
-import { SwapExecutionRegistry } from "contracts/core/SwapExecutionRegistry.sol";
-import { TangemYieldModuleFactory } from "contracts/core/TangemYieldModuleFactory.sol";
-import { TangemYieldProcessor } from "contracts/core/TangemYieldProcessor.sol";
+import { PRECISION } from "contracts/common/Constants.sol";
+import { SwapExecutionRegistry } from "contracts/infra/SwapExecutionRegistry.sol";
+import { TangemERC2771Forwarder } from "contracts/infra/TangemERC2771Forwarder.sol";
+import { TangemYieldModuleFactory } from "contracts/infra/TangemYieldModuleFactory.sol";
+import { TangemYieldProcessor } from "contracts/infra/TangemYieldProcessor.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
-import { TangemERC2771Forwarder } from "contracts/metatx/TangemERC2771Forwarder.sol";
-import { PRECISION } from "contracts/resources/Constants.sol";
 import { GeneralPoolMock } from "contracts/test/GeneralPoolMock.sol";
 import { MerklDistributorMock } from "contracts/test/MerklDistributorMock.sol";
 import { SwapProviderMock } from "contracts/test/SwapProviderMock.sol";
 import { TestERC20 } from "contracts/test/TestERC20.sol";
 
-abstract contract YieldModuleBase is BaseTest, TestHelpers {
+abstract contract YieldModuleFixture is BaseTest, TestHelpers {
     bytes32 internal constant FEE_PAYMENT_FAILED_EVENT_SIG = keccak256("FeePaymentFailed(address,uint256)");
 
     uint internal constant INITIAL_OWNER_BALANCE = 400_000e6;

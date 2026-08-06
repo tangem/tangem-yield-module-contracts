@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
 interface IMerklIncentives {
     error DuplicateRewardToken(address rewardToken);
@@ -10,7 +10,7 @@ interface IMerklIncentives {
     event MerklClaimed(
         address indexed rewardToken,
         uint received,
-        uint serviceFeeAmount,
+        uint serviceFee,
         address finalRecipient,
         address finalToken,
         uint finalAmount,

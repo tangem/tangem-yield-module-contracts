@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 /* solhint-disable func-name-mixedcase */
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import { MerklIncentivesBase, TestERC20 } from "./MerklIncentivesBase.sol";
+import { MerklIncentivesFixture, TestERC20 } from "./MerklIncentivesFixture.sol";
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 import { IMerklDistributor } from "contracts/interfaces/external/IMerklDistributor.sol";
 
 /// Reward routing tests: how claimed Merkl rewards are classified and processed
-contract RewardRouteTest is MerklIncentivesBase {
+contract RewardRouteTest is MerklIncentivesFixture {
     function setUp() public override {
         super.setUp();
 

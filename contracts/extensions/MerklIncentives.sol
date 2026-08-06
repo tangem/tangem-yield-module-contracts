@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import { IMerklIncentives } from "../interfaces/IMerklIncentives.sol";
 import { IMerklDistributor } from "../interfaces/external/IMerklDistributor.sol";
 
+import { PRECISION } from "../common/Constants.sol";
 import { Requires } from "../common/Requires.sol";
 import { YieldModuleLiquidUpgradeable } from "../core/YieldModuleLiquidUpgradeable.sol";
-import { PRECISION } from "../resources/Constants.sol";
 
 abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradeable {
     using SafeERC20 for IERC20;

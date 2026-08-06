@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
 import { Test } from "forge-std/src/Test.sol";
 
-import { YieldModuleLiquidUpgradeable } from "contracts/core/YieldModuleLiquidUpgradeable.sol";
+import { YieldModuleBase } from "contracts/core/YieldModuleBase.sol";
+import { SwapExecution } from "contracts/extensions/SwapExecution.sol";
 
-contract StorageLayoutStub is YieldModuleLiquidUpgradeable {
-    constructor() YieldModuleLiquidUpgradeable(address(1), address(2), address(3), address(4)) { }
+// Pins the frozen slots 0..6 on a module shaped like a real one: the full core chain plus an
+// extension. Adding a layer or reordering the bases must not move any of these.
+contract StorageLayoutStub is SwapExecution {
+    constructor() SwapExecution(address(4)) YieldModuleBase(address(1), address(2), address(3)) { }
 
     /* solhint-disable no-empty-blocks */
     function initialize(address) external { }

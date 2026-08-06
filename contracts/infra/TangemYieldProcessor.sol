@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.29;
 
 import { AccessControlEnumerable } from "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
 import { Arrays } from "@openzeppelin/contracts/utils/Arrays.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
+import { PRECISION } from "../common/Constants.sol";
 import { IMerklIncentives } from "../interfaces/IMerklIncentives.sol";
 import { IYieldModule } from "../interfaces/IYieldModule.sol";
 import { IYieldProcessor } from "../interfaces/IYieldProcessor.sol";
-import { PRECISION } from "../resources/Constants.sol";
 
 contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausable {
     using Arrays for uint[];

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.29;
+pragma solidity 0.8.29;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -21,6 +21,7 @@ contract SwapProviderMock {
     }
 
     function spendPartial(address tokenIn, uint amountIn, address sink) external {
+        /* solhint-disable gas-custom-errors */
         require(amountIn > 0, "amountIn=0");
         IERC20(tokenIn).transferFrom(msg.sender, sink, amountIn - 1);
     }
@@ -34,6 +35,8 @@ contract SwapProviderMock {
     }
 
     function revertEmpty() external pure {
+        /* solhint-disable reason-string */
+        /* solhint-disable gas-custom-errors */
         revert();
     }
 }
