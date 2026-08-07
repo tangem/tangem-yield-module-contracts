@@ -66,6 +66,26 @@ abstract contract YieldModuleBase is
         return protocolTokens[yieldToken].balanceOf(address(this));
     }
 
+    function _resolveYieldToken(address protocolToken) internal returns (address) {
+        address yieldToken = yieldTokenByProtocolToken[protocolToken];
+
+        if (yieldToken != address(0)) {
+            return yieldToken;
+        }
+
+        return _resolveAndSetYieldTokenByProtocolToken(protocolToken);
+    }
+
+    function _resolveAndSetYieldTokenByProtocolToken(address protocolToken) internal returns (address yieldToken) {
+        require(isProtocolToken[protocolToken], ProtocolTokenNotSet(protocolToken));
+
+        yieldToken = _tryResolveYieldToken(protocolToken);
+        require(yieldTokensData[yieldToken].initialized, YieldTokenNotInitialized(yieldToken));
+
+        yieldTokenByProtocolToken[protocolToken] = yieldToken;
+        emit YieldTokensByProtocolTokensSet(yieldToken, protocolToken);
+    }
+
     /* PORT FOR ADAPTERS */
 
     function _initProtocolToken(address yieldToken) internal virtual returns (address);
@@ -75,6 +95,10 @@ abstract contract YieldModuleBase is
     function _pullFromProtocolToOwner(address yieldToken, uint amount) internal virtual returns (uint);
 
     function _pullFromProtocolToModule(address yieldToken, uint amount) internal virtual returns (uint);
+
+    function _tryResolveYieldToken(address protocolToken) internal view virtual returns (address);
+
+    function _getProtocolToken(address yieldToken) internal view virtual returns (address);
 
     /* UPGRADE */
 

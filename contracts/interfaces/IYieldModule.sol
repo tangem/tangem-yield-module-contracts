@@ -40,6 +40,7 @@ interface IYieldModule {
         bool depositedToProtocol
     );
     event WithdrawNativeProcessed(address indexed to, uint amount);
+    event YieldTokensByProtocolTokensSet(address yieldToken, address protocolToken);
     event SoftExitTriggered(address indexed yieldToken, uint protocolBalance, uint amount);
     event EntrySuspensionSet(address indexed yieldToken, bool suspended);
 
@@ -68,6 +69,9 @@ interface IYieldModule {
     error NativeTransferFailed();
     error TokenInEqualsTokenOut();
     error SendingToThis();
+
+    error ProtocolTokenNotSet(address protocolToken);
+    error YieldTokenNotInitialized(address yieldToken);
     error TokenEntrySuspended();
     error NotEntrySuspended();
 

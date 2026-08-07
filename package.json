@@ -6,6 +6,7 @@
   "scripts": {
     "compile": "hardhat compile",
     "clean": "hardhat clean && forge clean",
+    "export:abi": "hardhat export-abi",
     "test": "npm run test:foundry && npm run test:hardhat",
     "test:foundry": "forge test",
     "test:hardhat": "hardhat test",

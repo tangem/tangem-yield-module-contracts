@@ -33,7 +33,7 @@ module.exports = {
     path: "./abi",
     clear: true,
     flat: true,
-    except: ["contracts/test/"]
+    only: ["^contracts/"]
   },
   bytecodeExporter: {
     path: "./bin",

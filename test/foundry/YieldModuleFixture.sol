@@ -14,6 +14,7 @@ import { TangemYieldModuleFactory } from "contracts/infra/TangemYieldModuleFacto
 import { TangemYieldProcessor } from "contracts/infra/TangemYieldProcessor.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 import { GeneralPoolMock } from "contracts/test/GeneralPoolMock.sol";
+import { MerklDistributorMock } from "contracts/test/MerklDistributorMock.sol";
 import { SwapProviderMock } from "contracts/test/SwapProviderMock.sol";
 import { TestERC20 } from "contracts/test/TestERC20.sol";
 
@@ -34,6 +35,7 @@ abstract contract YieldModuleFixture is BaseTest, TestHelpers {
     TangemYieldProcessor public processor;
     TangemYieldModuleFactory public factory;
     SwapExecutionRegistry public swapExecutionRegistry;
+    MerklDistributorMock public merklDistributor;
     SwapProviderMock public swapProvider;
     TestERC20 public yieldToken;
     GeneralPoolMock public generalPool;
@@ -51,11 +53,13 @@ abstract contract YieldModuleFixture is BaseTest, TestHelpers {
         processor.grantRole(processor.PROTOCOL_EXITER_ROLE(), backend);
         processor.grantRole(processor.SERVICE_FEE_COLLECTOR_ROLE(), backend);
         processor.grantRole(processor.PROPERTY_SETTER_ROLE(), backend);
+        processor.grantRole(processor.CLAIM_MERKL_REWARDS_ROLE(), backend);
         processor.grantRole(processor.PAUSER_ROLE(), backend);
         processor.grantRole(processor.RISK_SERVICE_ROLE(), backend);
 
         factory = new TangemYieldModuleFactory();
         swapExecutionRegistry = new SwapExecutionRegistry(backend);
+        merklDistributor = new MerklDistributorMock();
         swapProvider = new SwapProviderMock();
         yieldToken = new TestERC20("TestYieldToken", "TYT", 6);
 
@@ -64,6 +68,7 @@ abstract contract YieldModuleFixture is BaseTest, TestHelpers {
 
         ymGeneralImpl = new YieldModuleGeneralHarness(
             address(generalPool),
+            address(merklDistributor),
             address(processor),
             address(factory),
             address(forwarder),
@@ -83,6 +88,7 @@ abstract contract YieldModuleFixture is BaseTest, TestHelpers {
         vm.label(address(factory), "factory");
         vm.label(address(swapExecutionRegistry), "swapExecutionRegistry");
         vm.label(address(forwarder), "forwarder");
+        vm.label(address(merklDistributor), "merklDistributor");
         vm.label(address(swapProvider), "swapProvider");
         vm.label(address(yieldToken), "yieldToken");
         vm.label(address(generalPool), "generalPool");

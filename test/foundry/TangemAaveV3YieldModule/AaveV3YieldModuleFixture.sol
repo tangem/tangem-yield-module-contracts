@@ -25,7 +25,12 @@ abstract contract AaveV3YieldModuleFixture is YieldModuleFixture {
         yieldToken.mint(address(pool), POOL_LIQUIDITY);
 
         implementation = new TangemAaveV3YieldModuleHarness(
-            address(pool), address(processor), address(factory), address(forwarder), address(swapExecutionRegistry)
+            address(pool),
+            address(merklDistributor),
+            address(processor),
+            address(factory),
+            address(forwarder),
+            address(swapExecutionRegistry)
         );
 
         factory.setImplementation(address(implementation));

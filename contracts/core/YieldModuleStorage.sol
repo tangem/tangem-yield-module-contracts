@@ -27,6 +27,7 @@ abstract contract YieldModuleStorage {
 
     mapping(address yieldToken => bool) public isProtocolToken;
 
-    // yield token => entry into the protocol paused by the risk service
-    mapping(address => bool) public entrySuspended;
+    mapping(address protocolToken => address yieldToken) public yieldTokenByProtocolToken;
+
+    mapping(address yieldToken => bool) public entrySuspended;
 }

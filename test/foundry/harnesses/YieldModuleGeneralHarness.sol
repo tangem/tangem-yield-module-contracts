@@ -6,6 +6,7 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 
 import { YieldModuleHarness } from "./YieldModuleHarness.sol";
 import { YieldModuleBase } from "contracts/core/YieldModuleBase.sol";
+import { MerklIncentives } from "contracts/extensions/MerklIncentives.sol";
 import { SwapExecution } from "contracts/extensions/SwapExecution.sol";
 import { GeneralPoolMock } from "contracts/test/GeneralPoolMock.sol";
 
@@ -16,11 +17,16 @@ contract YieldModuleGeneralHarness is YieldModuleHarness {
 
     constructor(
         address pool_,
+        address distributor_,
         address yieldProcessor_,
         address factory_,
         address trustedForwarder_,
         address swapExecutionRegistry_
-    ) SwapExecution(swapExecutionRegistry_) YieldModuleBase(yieldProcessor_, factory_, trustedForwarder_) {
+    )
+        MerklIncentives(distributor_)
+        SwapExecution(swapExecutionRegistry_)
+        YieldModuleBase(yieldProcessor_, factory_, trustedForwarder_)
+    {
         pool = GeneralPoolMock(pool_);
 
         _disableInitializers();
@@ -32,6 +38,14 @@ contract YieldModuleGeneralHarness is YieldModuleHarness {
 
     function _initProtocolToken(address yieldToken) internal override returns (address) {
         return pool.initProtocolToken(yieldToken);
+    }
+
+    function _getProtocolToken(address yieldToken) internal view override returns (address) {
+        return address(pool.protocolTokens(yieldToken));
+    }
+
+    function _tryResolveYieldToken(address protocolToken) internal view override returns (address) {
+        return pool.yieldTokensByProtocolToken(protocolToken);
     }
 
     function _pushToProtocol(address yieldToken, uint amount) internal override {
