@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.29;
-
+pragma solidity 0.8.29;
 
 interface IYieldModule {
     event YieldTokenInitialized(address yieldToken, address protocolToken, uint maxNetworkFee);
@@ -41,6 +40,7 @@ interface IYieldModule {
         bool depositedToProtocol
     );
     event WithdrawNativeProcessed(address indexed to, uint amount);
+    event YieldTokensByProtocolTokensSet(address yieldToken, address protocolToken);
 
     error OnlyOwner();
     error OnlyOwnerOrFactory();
@@ -68,6 +68,9 @@ interface IYieldModule {
     error TokenInEqualsTokenOut();
     error SendingToThis();
 
+    error ProtocolTokenNotSet(address protocolToken);
+    error YieldTokenNotInitialized(address yieldToken);
+
     function initialize(address owner) external;
 
     function initYieldToken(address yieldToken, uint240 maxNetworkFee) external;
@@ -90,15 +93,7 @@ interface IYieldModule {
 
     function setYieldTokenMaxNetworkFee(address yieldToken, uint240 maxNetworkFee) external;
 
-    function swap(
-        address tokenIn,
-        uint amountIn,
-        address target,
-        address spender,
-        bytes calldata data
-    )
-        external
-        payable;
+    function swap(address tokenIn, uint amountIn, address target, address spender, bytes calldata data) external payable;
 
     function swapAndReceive(
         address tokenIn,
@@ -108,12 +103,10 @@ interface IYieldModule {
         address target,
         address spender,
         bytes calldata data
-    )
-        external
-        payable;
+    ) external payable;
 
     function protocolBalance(address yieldToken) external view returns (uint);
-    
+
     function effectiveBalance(address yieldToken) external view returns (uint);
 
     function calculateServiceFee(address yieldToken) external view returns (uint);
