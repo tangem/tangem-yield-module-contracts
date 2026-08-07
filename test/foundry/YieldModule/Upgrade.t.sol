@@ -23,7 +23,12 @@ contract UpgradeTest is YieldModuleFixture {
         yieldModule = _deployYieldModule(owner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
 
         newImplementation = new YieldModuleGeneralHarness(
-            address(generalPool), address(processor), address(factory), NEW_FORWARDER, address(swapExecutionRegistry)
+            address(generalPool),
+            address(merklDistributor),
+            address(processor),
+            address(factory),
+            NEW_FORWARDER,
+            address(swapExecutionRegistry)
         );
 
         vm.startPrank(backend);

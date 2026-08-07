@@ -48,4 +48,15 @@ contract TangemYieldModuleFactoryTest is YieldModuleFixture {
 
         assertEq(factory.yieldModules(owner), yieldModule);
     }
+
+    function test_setImplementation_EmitsImplementationSet() public {
+        vm.prank(backend);
+        factory.pause();
+
+        vm.expectEmit(address(factory));
+        emit TangemYieldModuleFactory.ImplementationSet(address(ymGeneralImpl));
+
+        vm.prank(backend);
+        factory.setImplementation(address(ymGeneralImpl));
+    }
 }

@@ -53,8 +53,8 @@ contract ExitProtocolTest is AaveV3YieldModuleFixture {
 
         vm.expectRevert(IYieldModule.TokenNotActive.selector);
 
-        vm.prank(address(processor));
-        yieldModule.exitProtocol(address(yieldToken), NETWORK_FEE);
+        vm.prank(backend);
+        processor.exitProtocol(address(yieldModule), address(yieldToken), NETWORK_FEE);
     }
 
     function test_exitProtocol_EmitsProtocolExited() public {

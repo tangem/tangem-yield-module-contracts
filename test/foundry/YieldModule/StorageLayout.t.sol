@@ -6,7 +6,7 @@ import { Test } from "forge-std/src/Test.sol";
 import { YieldModuleBase } from "contracts/core/YieldModuleBase.sol";
 import { SwapExecution } from "contracts/extensions/SwapExecution.sol";
 
-// Pins the frozen slots 0..6 on a module shaped like a real one: the full core chain plus an
+// Pins the frozen slots 0..7 on a module shaped like a real one: the full core chain plus an
 // extension. Adding a layer or reordering the bases must not move any of these.
 contract StorageLayoutStub is SwapExecution {
     constructor() SwapExecution(address(4)) YieldModuleBase(address(1), address(2), address(3)) { }
@@ -27,6 +27,14 @@ contract StorageLayoutStub is SwapExecution {
 
     function _pullFromProtocolToModule(address, uint) internal pure override returns (uint) {
         return 0;
+    }
+
+    function _tryResolveYieldToken(address) internal pure override returns (address) {
+        return address(0);
+    }
+
+    function _getProtocolToken(address) internal pure override returns (address) {
+        return address(0);
     }
 }
 
@@ -88,8 +96,14 @@ contract StorageLayoutTest is Test {
         assertTrue(module.isProtocolToken(key));
     }
 
-    function test_slot6_entrySuspended() public {
-        vm.store(address(module), _mappingSlot(key, 6), bytes32(uint(1)));
+    function test_slot6_yieldTokenByProtocolToken() public {
+        address value = makeAddr("yieldToken");
+        vm.store(address(module), _mappingSlot(key, 6), bytes32(uint(uint160(value))));
+        assertEq(module.yieldTokenByProtocolToken(key), value);
+    }
+
+    function test_slot7_entrySuspended() public {
+        vm.store(address(module), _mappingSlot(key, 7), bytes32(uint(1)));
         assertTrue(module.entrySuspended(key));
     }
 }

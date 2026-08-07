@@ -75,6 +75,21 @@ abstract contract FeeAccounting is YieldModuleBase {
         return transferSuccess;
     }
 
+    function _increaseProtocolBalanceWithoutFee(address yieldToken, uint amount) internal {
+        LatestFeePaymentState storage latestFeePaymentState = latestFeePaymentStates[yieldToken];
+        uint newFeeCheckpoint = latestFeePaymentState.protocolBalance + amount;
+        uint protocolBalance_ = _protocolBalance(yieldToken);
+
+        // avoid protocol rounding errors on crediting the amount
+        if (newFeeCheckpoint > protocolBalance_) {
+            newFeeCheckpoint = protocolBalance_;
+        }
+
+        latestFeePaymentState.protocolBalance = newFeeCheckpoint;
+
+        emit LatestFeePaymentStateUpdated(yieldToken, newFeeCheckpoint, latestFeePaymentState.serviceFeeRate);
+    }
+
     function _calculateServiceFee(address yieldToken, uint protocolBalance_) internal view returns (uint) {
         LatestFeePaymentState storage latestFeePaymentState = latestFeePaymentStates[yieldToken];
         uint latestFeePaymentProtocolBalance = latestFeePaymentState.protocolBalance;

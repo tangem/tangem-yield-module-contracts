@@ -2,14 +2,12 @@
 /* solhint-disable func-name-mixedcase */
 pragma solidity 0.8.29;
 
-import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
-
 import { SwapExecutionRegistry } from "contracts/infra/SwapExecutionRegistry.sol";
 import { ISwapExecutionRegistry } from "contracts/interfaces/ISwapExecutionRegistry.sol";
 
-import { BaseTest } from "../BaseTest.sol";
+import { TestHelpers } from "../utils/TestHelpers.sol";
 
-contract SwapExecutionRegistryTest is BaseTest {
+contract SwapExecutionRegistryTest is TestHelpers {
     address internal target = makeAddr("target");
     address internal spender = makeAddr("spender");
 
@@ -24,8 +22,7 @@ contract SwapExecutionRegistryTest is BaseTest {
     }
 
     function _expectUnauthorized(address account) internal {
-        bytes32 role = registry.ALLOWLIST_ADMIN_ROLE();
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, account, role));
+        vm.expectRevert(_accessControlError(account, registry.ALLOWLIST_ADMIN_ROLE()));
     }
 
     /* constructor */

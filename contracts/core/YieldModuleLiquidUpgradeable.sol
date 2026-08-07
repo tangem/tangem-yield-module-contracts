@@ -89,6 +89,7 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
 
         protocolTokens[yieldToken] = IERC20(protocolToken);
         isProtocolToken[protocolToken] = true;
+        yieldTokenByProtocolToken[protocolToken] = yieldToken;
 
         emit YieldTokenInitialized(yieldToken, protocolToken, maxNetworkFee);
     }
