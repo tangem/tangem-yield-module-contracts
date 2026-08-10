@@ -28,4 +28,6 @@ abstract contract YieldModuleStorage {
     mapping(address yieldToken => bool) public isProtocolToken;
 
     mapping(address protocolToken => address yieldToken) public yieldTokenByProtocolToken;
+
+    mapping(address yieldToken => bool) public entrySuspended;
 }

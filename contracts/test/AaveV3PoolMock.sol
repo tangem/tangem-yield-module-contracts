@@ -11,8 +11,13 @@ contract AaveV3PoolMock {
     event Withdraw(address asset, uint amount, address to);
     event GenerateRevenue(address account, uint amount);
 
+    error SupplyFailed();
+    error WithdrawFailed();
+
     TestERC20 public aToken;
     uint public withdrawBurnShortfall;
+    bool public failSupply; // test toggle to simulate a reverting pool.supply
+    bool public failWithdraw; // test toggle to simulate a reverting pool.withdraw
 
     constructor() {
         aToken = new TestERC20("AaveV3MockAToken", "aTST", 6);
@@ -21,6 +26,14 @@ contract AaveV3PoolMock {
     // simulates aToken index rounding: burns slightly less than withdrawn, leaving dust on the account
     function setWithdrawBurnShortfall(uint shortfall) external {
         withdrawBurnShortfall = shortfall;
+    }
+
+    function setFailSupply(bool value) external {
+        failSupply = value;
+    }
+
+    function setFailWithdraw(bool value) external {
+        failWithdraw = value;
     }
 
     function getReserveData(address) external view returns (DataTypes.ReserveData memory) {
@@ -44,6 +57,8 @@ contract AaveV3PoolMock {
     }
 
     function supply(address asset, uint amount, address onBehalfOf, uint16 referralCode) external {
+        require(!failSupply, SupplyFailed());
+
         IERC20(asset).transferFrom(msg.sender, address(this), amount);
         aToken.mint(msg.sender, amount);
 
@@ -51,6 +66,8 @@ contract AaveV3PoolMock {
     }
 
     function withdraw(address asset, uint amount, address to) external returns (uint) {
+        require(!failWithdraw, WithdrawFailed());
+
         if (amount == type(uint).max) {
             amount = aToken.balanceOf(msg.sender);
         }

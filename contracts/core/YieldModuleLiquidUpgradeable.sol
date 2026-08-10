@@ -43,6 +43,39 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
         require(success, FeeProcessingFailed());
     }
 
+    /* RISK SERVICE FUNCTIONS */
+
+    function softExit(address yieldToken) external onlyProcessor {
+        _softExit(yieldToken, type(uint).max);
+    }
+
+    function softExit(address yieldToken, uint amount) external onlyProcessor {
+        amount.requireNotZero();
+
+        _softExit(yieldToken, amount);
+    }
+
+    function suspendToken(address yieldToken) external onlyProcessor {
+        _requireEntryAllowed(yieldToken);
+
+        entrySuspended[yieldToken] = true;
+
+        emit EntrySuspensionSet(yieldToken, true);
+    }
+
+    function resumeAndEnterProtocol(address yieldToken) external onlyProcessor {
+        require(yieldTokensData[yieldToken].active, TokenNotActive());
+        require(entrySuspended[yieldToken], NotEntrySuspended());
+
+        entrySuspended[yieldToken] = false;
+
+        if (IERC20(yieldToken).balanceOf(owner) > 0) {
+            _enterProtocol(yieldToken, type(uint).max, 0);
+        }
+
+        emit EntrySuspensionSet(yieldToken, false);
+    }
+
     /* OWNER FUNCTIONS */
 
     function initYieldToken(address yieldToken, uint240 maxNetworkFee) external onlyOwnerOrFactory {
@@ -211,10 +244,21 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
         return protocolBalance_ > fee ? (protocolBalance_ - fee) : 0;
     }
 
+    /* INTERNAL FUNCTIONS */
+
+    function _isEntryAllowed(address yieldToken) internal view returns (bool) {
+        return yieldTokensData[yieldToken].active && !entrySuspended[yieldToken];
+    }
+
+    function _requireEntryAllowed(address yieldToken) internal view {
+        require(yieldTokensData[yieldToken].active, TokenNotActive());
+        require(!entrySuspended[yieldToken], TokenEntrySuspended());
+    }
+
     /* PRIVATE FUNCTIONS */
 
     function _enterProtocol(address yieldToken, uint amount, uint networkFee) private {
-        require(yieldTokensData[yieldToken].active, TokenNotActive());
+        _requireEntryAllowed(yieldToken);
 
         IERC20 ierc20YieldToken = IERC20(yieldToken);
 
@@ -235,5 +279,28 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
         _tryProcessFee(yieldToken, fee, true);
 
         emit ProtocolEntered(yieldToken, amountToEnter, networkFee);
+    }
+
+    function _softExit(address yieldToken, uint amount) private {
+        require(yieldTokensData[yieldToken].active, TokenNotActive());
+
+        if (!entrySuspended[yieldToken]) {
+            entrySuspended[yieldToken] = true;
+            emit EntrySuspensionSet(yieldToken, true);
+        }
+
+        uint protocolBal = _protocolBalance(yieldToken);
+        uint fee = _calculateServiceFee(yieldToken, protocolBal);
+
+        uint available = protocolBal > fee ? protocolBal - fee : 0;
+        amount = amount > available ? available : amount;
+
+        if (amount > 0) {
+            _pullFromProtocolToOwner(yieldToken, amount);
+        }
+
+        _processFeeAfterProtocolPull(yieldToken, fee, protocolBal, amount);
+
+        emit SoftExitTriggered(yieldToken, protocolBal, amount);
     }
 }

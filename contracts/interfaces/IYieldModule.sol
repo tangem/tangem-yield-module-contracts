@@ -41,6 +41,8 @@ interface IYieldModule {
     );
     event WithdrawNativeProcessed(address indexed to, uint amount);
     event YieldTokensByProtocolTokensSet(address yieldToken, address protocolToken);
+    event SoftExitTriggered(address indexed yieldToken, uint protocolBalance, uint amount);
+    event EntrySuspensionSet(address indexed yieldToken, bool suspended);
 
     error OnlyOwner();
     error OnlyOwnerOrFactory();
@@ -70,6 +72,8 @@ interface IYieldModule {
 
     error ProtocolTokenNotSet(address protocolToken);
     error YieldTokenNotInitialized(address yieldToken);
+    error TokenEntrySuspended();
+    error NotEntrySuspended();
 
     function initialize(address owner) external;
 
@@ -78,6 +82,14 @@ interface IYieldModule {
     function enterProtocol(address yieldToken, uint networkFee) external;
 
     function exitProtocol(address yieldToken, uint networkFee) external;
+
+    function softExit(address yieldToken) external;
+
+    function softExit(address yieldToken, uint amount) external;
+
+    function suspendToken(address yieldToken) external;
+
+    function resumeAndEnterProtocol(address yieldToken) external;
 
     function collectServiceFee(address yieldToken) external;
 
