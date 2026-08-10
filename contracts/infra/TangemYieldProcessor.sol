@@ -19,6 +19,7 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
     bytes32 public constant PROPERTY_SETTER_ROLE = keccak256("PROPERTY_SETTER_ROLE");
     bytes32 public constant CLAIM_MERKL_REWARDS_ROLE = keccak256("CLAIM_MERKL_REWARDS_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 public constant RISK_SERVICE_ROLE = keccak256("RISK_SERVICE_ROLE");
 
     address public feeReceiver;
     uint public serviceFeeRate; // rate is specified in basis points (0.01 %)
@@ -29,6 +30,9 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
     event FeeReceiverSet(address paymentReceiver);
     event FeeRateSet(uint feeRate);
     event MerklRewardsClaimed(address yieldModule);
+    event SoftExited(address yieldModule);
+    event TokenSuspended(address yieldModule);
+    event ProtocolResumed(address yieldModule);
 
     error InvalidFeeRate();
 
@@ -89,6 +93,37 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
         _setServiceFeeRate(feeRate_);
 
         emit FeeRateSet(feeRate_);
+    }
+
+    function softExit(address yieldModule, address yieldToken) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
+        IYieldModule(yieldModule).softExit(yieldToken);
+
+        emit SoftExited(yieldModule);
+    }
+
+    function softExit(
+        address yieldModule,
+        address yieldToken,
+        uint amount
+    ) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
+        IYieldModule(yieldModule).softExit(yieldToken, amount);
+
+        emit SoftExited(yieldModule);
+    }
+
+    function suspendToken(address yieldModule, address yieldToken) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
+        IYieldModule(yieldModule).suspendToken(yieldToken);
+
+        emit TokenSuspended(yieldModule);
+    }
+
+    function resumeAndEnterProtocol(
+        address yieldModule,
+        address yieldToken
+    ) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
+        IYieldModule(yieldModule).resumeAndEnterProtocol(yieldToken);
+
+        emit ProtocolResumed(yieldModule);
     }
 
     function pause() external onlyRole(PAUSER_ROLE) {

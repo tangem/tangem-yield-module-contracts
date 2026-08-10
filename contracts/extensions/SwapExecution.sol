@@ -81,7 +81,7 @@ abstract contract SwapExecution is YieldModuleLiquidUpgradeable {
         );
 
         bool deposited;
-        if (yieldTokensData[tokenOut].active) {
+        if (_isEntryAllowed(tokenOut)) {
             uint feeOut = calculateServiceFee(tokenOut);
 
             _pushToProtocol(tokenOut, outAfter);

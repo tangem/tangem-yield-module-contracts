@@ -154,6 +154,49 @@ contract TangemYieldProcessorTest is YieldModuleFixture {
         vm.stopPrank();
     }
 
+    function test_pause_BlocksRiskServiceOperations() public {
+        vm.prank(backend);
+        processor.pause();
+
+        vm.startPrank(backend);
+
+        vm.expectRevert(Pausable.EnforcedPause.selector);
+        processor.softExit(address(1), address(yieldToken));
+
+        vm.expectRevert(Pausable.EnforcedPause.selector);
+        processor.softExit(address(1), address(yieldToken), AMOUNT);
+
+        vm.expectRevert(Pausable.EnforcedPause.selector);
+        processor.suspendToken(address(1), address(yieldToken));
+
+        vm.expectRevert(Pausable.EnforcedPause.selector);
+        processor.resumeAndEnterProtocol(address(1), address(yieldToken));
+
+        vm.stopPrank();
+    }
+
+    /*  Access control  */
+
+    function test_RiskServiceFunctions_Revert_WhenNotRiskService() public {
+        bytes memory unauthorized = _accessControlError(otherAccount, processor.RISK_SERVICE_ROLE());
+
+        vm.startPrank(otherAccount);
+
+        vm.expectRevert(unauthorized);
+        processor.softExit(address(1), address(yieldToken));
+
+        vm.expectRevert(unauthorized);
+        processor.softExit(address(1), address(yieldToken), AMOUNT);
+
+        vm.expectRevert(unauthorized);
+        processor.suspendToken(address(1), address(yieldToken));
+
+        vm.expectRevert(unauthorized);
+        processor.resumeAndEnterProtocol(address(1), address(yieldToken));
+
+        vm.stopPrank();
+    }
+
     /*  unpause  */
 
     function test_unpause_UnpausesProcessor() public {
