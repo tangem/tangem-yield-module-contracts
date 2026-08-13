@@ -23,6 +23,7 @@ async function deployBase(hre, args) {
     factory: await factory.getAddress(),
     forwarder: await forwarder.getAddress(),
     registry: await registry.getAddress(),
+    wrappedNative: args.wrappedNative,
   });
 
   await withRoles(hre, factory, ["IMPLEMENTATION_SETTER_ROLE", "PAUSER_ROLE"], deployer, async () => {
@@ -38,6 +39,7 @@ async function deployBase(hre, args) {
 task("deploy-base", "Deploys the base set of Tangem yield contracts")
   .addParam("pool", "The address of the Aave pool")
   .addParam("distributor", "The address of the Merkl distributor")
+  .addParam("wrappedNative", "The address of the wrapped native token")
   .addOptionalParam("feeReceiver", `The address collecting service fees (defaults to ${DEFAULT_FEE_RECEIVER})`)
   .addOptionalParam("serviceFeeRate", `The service fee rate in bps (defaults to ${DEFAULT_SERVICE_FEE_RATE})`)
   .setAction(async (args, hre) => {

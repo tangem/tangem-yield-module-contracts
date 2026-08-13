@@ -30,7 +30,8 @@ abstract contract AaveV3YieldModuleFixture is YieldModuleFixture {
             address(processor),
             address(factory),
             address(forwarder),
-            address(swapExecutionRegistry)
+            address(swapExecutionRegistry),
+            address(wrappedNative)
         );
 
         factory.setImplementation(address(implementation));

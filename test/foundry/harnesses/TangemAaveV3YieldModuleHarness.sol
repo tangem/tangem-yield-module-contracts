@@ -11,10 +11,11 @@ contract TangemAaveV3YieldModuleHarness is TangemAaveV3YieldModule, YieldModuleH
         address yieldProcessor_,
         address factory_,
         address trustedForwarder_,
-        address swapExecutionRegistry_
+        address swapExecutionRegistry_,
+        address wrappedNative_
     )
         TangemAaveV3YieldModule(
-            pool_, distributor_, yieldProcessor_, factory_, trustedForwarder_, swapExecutionRegistry_
+            pool_, distributor_, yieldProcessor_, factory_, trustedForwarder_, swapExecutionRegistry_, wrappedNative_
         )
     { }
 }
