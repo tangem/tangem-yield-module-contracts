@@ -17,6 +17,7 @@ import { GeneralPoolMock } from "contracts/test/GeneralPoolMock.sol";
 import { MerklDistributorMock } from "contracts/test/MerklDistributorMock.sol";
 import { SwapProviderMock } from "contracts/test/SwapProviderMock.sol";
 import { TestERC20 } from "contracts/test/TestERC20.sol";
+import { WrappedNativeMock } from "contracts/test/WrappedNativeMock.sol";
 
 abstract contract YieldModuleFixture is BaseTest, TestHelpers {
     bytes32 internal constant FEE_PAYMENT_FAILED_EVENT_SIG = keccak256("FeePaymentFailed(address,uint256)");
@@ -38,6 +39,7 @@ abstract contract YieldModuleFixture is BaseTest, TestHelpers {
     MerklDistributorMock public merklDistributor;
     SwapProviderMock public swapProvider;
     TestERC20 public yieldToken;
+    WrappedNativeMock public wrappedNative;
     GeneralPoolMock public generalPool;
     YieldModuleGeneralHarness public ymGeneralImpl;
 
@@ -62,6 +64,7 @@ abstract contract YieldModuleFixture is BaseTest, TestHelpers {
         merklDistributor = new MerklDistributorMock();
         swapProvider = new SwapProviderMock();
         yieldToken = new TestERC20("TestYieldToken", "TYT", 6);
+        wrappedNative = new WrappedNativeMock();
 
         generalPool = new GeneralPoolMock();
         yieldToken.mint(address(generalPool), POOL_LIQUIDITY);
@@ -91,6 +94,7 @@ abstract contract YieldModuleFixture is BaseTest, TestHelpers {
         vm.label(address(merklDistributor), "merklDistributor");
         vm.label(address(swapProvider), "swapProvider");
         vm.label(address(yieldToken), "yieldToken");
+        vm.label(address(wrappedNative), "wrappedNative");
         vm.label(address(generalPool), "generalPool");
         vm.label(address(ymGeneralImpl), "ymGeneralImpl");
     }

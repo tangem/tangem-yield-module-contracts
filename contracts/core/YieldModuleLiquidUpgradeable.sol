@@ -227,7 +227,6 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
         emit WithdrawProcessed(yieldToken, amount);
     }
 
-    // withdraws to the module instead of the owner when toModule is set, the caller handles the funds then
     function _withdrawAndDeactivate(address yieldToken, bool toModule) internal returns (uint withdrawnAmount) {
         YieldTokenData storage yieldTokenData = yieldTokensData[yieldToken];
         require(yieldTokenData.active, TokenNotActive());
