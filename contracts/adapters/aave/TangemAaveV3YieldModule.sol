@@ -9,9 +9,10 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { YieldModuleBase } from "contracts/core/YieldModuleBase.sol";
 import { YieldModuleLiquidUpgradeable } from "contracts/core/YieldModuleLiquidUpgradeable.sol";
 import { MerklIncentives } from "contracts/extensions/MerklIncentives.sol";
+import { NativeSupport } from "contracts/extensions/NativeSupport.sol";
 import { SwapExecution } from "contracts/extensions/SwapExecution.sol";
 
-contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable, SwapExecution, MerklIncentives {
+contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable, SwapExecution, MerklIncentives, NativeSupport {
     using SafeERC20 for IERC20;
 
     IPool public immutable pool;
@@ -23,10 +24,12 @@ contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable, SwapExecution,
         address yieldProcessor_,
         address factory_,
         address trustedForwarder_,
-        address swapExecutionRegistry_
+        address swapExecutionRegistry_,
+        address wrappedNative_
     )
         MerklIncentives(distributor_)
         SwapExecution(swapExecutionRegistry_)
+        NativeSupport(wrappedNative_)
         YieldModuleBase(yieldProcessor_, factory_, trustedForwarder_)
     {
         pool = IPool(pool_);

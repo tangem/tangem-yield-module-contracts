@@ -134,46 +134,11 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
     }
 
     function withdraw(address yieldToken, uint amount) external onlyOwner {
-        require(yieldTokensData[yieldToken].active, TokenNotActive());
-        amount.requireNotZero();
-
-        uint protocolBal = _protocolBalance(yieldToken);
-        uint fee = _calculateServiceFee(yieldToken, protocolBal); // calculate service fee before changing funds in a protocol
-
-        require(protocolBal >= amount + fee, InsufficientFunds());
-
-        _pullFromProtocolToOwner(yieldToken, amount);
-
-        _processFeeAfterProtocolPull(yieldToken, fee, protocolBal, amount);
-
-        emit WithdrawProcessed(yieldToken, amount);
+        _withdraw(yieldToken, amount, false);
     }
 
     function withdrawAndDeactivate(address yieldToken) external onlyOwner {
-        YieldTokenData storage yieldTokenData = yieldTokensData[yieldToken];
-        require(yieldTokenData.active, TokenNotActive());
-
-        uint protocolBal = _protocolBalance(yieldToken);
-        // calculate service fee before changing funds in a protocol
-        uint fee = _calculateServiceFee(yieldToken, protocolBal);
-
-        // we should still allow to deactivate token even if there is some error
-        uint feeToCharge = fee > protocolBal ? protocolBal : fee;
-        uint amountToExit = protocolBal - feeToCharge;
-
-        if (amountToExit > 0) {
-            _pullFromProtocolToOwner(yieldToken, amountToExit);
-        }
-
-        // the whole balance left is charged as fee
-        // we can lose debt if the balance were less than the debt due to some error, but we have no means to get it anyway,
-        // since not enough funds left, but we'll catch this behaviour with data collection
-        _processFeeAfterProtocolPull(yieldToken, feeToCharge, protocolBal, amountToExit);
-
-        // disable token to avoid abuse by processor
-        yieldTokenData.active = false;
-
-        emit WithdrawAndDeactivateProcessed(yieldToken, amountToExit);
+        _withdrawAndDeactivate(yieldToken, false);
     }
 
     function withdrawNonYieldToken(address token) external onlyOwner {
@@ -246,6 +211,62 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
 
     /* INTERNAL FUNCTIONS */
 
+    function _withdraw(address yieldToken, uint amount, bool toModule) internal returns (uint withdrawnAmount) {
+        require(yieldTokensData[yieldToken].active, TokenNotActive());
+        amount.requireNotZero();
+
+        uint protocolBal = _protocolBalance(yieldToken);
+        uint fee = _calculateServiceFee(yieldToken, protocolBal);
+
+        require(protocolBal >= amount + fee, InsufficientFunds());
+
+        withdrawnAmount = _pullFromProtocol(yieldToken, amount, toModule);
+
+        _processFeeAfterProtocolPull(yieldToken, fee, protocolBal, amount);
+
+        emit WithdrawProcessed(yieldToken, amount);
+    }
+
+    // withdraws to the module instead of the owner when toModule is set, the caller handles the funds then
+    function _withdrawAndDeactivate(address yieldToken, bool toModule) internal returns (uint withdrawnAmount) {
+        YieldTokenData storage yieldTokenData = yieldTokensData[yieldToken];
+        require(yieldTokenData.active, TokenNotActive());
+
+        uint protocolBal = _protocolBalance(yieldToken);
+        uint fee = _calculateServiceFee(yieldToken, protocolBal);
+
+        // we should still allow to deactivate token even if there is some error
+        uint feeToCharge = fee > protocolBal ? protocolBal : fee;
+        uint amountToExit = protocolBal - feeToCharge;
+
+        if (amountToExit > 0) {
+            withdrawnAmount = _pullFromProtocol(yieldToken, amountToExit, toModule);
+        }
+
+        // the whole balance left is charged as fee
+        // we can lose debt if the balance were less than the debt due to some error, but we have no means to get it anyway,
+        // since not enough funds left, but we'll catch this behaviour with data collection
+        _processFeeAfterProtocolPull(yieldToken, feeToCharge, protocolBal, amountToExit);
+
+        // disable token to avoid abuse by processor
+        yieldTokenData.active = false;
+
+        emit WithdrawAndDeactivateProcessed(yieldToken, amountToExit);
+    }
+
+    function _processDeposit(address yieldToken, uint networkFee) internal {
+        uint fee = calculateFee(yieldToken, networkFee);
+        uint amountToEnter = IERC20(yieldToken).balanceOf(address(this));
+
+        amountToEnter.requireNotZero();
+        require(amountToEnter > networkFee, NetworkFeeExceedsAmount());
+
+        _pushToProtocol(yieldToken, amountToEnter);
+        _tryProcessFee(yieldToken, fee, true);
+
+        emit ProtocolEntered(yieldToken, amountToEnter, networkFee);
+    }
+
     function _isEntryAllowed(address yieldToken) internal view returns (bool) {
         return yieldTokensData[yieldToken].active && !entrySuspended[yieldToken];
     }
@@ -256,6 +277,10 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
     }
 
     /* PRIVATE FUNCTIONS */
+
+    function _pullFromProtocol(address yieldToken, uint amount, bool toModule) private returns (uint) {
+        return toModule ? _pullFromProtocolToModule(yieldToken, amount) : _pullFromProtocolToOwner(yieldToken, amount);
+    }
 
     function _enterProtocol(address yieldToken, uint amount, uint networkFee) private {
         _requireEntryAllowed(yieldToken);
@@ -268,17 +293,7 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
 
         ierc20YieldToken.safeTransferFrom(owner, address(this), amount);
 
-        // calculate service fee before changing funds in a protocol
-        uint fee = calculateFee(yieldToken, networkFee);
-        uint amountToEnter = ierc20YieldToken.balanceOf(address(this)); // in case some yield token is stuck in module
-
-        amountToEnter.requireNotZero();
-        require(amountToEnter > networkFee, NetworkFeeExceedsAmount());
-
-        _pushToProtocol(yieldToken, amountToEnter);
-        _tryProcessFee(yieldToken, fee, true);
-
-        emit ProtocolEntered(yieldToken, amountToEnter, networkFee);
+        _processDeposit(yieldToken, networkFee);
     }
 
     function _softExit(address yieldToken, uint amount) private {
