@@ -7,4 +7,4 @@ coverage:
 	rm -rf lcov.info
 
 gas_snapshot:
-	forge snapshot --mt "_gas"
+	FOUNDRY_PROFILE=prod forge snapshot --mt "_gas"
