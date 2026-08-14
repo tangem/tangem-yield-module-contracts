@@ -9,6 +9,7 @@ async function deployModuleImplementation(hre, args) {
     args.factory,
     args.forwarder,
     args.registry,
+    args.wrappedNative,
   ]);
 }
 
@@ -19,6 +20,7 @@ task("deploy-module-implementation", "Deploys a new yield module implementation"
   .addParam("factory", "The address of the yield module factory")
   .addParam("forwarder", "The address of the Tangem forwarder")
   .addParam("registry", "The address of the swap execution registry")
+  .addParam("wrappedNative", "The address of the wrapped native token")
   .setAction(async (args, hre) => {
     await compile(hre);
     await deployModuleImplementation(hre, args);
