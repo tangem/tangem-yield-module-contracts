@@ -28,7 +28,8 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
             address(processor),
             address(factory),
             address(forwarder),
-            address(swapExecutionRegistry)
+            address(swapExecutionRegistry),
+            address(wrappedNative)
         );
     }
 

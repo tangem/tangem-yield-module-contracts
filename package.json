@@ -5,10 +5,12 @@
   "main": "index.js",
   "scripts": {
     "compile": "hardhat compile",
+    "build:prod": "FOUNDRY_PROFILE=prod forge build --sizes",
     "clean": "hardhat clean && forge clean",
     "export:abi": "hardhat export-abi",
     "test": "npm run test:foundry && npm run test:hardhat",
     "test:foundry": "forge test",
+    "test:foundry:prod": "FOUNDRY_PROFILE=prod forge test",
     "test:hardhat": "hardhat test",
     "coverage": "make coverage",
     "gas": "make gas_snapshot",

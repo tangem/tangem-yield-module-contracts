@@ -16,6 +16,9 @@ remappings = [
     "contracts/=contracts/",
 ]
 
+[profile.prod]
+via_ir = true
+
 [fmt]
 tab_width = 4
 line_length = 120
