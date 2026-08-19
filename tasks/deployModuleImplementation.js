@@ -10,7 +10,7 @@ async function deployModuleImplementation(hre, args) {
     args.forwarder,
     args.registry,
     args.wrappedNative,
-  ]);
+  ], { verify: true });
 }
 
 task("deploy-module-implementation", "Deploys a new yield module implementation")

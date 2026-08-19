@@ -4,7 +4,7 @@ const { compile, deployContract, getSigner } = require("./utils");
 async function deployRegistry(hre, args = {}) {
   const admin = args.admin || (await getSigner(hre)).address;
 
-  return deployContract(hre, "SwapExecutionRegistry", [admin]);
+  return deployContract(hre, "SwapExecutionRegistry", [admin], { verify: true });
 }
 
 task("deploy-registry", "Deploys a new SwapExecutionRegistry")
