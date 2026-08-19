@@ -1,7 +1,7 @@
 const { task } = require("hardhat/config");
 const { compile, getContract, grantRoles } = require("./utils");
 
-const BACKEND_ROLES = ["PROTOCOL_ENTERER_ROLE", "SERVICE_FEE_COLLECTOR_ROLE"];
+const BACKEND_ROLES = ["PROTOCOL_ENTERER_ROLE", "SERVICE_FEE_COLLECTOR_ROLE", "CLAIM_MERKL_REWARDS_ROLE", "RISK_SERVICE_ROLE"];
 
 async function grantBackendRoles(hre, args) {
   const processor = await getContract(hre, "TangemYieldProcessor", args.processor);

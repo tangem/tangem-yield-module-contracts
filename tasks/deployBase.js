@@ -1,19 +1,15 @@
 const { task } = require("hardhat/config");
 const { deployModuleImplementation } = require("./deployModuleImplementation");
+const { DEFAULT_FEE_RECEIVER, DEFAULT_SERVICE_FEE_RATE, deployProcessor } = require("./deployProcessor");
 const { deployRegistry } = require("./deployRegistry");
 const { compile, deployContract, getSigner, log, send, withRoles } = require("./utils");
 
-const DEFAULT_FEE_RECEIVER = "0x37E7e93093AE3A8AAEf4A0D41DBd9c037508eB60";
-const DEFAULT_SERVICE_FEE_RATE = 1500;
-
 async function deployBase(hre, args) {
   const deployer = (await getSigner(hre)).address;
-  const feeReceiver = args.feeReceiver || DEFAULT_FEE_RECEIVER;
-  const serviceFeeRate = args.serviceFeeRate ?? DEFAULT_SERVICE_FEE_RATE;
 
-  const forwarder = await deployContract(hre, "TangemERC2771Forwarder");
-  const processor = await deployContract(hre, "TangemYieldProcessor", [feeReceiver, serviceFeeRate]);
-  const factory = await deployContract(hre, "TangemYieldModuleFactory");
+  const forwarder = await deployContract(hre, "TangemERC2771Forwarder", [], { verify: true });
+  const processor = await deployProcessor(hre, args);
+  const factory = await deployContract(hre, "TangemYieldModuleFactory", [], { verify: true });
   const registry = await deployRegistry(hre, { admin: deployer });
 
   const implementation = await deployModuleImplementation(hre, {
