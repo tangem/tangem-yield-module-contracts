@@ -235,17 +235,16 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
         uint fee = _calculateServiceFee(yieldToken, protocolBal);
 
         // we should still allow to deactivate token even if there is some error
-        uint feeToCharge = fee > protocolBal ? protocolBal : fee;
-        uint amountToExit = protocolBal - feeToCharge;
+        uint amountToExit = protocolBal > fee ? protocolBal - fee : 0;
 
         if (amountToExit > 0) {
             withdrawnAmount = _pullFromProtocol(yieldToken, amountToExit, toModule);
         }
 
         // the whole balance left is charged as fee
-        // we can lose debt if the balance were less than the debt due to some error, but we have no means to get it anyway,
-        // since not enough funds left, but we'll catch this behaviour with data collection
-        _processFeeAfterProtocolPull(yieldToken, feeToCharge, protocolBal, amountToExit);
+        // if the balance is less than the fee debt due to some error, we have no means to collect the remaining debt immediately,
+        // since not enough funds are left, but it remains recorded and we'll catch this behaviour with data collection
+        _processFeeAfterProtocolPull(yieldToken, fee, protocolBal, amountToExit);
 
         // disable token to avoid abuse by processor
         yieldTokenData.active = false;
