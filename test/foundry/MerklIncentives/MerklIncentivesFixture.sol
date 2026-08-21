@@ -44,6 +44,17 @@ abstract contract MerklIncentivesFixture is AaveV3YieldModuleFixture {
         proofs = new bytes32[][](count);
     }
 
+    /// the module requires strictly ascending reward tokens, so every multi-token claim must be sorted
+    function _sortClaimArgs(address[] memory tokens, uint[] memory amounts, bytes32[][] memory proofs) internal pure {
+        for (uint i = 1; i < tokens.length; ++i) {
+            for (uint j = i; j > 0 && tokens[j - 1] > tokens[j]; --j) {
+                (tokens[j - 1], tokens[j]) = (tokens[j], tokens[j - 1]);
+                (amounts[j - 1], amounts[j]) = (amounts[j], amounts[j - 1]);
+                (proofs[j - 1], proofs[j]) = (proofs[j], proofs[j - 1]);
+            }
+        }
+    }
+
     function _singleClaimArgs(
         address rewardToken,
         uint amount

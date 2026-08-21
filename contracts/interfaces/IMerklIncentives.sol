@@ -2,10 +2,10 @@
 pragma solidity 0.8.29;
 
 interface IMerklIncentives {
-    error DuplicateRewardToken(address rewardToken);
     error MerklClaimedNoReward(address rewardToken);
     error RewardTokensEmpty();
     error RewardTokensLengthsMismatch();
+    error RewardTokensNotSorted(address rewardToken);
 
     event MerklClaimed(
         address indexed rewardToken,
