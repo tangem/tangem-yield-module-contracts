@@ -131,6 +131,40 @@ contract RewardRouteTest is MerklIncentivesFixture {
         assertEq(ym.protocolBalance(address(yieldToken)), protocolBalanceBefore);
     }
 
+    function test_claim_SendsToOwner_WhenYieldTokenIsEntrySuspended() public {
+        _suspendViaProcessor(ym);
+
+        uint ownerBalanceBefore = yieldToken.balanceOf(owner);
+        uint poolBalanceBefore = yieldToken.balanceOf(address(pool));
+        uint protocolBalanceBefore = ym.protocolBalance(address(yieldToken));
+
+        _fundMerklDistributor(address(yieldToken), YIELD_AMOUNT);
+
+        uint fee = _expectedRewardFee(YIELD_AMOUNT);
+
+        // supplying is an entry, so a suspended token is forwarded instead of pushed
+        vm.expectEmit(true, true, false, true, address(ym));
+        emit IMerklIncentives.MerklClaimed(
+            address(yieldToken),
+            YIELD_AMOUNT,
+            fee,
+            owner,
+            address(yieldToken),
+            YIELD_AMOUNT - fee,
+            owner
+        );
+
+        _claimSingleAsOwner(address(yieldToken), YIELD_AMOUNT);
+
+        // nothing reached the suspended pool and the accounted position is untouched
+        assertEq(yieldToken.balanceOf(owner), ownerBalanceBefore + YIELD_AMOUNT - fee);
+        assertEq(yieldToken.balanceOf(feeReceiver), fee);
+        assertEq(yieldToken.balanceOf(address(pool)), poolBalanceBefore);
+        assertEq(ym.protocolBalance(address(yieldToken)), protocolBalanceBefore);
+        assertEq(yieldToken.balanceOf(address(ym)), 0);
+        assertEq(ym.calculateServiceFee(address(yieldToken)), ACCUMULATED_SERVICE_FEE);
+    }
+
     function testFuzz_claim_SendsToOwner_ManyUnknownTokens(uint numTokens, uint[10] memory rawAmounts) public {
         numTokens = bound(numTokens, 1, 10);
 
@@ -205,6 +239,23 @@ contract RewardRouteTest is MerklIncentivesFixture {
         _claimSingleAsOwner(address(yieldToken), YIELD_AMOUNT);
     }
 
+    function test_claim_PushesToProtocol_AfterEntryResumed() public {
+        _suspendViaProcessor(ym);
+        _resumeViaProcessor(ym);
+
+        uint poolBalanceBefore = yieldToken.balanceOf(address(pool));
+
+        _fundMerklDistributor(address(yieldToken), YIELD_AMOUNT);
+
+        uint fee = _expectedRewardFee(YIELD_AMOUNT);
+
+        _claimSingleAsOwner(address(yieldToken), YIELD_AMOUNT);
+
+        assertEq(ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + YIELD_AMOUNT - fee);
+        assertEq(yieldToken.balanceOf(address(pool)), poolBalanceBefore + YIELD_AMOUNT - fee);
+        assertEq(yieldToken.balanceOf(owner), 0);
+    }
+
     /* KEEP_IN_MODULE */
 
     function testFuzz_claim_KeepsInModule_WhenRewardTokenIsProtocolTokenOfActiveYieldToken(uint amount) public {
@@ -247,6 +298,34 @@ contract RewardRouteTest is MerklIncentivesFixture {
         );
 
         _claimSingleAsOwner(address(protocolToken), YIELD_AMOUNT);
+    }
+
+    function test_claim_KeepsInModule_WhenYieldTokenIsEntrySuspended() public {
+        _suspendViaProcessor(ym);
+
+        uint poolBalanceBefore = yieldToken.balanceOf(address(pool));
+
+        _fundMerklDistributor(address(protocolToken), YIELD_AMOUNT);
+
+        uint fee = _expectedRewardFee(YIELD_AMOUNT);
+
+        vm.expectEmit(true, true, false, true, address(ym));
+        emit IMerklIncentives.MerklClaimed(
+            address(protocolToken),
+            YIELD_AMOUNT,
+            fee,
+            address(ym),
+            address(protocolToken),
+            YIELD_AMOUNT - fee,
+            owner
+        );
+
+        _claimSingleAsOwner(address(protocolToken), YIELD_AMOUNT);
+
+        assertEq(ym.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE + YIELD_AMOUNT - fee);
+        assertEq(protocolToken.balanceOf(feeReceiver), fee);
+        assertEq(yieldToken.balanceOf(address(pool)), poolBalanceBefore);
+        assertEq(yieldToken.balanceOf(owner), 0);
     }
 
     /* UNWRAP_TO_OWNER  */

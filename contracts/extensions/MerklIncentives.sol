@@ -149,7 +149,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         if (isProtocolToken[rewardToken]) {
             yieldToken = _resolveYieldToken(rewardToken);
             tokenAction = yieldTokensData[yieldToken].active ? TokenAction.KEEP_IN_MODULE : TokenAction.UNWRAP_TO_OWNER;
-        } else if (yieldTokensData[rewardToken].active) {
+        } else if (_isEntryAllowed(rewardToken)) {
             yieldToken = rewardToken;
             tokenAction = TokenAction.PUSH_TO_PROTOCOL;
         } else {
