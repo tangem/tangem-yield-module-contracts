@@ -178,17 +178,19 @@ contract RewardRouteTest is MerklIncentivesFixture {
             cumulativeAmounts[i] = bound(rawAmounts[i], 1, type(uint128).max);
             _fundMerklDistributor(rewardTokens[i], cumulativeAmounts[i]);
         }
+        _sortClaimArgs(rewardTokens, cumulativeAmounts, proofs);
 
         vm.prank(owner);
         ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
 
         for (uint i; i < numTokens; ++i) {
+            TestERC20 token = TestERC20(rewardTokens[i]);
             uint fee = _expectedRewardFee(cumulativeAmounts[i]);
 
-            assertEq(tokens[i].balanceOf(owner), cumulativeAmounts[i] - fee);
-            assertEq(tokens[i].balanceOf(feeReceiver), fee);
-            assertEq(tokens[i].balanceOf(address(ym)), 0);
-            assertEq(tokens[i].balanceOf(address(merklDistributor)), 0);
+            assertEq(token.balanceOf(owner), cumulativeAmounts[i] - fee);
+            assertEq(token.balanceOf(feeReceiver), fee);
+            assertEq(token.balanceOf(address(ym)), 0);
+            assertEq(token.balanceOf(address(merklDistributor)), 0);
             assertEq(merklDistributor.claimed(address(ym), rewardTokens[i]), cumulativeAmounts[i]);
         }
     }
@@ -417,6 +419,7 @@ contract RewardRouteTest is MerklIncentivesFixture {
         cumulativeAmounts[0] = sendAmount;
         cumulativeAmounts[1] = pushAmount;
         cumulativeAmounts[2] = keepAmount;
+        _sortClaimArgs(rewardTokens, cumulativeAmounts, proofs);
 
         uint sendNet = sendAmount - _expectedRewardFee(sendAmount);
         uint pushNet = pushAmount - _expectedRewardFee(pushAmount);
@@ -446,16 +449,18 @@ contract RewardRouteTest is MerklIncentivesFixture {
     }
 
     /// PUSH_TO_PROTOCOL supplies the underlying, which mints the very aToken that
-    /// KEEP_IN_MODULE was measured on, so the pair must settle the same in either order
-    function testFuzz_claim_SettlesActivePairIndependently_InEitherOrder(bool underlyingFirst) public {
+    /// KEEP_IN_MODULE was measured on, so the pair must settle independently
+    /// (the batch order itself is not a variable: the module only accepts ascending tokens)
+    function test_claim_SettlesActivePairIndependently() public {
         _fundMerklDistributor(address(yieldToken), YIELD_AMOUNT);
         _fundMerklDistributor(address(protocolToken), YIELD_AMOUNT);
 
         (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) = _claimArgs(2);
-        rewardTokens[0] = underlyingFirst ? address(yieldToken) : address(protocolToken);
-        rewardTokens[1] = underlyingFirst ? address(protocolToken) : address(yieldToken);
+        rewardTokens[0] = address(yieldToken);
+        rewardTokens[1] = address(protocolToken);
         cumulativeAmounts[0] = YIELD_AMOUNT;
         cumulativeAmounts[1] = YIELD_AMOUNT;
+        _sortClaimArgs(rewardTokens, cumulativeAmounts, proofs);
 
         uint fee = _expectedRewardFee(YIELD_AMOUNT);
         uint net = YIELD_AMOUNT - fee;
@@ -473,8 +478,8 @@ contract RewardRouteTest is MerklIncentivesFixture {
     }
 
     /// UNWRAP_TO_OWNER pays the owner in the same token SEND_TO_OWNER forwards,
-    /// so both credits must reach the owner in full in either order
-    function testFuzz_claim_SettlesInactivePairIndependently_InEitherOrder(bool underlyingFirst) public {
+    /// so both credits must reach the owner in full
+    function test_claim_SettlesInactivePairIndependently() public {
         _withdrawAndDeactivate(ym, owner, address(yieldToken));
 
         uint ownerBalanceBefore = yieldToken.balanceOf(owner);
@@ -485,10 +490,11 @@ contract RewardRouteTest is MerklIncentivesFixture {
         _fundMerklDistributor(address(protocolToken), YIELD_AMOUNT);
 
         (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) = _claimArgs(2);
-        rewardTokens[0] = underlyingFirst ? address(yieldToken) : address(protocolToken);
-        rewardTokens[1] = underlyingFirst ? address(protocolToken) : address(yieldToken);
+        rewardTokens[0] = address(yieldToken);
+        rewardTokens[1] = address(protocolToken);
         cumulativeAmounts[0] = YIELD_AMOUNT;
         cumulativeAmounts[1] = YIELD_AMOUNT;
+        _sortClaimArgs(rewardTokens, cumulativeAmounts, proofs);
 
         uint fee = _expectedRewardFee(YIELD_AMOUNT);
         uint net = YIELD_AMOUNT - fee;
