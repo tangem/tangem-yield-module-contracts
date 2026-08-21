@@ -45,14 +45,16 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
 
     /* RISK SERVICE FUNCTIONS */
 
-    function softExit(address yieldToken) external onlyProcessor {
-        _softExit(yieldToken, type(uint).max);
+    function softExit(address yieldToken) external onlyProcessor returns (SoftExitResult, bytes memory) {
+        return _softExit(yieldToken, type(uint).max);
     }
 
-    function softExit(address yieldToken, uint amount) external onlyProcessor {
-        amount.requireNotZero();
+    function softExit(address yieldToken, uint amount) external onlyProcessor returns (SoftExitResult, bytes memory) {
+        if (amount == 0) {
+            return (SoftExitResult.ZERO_AMOUNT, "");
+        }
 
-        _softExit(yieldToken, amount);
+        return _softExit(yieldToken, amount);
     }
 
     function suspendToken(address yieldToken) external onlyProcessor {
@@ -294,8 +296,10 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
         _processDeposit(yieldToken, networkFee);
     }
 
-    function _softExit(address yieldToken, uint amount) private {
-        require(yieldTokensData[yieldToken].active, TokenNotActive());
+    function _softExit(address yieldToken, uint amount) private returns (SoftExitResult, bytes memory) {
+        if (!yieldTokensData[yieldToken].active) {
+            return (SoftExitResult.TOKEN_NOT_ACTIVE, "");
+        }
 
         if (!entrySuspended[yieldToken]) {
             entrySuspended[yieldToken] = true;
@@ -309,11 +313,17 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
         amount = amount > available ? available : amount;
 
         if (amount > 0) {
-            _pullFromProtocolToOwner(yieldToken, amount);
+            (bool pulled,, bytes memory reason) = _tryPullFromProtocolToOwner(yieldToken, amount);
+
+            if (!pulled) {
+                return (SoftExitResult.PULL_FAILED, reason);
+            }
         }
 
         _processFeeAfterProtocolPull(yieldToken, fee, protocolBal, amount);
 
         emit SoftExitTriggered(yieldToken, protocolBal, amount);
+
+        return (SoftExitResult.EXECUTED, "");
     }
 }
