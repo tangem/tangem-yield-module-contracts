@@ -1,6 +1,5 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("hardhat-abi-exporter");
-require("@solidstate/hardhat-bytecode-exporter");
 require("dotenv").config();
 require("./tasks");
 
