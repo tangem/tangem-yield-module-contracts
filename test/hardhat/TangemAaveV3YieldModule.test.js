@@ -5,6 +5,13 @@ const { deployTestSetup } = require("./fixtures/testDeploy");
 
 describe("TangemBridgeProcessor", function () {
   const PRECISION = 10000;
+  // IYieldModule.SoftExitResult
+  const SOFT_EXIT_EXECUTED = 0;
+  const SOFT_EXIT_PULL_FAILED = 1;
+  const SOFT_EXIT_TOKEN_NOT_ACTIVE = 2;
+  const SOFT_EXIT_ZERO_AMOUNT = 3;
+  // AaveV3PoolMock.WithdrawFailed(), as the module forwards it verbatim
+  const POOL_WITHDRAW_FAILED_REASON = ethers.id("WithdrawFailed()").slice(0, 10);
   let yieldToken, factory, processor, pool, forwarder, protocolToken, swapExecutionRegistry, merklDistributor, wrappedNative, backend, owner, otherAccount;
 
   async function deployYieldModuleFor(moduleOwnerSigner, initialYieldTokenAddress = ethers.ZeroAddress, maxNetworkFee = 0) {
@@ -2283,11 +2290,12 @@ describe("TangemBridgeProcessor", function () {
         .to.be.revertedWithCustomError(processor, "AccessControlUnauthorizedAccount");
     });
 
-    it("Should fail with correct error if token is not active", async function () {
+    it("Should report TOKEN_NOT_ACTIVE if token is not active", async function () {
       await (await yieldModule.connect(owner).withdrawAndDeactivate(yieldToken)).wait();
 
       await expect(processor.softExit(yieldModule, yieldToken))
-        .to.be.revertedWithCustomError(yieldModule, "TokenNotActive");
+        .to.emit(processor, "SoftExitProcessed")
+        .withArgs(yieldModule, yieldToken, ethers.MaxUint256, SOFT_EXIT_TOKEN_NOT_ACTIVE, "0x");
     });
 
     it("Should block normal processor enterProtocol after softExit", async function () {
@@ -2330,15 +2338,21 @@ describe("TangemBridgeProcessor", function () {
       expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
     });
 
-    it("Should revert the whole softExit when the pool withdraw fails", async function () {
-      // simulate an illiquid pool: withdraw reverts => whole tx reverts, nothing is suspended
+    it("Should report PULL_FAILED instead of reverting when the pool withdraw fails", async function () {
+      // simulate an illiquid pool: the call must not revert, otherwise it takes down the whole batch
       await (await pool.setFailWithdraw(true)).wait();
-      await expect(processor.softExit(yieldModule, yieldToken)).to.be.reverted;
-      expect(await yieldModule.entrySuspended(yieldToken)).to.be.false;
+      await expect(processor.softExit(yieldModule, yieldToken))
+        .to.emit(processor, "SoftExitProcessed")
+        .withArgs(yieldModule, yieldToken, ethers.MaxUint256, SOFT_EXIT_PULL_FAILED, POOL_WITHDRAW_FAILED_REASON);
+
+      // the suspension is the point of a soft exit: it must survive a failing pool
+      expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
 
       // a retry must succeed as soon as the pool allows it
       await (await pool.setFailWithdraw(false)).wait();
-      await expect(processor.softExit(yieldModule, yieldToken)).to.not.be.reverted;
+      await expect(processor.softExit(yieldModule, yieldToken))
+        .to.emit(processor, "SoftExitProcessed")
+        .withArgs(yieldModule, yieldToken, ethers.MaxUint256, SOFT_EXIT_EXECUTED, "0x");
     });
 
     describe("softExit with amount", function () {
@@ -2353,9 +2367,12 @@ describe("TangemBridgeProcessor", function () {
         expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
       });
 
-      it("Should revert when amount is zero", async function () {
+      it("Should report ZERO_AMOUNT when amount is zero", async function () {
         await expect(processor["softExit(address,address,uint256)"](yieldModule, yieldToken, 0))
-          .to.be.revertedWithCustomError(yieldModule, "ZeroAmount");
+          .to.emit(processor, "SoftExitProcessed")
+          .withArgs(yieldModule, yieldToken, 0, SOFT_EXIT_ZERO_AMOUNT, "0x");
+
+        expect(await yieldModule.entrySuspended(yieldToken)).to.be.false;
       });
 
       it("Should clamp the amount to what is available instead of reverting", async function () {
@@ -2569,18 +2586,22 @@ describe("TangemBridgeProcessor", function () {
       expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
     });
 
-    it("Should keep the suspension intact when an escalation softExit reverts", async function () {
+    it("Should keep the suspension intact when an escalation softExit fails", async function () {
       await (await processor.suspendToken(yieldModule, yieldToken)).wait();
 
       // simulate an illiquid pool during escalation
       await (await pool.setFailWithdraw(true)).wait();
-      await expect(processor.softExit(yieldModule, yieldToken)).to.be.reverted;
+      await expect(processor.softExit(yieldModule, yieldToken))
+        .to.emit(processor, "SoftExitProcessed")
+        .withArgs(yieldModule, yieldToken, ethers.MaxUint256, SOFT_EXIT_PULL_FAILED, POOL_WITHDRAW_FAILED_REASON);
 
       expect(await yieldModule.entrySuspended(yieldToken)).to.be.true;
 
       // retry succeeds as soon as the pool allows it
       await (await pool.setFailWithdraw(false)).wait();
-      await expect(processor.softExit(yieldModule, yieldToken)).to.not.be.reverted;
+      await expect(processor.softExit(yieldModule, yieldToken))
+        .to.emit(processor, "SoftExitProcessed")
+        .withArgs(yieldModule, yieldToken, ethers.MaxUint256, SOFT_EXIT_EXECUTED, "0x");
     });
 
     it("Should NOT block owner withdraw while suspended (full balance in protocol)", async function () {
