@@ -1,13 +1,13 @@
 # tangem-yield-module-contracts
 EVM smart contracts for Tangem Yield Module
 
-## Current test mainnet deployment (Polygon PoS)
+## Current test mainnet deployment (Monad)
 
-TangemYieldProcessor - [0xD021F1D410aCB895aB110a0CbB740a33db209bDD](https://polygonscan.com/address/0xD021F1D410aCB895aB110a0CbB740a33db209bDD)
+TangemYieldProcessor - [0x935650393daBDbB1d2D850cC9A275cf13D8da654](https://monadvision.com/address/0x935650393daBDbB1d2D850cC9A275cf13D8da654)
 
-TangemYieldModuleFactory - [0x1bE509C2fF23dF065E15A6d37b0eFe4c839c62fE](https://polygonscan.com/address/0x1bE509C2fF23dF065E15A6d37b0eFe4c839c62fE)
+TangemYieldModuleFactory - [0x1bE509C2fF23dF065E15A6d37b0eFe4c839c62fE](https://monadvision.com/address/0x70A0551F8B47d43B4fB365024a794A5AfeAc35dE)
 
-SwapExecutionRegistry - [0x2F0C06606238abD3e45c2F8ED233A06FDD7F454d](https://polygonscan.com/address/0x2F0C06606238abD3e45c2F8ED233A06FDD7F454d)
+SwapExecutionRegistry - [0x2F0C06606238abD3e45c2F8ED233A06FDD7F454d](https://monadvision.com/address/0xa4f336Fc0fDD8eeEb4a7f8a4d1c00ae694f75fA0)
 
 ## Implementation table
 
