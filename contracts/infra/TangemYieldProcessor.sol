@@ -30,9 +30,15 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
     event FeeReceiverSet(address paymentReceiver);
     event FeeRateSet(uint feeRate);
     event MerklRewardsClaimed(address yieldModule);
-    event SoftExited(address yieldModule);
     event TokenSuspended(address yieldModule);
     event ProtocolResumed(address yieldModule);
+    event SoftExitProcessed(
+        address indexed yieldModule,
+        address indexed yieldToken,
+        uint amount,
+        IYieldModule.SoftExitResult result,
+        bytes reason
+    );
 
     error InvalidFeeRate();
 
@@ -96,9 +102,9 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
     }
 
     function softExit(address yieldModule, address yieldToken) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
-        IYieldModule(yieldModule).softExit(yieldToken);
+        (IYieldModule.SoftExitResult result, bytes memory reason) = IYieldModule(yieldModule).softExit(yieldToken);
 
-        emit SoftExited(yieldModule);
+        emit SoftExitProcessed(yieldModule, yieldToken, type(uint).max, result, reason);
     }
 
     function softExit(
@@ -106,9 +112,10 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
         address yieldToken,
         uint amount
     ) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
-        IYieldModule(yieldModule).softExit(yieldToken, amount);
+        (IYieldModule.SoftExitResult result, bytes memory reason) =
+            IYieldModule(yieldModule).softExit(yieldToken, amount);
 
-        emit SoftExited(yieldModule);
+        emit SoftExitProcessed(yieldModule, yieldToken, amount, result, reason);
     }
 
     function suspendToken(address yieldModule, address yieldToken) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {

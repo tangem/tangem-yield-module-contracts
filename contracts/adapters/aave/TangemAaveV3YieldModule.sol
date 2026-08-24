@@ -50,6 +50,17 @@ contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable, SwapExecution,
         return pool.withdraw(yieldToken, amount, owner);
     }
 
+    function _tryPullFromProtocolToOwner(
+        address yieldToken,
+        uint amount
+    ) internal override returns (bool, uint, bytes memory) {
+        try pool.withdraw(yieldToken, amount, owner) returns (uint withdrawnAmount) {
+            return (true, withdrawnAmount, "");
+        } catch (bytes memory reason) {
+            return (false, 0, reason);
+        }
+    }
+
     function _pullFromProtocolToModule(address yieldToken, uint amount) internal override returns (uint) {
         return pool.withdraw(yieldToken, amount, address(this));
     }
