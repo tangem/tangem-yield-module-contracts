@@ -94,6 +94,11 @@ abstract contract YieldModuleBase is
 
     function _pullFromProtocolToOwner(address yieldToken, uint amount) internal virtual returns (uint);
 
+    function _tryPullFromProtocolToOwner(
+        address yieldToken,
+        uint amount
+    ) internal virtual returns (bool success, uint withdrawnAmount, bytes memory reason);
+
     function _pullFromProtocolToModule(address yieldToken, uint amount) internal virtual returns (uint);
 
     function _tryResolveYieldToken(address protocolToken) internal view virtual returns (address);

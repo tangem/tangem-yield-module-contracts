@@ -45,14 +45,16 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
 
     /* RISK SERVICE FUNCTIONS */
 
-    function softExit(address yieldToken) external onlyProcessor {
-        _softExit(yieldToken, type(uint).max);
+    function softExit(address yieldToken) external onlyProcessor returns (SoftExitResult, bytes memory) {
+        return _softExit(yieldToken, type(uint).max);
     }
 
-    function softExit(address yieldToken, uint amount) external onlyProcessor {
-        amount.requireNotZero();
+    function softExit(address yieldToken, uint amount) external onlyProcessor returns (SoftExitResult, bytes memory) {
+        if (amount == 0) {
+            return (SoftExitResult.ZERO_AMOUNT, "");
+        }
 
-        _softExit(yieldToken, amount);
+        return _softExit(yieldToken, amount);
     }
 
     function suspendToken(address yieldToken) external onlyProcessor {
@@ -235,17 +237,16 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
         uint fee = _calculateServiceFee(yieldToken, protocolBal);
 
         // we should still allow to deactivate token even if there is some error
-        uint feeToCharge = fee > protocolBal ? protocolBal : fee;
-        uint amountToExit = protocolBal - feeToCharge;
+        uint amountToExit = protocolBal > fee ? protocolBal - fee : 0;
 
         if (amountToExit > 0) {
             withdrawnAmount = _pullFromProtocol(yieldToken, amountToExit, toModule);
         }
 
         // the whole balance left is charged as fee
-        // we can lose debt if the balance were less than the debt due to some error, but we have no means to get it anyway,
-        // since not enough funds left, but we'll catch this behaviour with data collection
-        _processFeeAfterProtocolPull(yieldToken, feeToCharge, protocolBal, amountToExit);
+        // if the balance is less than the fee debt due to some error, we have no means to collect the remaining debt immediately,
+        // since not enough funds are left, but it remains recorded and we'll catch this behaviour with data collection
+        _processFeeAfterProtocolPull(yieldToken, fee, protocolBal, amountToExit);
 
         // disable token to avoid abuse by processor
         yieldTokenData.active = false;
@@ -295,8 +296,10 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
         _processDeposit(yieldToken, networkFee);
     }
 
-    function _softExit(address yieldToken, uint amount) private {
-        require(yieldTokensData[yieldToken].active, TokenNotActive());
+    function _softExit(address yieldToken, uint amount) private returns (SoftExitResult, bytes memory) {
+        if (!yieldTokensData[yieldToken].active) {
+            return (SoftExitResult.TOKEN_NOT_ACTIVE, "");
+        }
 
         if (!entrySuspended[yieldToken]) {
             entrySuspended[yieldToken] = true;
@@ -310,11 +313,17 @@ abstract contract YieldModuleLiquidUpgradeable is YieldModuleBase, FeeAccounting
         amount = amount > available ? available : amount;
 
         if (amount > 0) {
-            _pullFromProtocolToOwner(yieldToken, amount);
+            (bool pulled,, bytes memory reason) = _tryPullFromProtocolToOwner(yieldToken, amount);
+
+            if (!pulled) {
+                return (SoftExitResult.PULL_FAILED, reason);
+            }
         }
 
         _processFeeAfterProtocolPull(yieldToken, fee, protocolBal, amount);
 
         emit SoftExitTriggered(yieldToken, protocolBal, amount);
+
+        return (SoftExitResult.EXECUTED, "");
     }
 }

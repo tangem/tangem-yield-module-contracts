@@ -25,7 +25,7 @@ abstract contract YieldModuleStorage {
 
     mapping(address yieldToken => uint feeDebt) public feeDebts;
 
-    mapping(address yieldToken => bool) public isProtocolToken;
+    mapping(address protocolToken => bool) public isProtocolToken;
 
     mapping(address protocolToken => address yieldToken) public yieldTokenByProtocolToken;
 
