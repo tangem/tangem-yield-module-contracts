@@ -8,7 +8,7 @@ import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 import { AaveV3YieldModuleFixture } from "./AaveV3YieldModuleFixture.sol";
 
 import { PRECISION } from "contracts/common/Constants.sol";
-import { Requires } from "contracts/common/Requires.sol";
+import { TangemYieldProcessor } from "contracts/infra/TangemYieldProcessor.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 import { AaveV3PoolMock } from "contracts/test/AaveV3PoolMock.sol";
 import { SwapProviderMock } from "contracts/test/SwapProviderMock.sol";
@@ -125,11 +125,39 @@ contract RiskServiceTest is AaveV3YieldModuleFixture {
         _assertEventNotEmitted(vm.getRecordedLogs(), ENTRY_SUSPENSION_SET_EVENT_SIG);
     }
 
-    function test_softExit_Reverts_WhenTokenNotActive() public {
+    function test_softExit_ReportsTokenNotActive_WhenTokenNotActive() public {
         _withdrawAndDeactivate(yieldModule, owner, address(yieldToken));
 
-        vm.expectRevert(IYieldModule.TokenNotActive.selector);
+        vm.expectEmit(address(processor));
+        emit TangemYieldProcessor.SoftExitProcessed(
+            address(yieldModule),
+            address(yieldToken),
+            type(uint).max,
+            IYieldModule.SoftExitResult.TOKEN_NOT_ACTIVE,
+            ""
+        );
+
         _softExitViaProcessor(yieldModule);
+    }
+
+    function test_softExit_ReportsPullFailed_WhenProtocolPullReverts() public {
+        pool.setFailWithdraw(true);
+
+        vm.expectEmit(address(processor));
+        emit TangemYieldProcessor.SoftExitProcessed(
+            address(yieldModule),
+            address(yieldToken),
+            type(uint).max,
+            IYieldModule.SoftExitResult.PULL_FAILED,
+            abi.encodeWithSelector(AaveV3PoolMock.WithdrawFailed.selector)
+        );
+
+        _softExitViaProcessor(yieldModule);
+
+        // the suspension is the point of a soft exit: it must survive a failing pool
+        assertTrue(yieldModule.entrySuspended(address(yieldToken)), "entry suspended");
+        assertEq(yieldModule.protocolBalance(address(yieldToken)), PROTOCOL_BALANCE, "protocol");
+        assertEq(protocolToken.balanceOf(feeReceiver), 0, "fee");
     }
 
     function testFuzz_softExit_ClampsAmountToBalanceAvailableAfterFee(uint deposit, uint revenue, uint amount) public {
@@ -158,9 +186,19 @@ contract RiskServiceTest is AaveV3YieldModuleFixture {
         assertEq(protocolToken.balanceOf(feeReceiver), expectedFee, "fee");
     }
 
-    function test_softExitAmount_Reverts_WhenAmountIsZero() public {
-        vm.expectRevert(Requires.ZeroAmount.selector);
+    function test_softExitAmount_ReportsZeroAmount_WhenAmountIsZero() public {
+        vm.expectEmit(address(processor));
+        emit TangemYieldProcessor.SoftExitProcessed(
+            address(yieldModule),
+            address(yieldToken),
+            0,
+            IYieldModule.SoftExitResult.ZERO_AMOUNT,
+            ""
+        );
+
         _softExitViaProcessor(yieldModule, 0);
+
+        assertFalse(yieldModule.entrySuspended(address(yieldToken)), "entry suspension untouched");
     }
 
     /*  suspendToken  */

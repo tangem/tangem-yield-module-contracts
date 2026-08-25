@@ -2,6 +2,8 @@
 /* solhint-disable func-name-mixedcase */
 pragma solidity 0.8.29;
 
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import { PRECISION } from "contracts/common/Constants.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
@@ -111,6 +113,44 @@ contract ServiceFeeTest is YieldModuleFixture {
         assertEq(yieldModule.feeDebts(address(yieldToken)), 0);
         assertEq(yieldModule.calculateServiceFee(address(yieldToken)), 0);
         assertEq(yieldModule.protocolBalance(address(yieldToken)), reEnterDeposit - feeDebt);
+    }
+
+    function test_withdrawAndDeactivate_KeepsFeeDebtWhenProtocolBalanceIsZero() public {
+        IERC20 protocolToken = debtModule.protocolTokens(address(yieldToken));
+        uint feeReceiverBalanceBefore = protocolToken.balanceOf(feeReceiver);
+
+        assertEq(debtModule.protocolBalance(address(yieldToken)), 0);
+
+        // nothing can be charged, so the whole debt must stay recorded
+        vm.expectEmit(address(debtModule));
+        emit IYieldModule.FeePaymentFailed(address(yieldToken), remainingFeeDebt);
+
+        vm.prank(debtOwner);
+        debtModule.withdrawAndDeactivate(address(yieldToken));
+
+        assertEq(debtModule.feeDebts(address(yieldToken)), remainingFeeDebt);
+        assertEq(debtModule.calculateServiceFee(address(yieldToken)), remainingFeeDebt);
+        assertEq(protocolToken.balanceOf(feeReceiver), feeReceiverBalanceBefore);
+    }
+
+    function test_withdrawAndDeactivate_KeepsFeeDebtRemainderWhenProtocolBalanceIsBelowFee() public {
+        IERC20 protocolToken = debtModule.protocolTokens(address(yieldToken));
+        uint feeReceiverBalanceBefore = protocolToken.balanceOf(feeReceiver);
+
+        uint leftoverPosition = 30e6;
+        _generateRevenue(address(yieldToken), address(debtModule), leftoverPosition);
+
+        uint fee = debtModule.calculateServiceFee(address(yieldToken));
+        assertGt(fee, leftoverPosition);
+
+        vm.expectEmit(address(debtModule));
+        emit IYieldModule.FeePaymentPartial(address(yieldToken), leftoverPosition, fee - leftoverPosition, feeReceiver);
+
+        vm.prank(debtOwner);
+        debtModule.withdrawAndDeactivate(address(yieldToken));
+
+        assertEq(debtModule.feeDebts(address(yieldToken)), fee - leftoverPosition);
+        assertEq(protocolToken.balanceOf(feeReceiver) - feeReceiverBalanceBefore, leftoverPosition);
     }
 
     /*  Fee debt & effective balances  */

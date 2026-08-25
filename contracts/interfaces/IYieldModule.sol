@@ -2,6 +2,13 @@
 pragma solidity 0.8.29;
 
 interface IYieldModule {
+    enum SoftExitResult {
+        EXECUTED,
+        PULL_FAILED,
+        TOKEN_NOT_ACTIVE,
+        ZERO_AMOUNT
+    }
+
     event YieldTokenInitialized(address yieldToken, address protocolToken, uint maxNetworkFee);
     event ProtocolEntered(address yieldToken, uint amount, uint networkFee);
     event ProtocolExited(address yieldToken, uint amount, uint networkFee);
@@ -83,9 +90,9 @@ interface IYieldModule {
 
     function exitProtocol(address yieldToken, uint networkFee) external;
 
-    function softExit(address yieldToken) external;
+    function softExit(address yieldToken) external returns (SoftExitResult result, bytes memory reason);
 
-    function softExit(address yieldToken, uint amount) external;
+    function softExit(address yieldToken, uint amount) external returns (SoftExitResult result, bytes memory reason);
 
     function suspendToken(address yieldToken) external;
 

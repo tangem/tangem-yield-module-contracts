@@ -222,7 +222,7 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
         _claimSingleAsOwner(address(rewardToken), AMOUNT);
     }
 
-    function test_claimMerklRewardsOwner_Reverts_WhenDuplicateRewardToken() public {
+    function test_claimMerklRewardsOwner_Reverts_WhenRewardTokenIsDuplicated() public {
         TestERC20 rewardToken = _createRewardToken();
 
         (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) = _claimArgs(2);
@@ -231,13 +231,32 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
         cumulativeAmounts[0] = AMOUNT;
         cumulativeAmounts[1] = AMOUNT;
 
-        vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.DuplicateRewardToken.selector, address(rewardToken)));
+        vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.RewardTokensNotSorted.selector, address(rewardToken)));
 
         vm.prank(owner);
         ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
     }
 
-    function testFuzz_claimMerklRewardsOwner_Reverts_WhenDuplicateRewardToken(uint numTokens, uint dupIndex) public {
+    function test_claimMerklRewardsOwner_Reverts_WhenRewardTokensAreNotSorted() public {
+        (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) = _claimArgs(2);
+        cumulativeAmounts[0] = AMOUNT;
+        cumulativeAmounts[1] = AMOUNT;
+
+        TestERC20[] memory tokens = _createRewardTokens(2);
+        rewardTokens[0] = address(tokens[0]);
+        rewardTokens[1] = address(tokens[1]);
+        _sortClaimArgs(rewardTokens, cumulativeAmounts, proofs);
+
+        // distinct tokens in descending order are rejected as well
+        (rewardTokens[0], rewardTokens[1]) = (rewardTokens[1], rewardTokens[0]);
+
+        vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.RewardTokensNotSorted.selector, rewardTokens[1]));
+
+        vm.prank(owner);
+        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+    }
+
+    function testFuzz_claimMerklRewardsOwner_Reverts_WhenRewardTokenIsDuplicated(uint numTokens, uint dupIndex) public {
         numTokens = bound(numTokens, 2, 10);
 
         TestERC20[] memory tokens = _createRewardTokens(numTokens);
@@ -247,12 +266,14 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
             rewardTokens[i] = address(tokens[i]);
             cumulativeAmounts[i] = AMOUNT;
         }
+        _sortClaimArgs(rewardTokens, cumulativeAmounts, proofs);
 
+        // an otherwise sorted batch whose last entry repeats an earlier token
         dupIndex = dupIndex % (numTokens - 1);
         address duplicate = rewardTokens[dupIndex];
         rewardTokens[numTokens - 1] = duplicate;
 
-        vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.DuplicateRewardToken.selector, duplicate));
+        vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.RewardTokensNotSorted.selector, duplicate));
 
         vm.prank(owner);
         ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
