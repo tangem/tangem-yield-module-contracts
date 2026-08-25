@@ -25,6 +25,10 @@ contract StorageLayoutStub is SwapExecution {
         return 0;
     }
 
+    function _tryPullFromProtocolToOwner(address, uint) internal pure override returns (bool, uint, bytes memory) {
+        return (true, 0, "");
+    }
+
     function _pullFromProtocolToModule(address, uint) internal pure override returns (uint) {
         return 0;
     }

@@ -66,9 +66,8 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             rewardTokens[i].requireNotZero();
             cumulativeAmounts[i].requireNotZero();
 
-            // Check for duplicate reward tokens
-            for (uint k; k < i; ++k) {
-                require(rewardTokens[k] != rewardTokens[i], DuplicateRewardToken(rewardTokens[i]));
+            if (i > 0) {
+                require(rewardTokens[i] > rewardTokens[i - 1], RewardTokensNotSorted(rewardTokens[i]));
             }
 
             balancesBefore[i] = IERC20(rewardTokens[i]).balanceOf(address(this));
@@ -149,7 +148,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         if (isProtocolToken[rewardToken]) {
             yieldToken = _resolveYieldToken(rewardToken);
             tokenAction = yieldTokensData[yieldToken].active ? TokenAction.KEEP_IN_MODULE : TokenAction.UNWRAP_TO_OWNER;
-        } else if (yieldTokensData[rewardToken].active) {
+        } else if (_isEntryAllowed(rewardToken)) {
             yieldToken = rewardToken;
             tokenAction = TokenAction.PUSH_TO_PROTOCOL;
         } else {

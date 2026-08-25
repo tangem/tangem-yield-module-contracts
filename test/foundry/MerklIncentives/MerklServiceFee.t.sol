@@ -205,6 +205,7 @@ contract MerklServiceFeeTest is MerklIncentivesFixture {
         cumulativeAmounts[0] = AMOUNT;
         cumulativeAmounts[1] = YIELD_AMOUNT;
         cumulativeAmounts[2] = YIELD_AMOUNT;
+        _sortClaimArgs(rewardTokens, cumulativeAmounts, proofs);
 
         vm.prank(owner);
         ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
@@ -230,6 +231,8 @@ contract MerklServiceFeeTest is MerklIncentivesFixture {
 
         _fundMerklDistributor(rewardTokens[0], firstAmount);
         _fundMerklDistributor(rewardTokens[1], secondAmount);
+
+        _sortClaimArgs(rewardTokens, cumulativeAmounts, proofs);
 
         vm.prank(owner);
         ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
