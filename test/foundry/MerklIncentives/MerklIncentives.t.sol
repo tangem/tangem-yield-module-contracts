@@ -44,6 +44,7 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
         vm.expectEmit(address(ym));
         emit IMerklIncentives.MerklClaimed(
             address(rewardToken),
+            address(rewardToken),
             AMOUNT,
             fee,
             owner,
@@ -67,6 +68,7 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
 
         vm.expectEmit(address(ym));
         emit IMerklIncentives.MerklClaimed(
+            address(rewardToken),
             address(rewardToken),
             AMOUNT,
             fee,
@@ -103,6 +105,7 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
         vm.expectEmit(address(ym));
         emit IMerklIncentives.MerklClaimed(
             address(rewardToken),
+            address(rewardToken),
             AMOUNT,
             fee,
             owner,
@@ -136,7 +139,7 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
 
         vm.prank(owner);
         vm.resumeGasMetering();
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, rewardTokens, cumulativeAmounts, proofs);
     }
 
     /* Access control */
@@ -146,7 +149,7 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
 
         vm.expectRevert(IYieldModule.OnlyOwner.selector);
 
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, rewardTokens, cumulativeAmounts, proofs);
     }
 
     function test_claimMerklRewardsBE_Reverts_WhenNotProcessor() public {
@@ -154,7 +157,7 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
 
         vm.expectRevert(IYieldModule.OnlyProcessor.selector);
 
-        ym.claimMerklRewardsBE(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsBE(rewardTokens, rewardTokens, cumulativeAmounts, proofs);
     }
 
     /* Entry Errors */
@@ -165,7 +168,7 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
         vm.expectRevert(IMerklIncentives.RewardTokensEmpty.selector);
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, rewardTokens, cumulativeAmounts, proofs);
     }
 
     function test_claimMerklRewardsOwner_Reverts_WhenAmountsLengthMismatches() public {
@@ -175,7 +178,7 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
         vm.expectRevert(IMerklIncentives.RewardTokensLengthsMismatch.selector);
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, rewardTokens, cumulativeAmounts, proofs);
     }
 
     function test_claimMerklRewardsOwner_Reverts_WhenProofsLengthMismatches() public {
@@ -185,7 +188,7 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
         vm.expectRevert(IMerklIncentives.RewardTokensLengthsMismatch.selector);
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, rewardTokens, cumulativeAmounts, proofs);
     }
 
     function test_claimMerklRewardsOwner_Reverts_WhenRewardTokenIsZero() public {
@@ -194,7 +197,29 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
         vm.expectRevert(abi.encodeWithSelector(Requires.ZeroAddress.selector));
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, rewardTokens, cumulativeAmounts, proofs);
+    }
+
+    function test_claimMerklRewardsOwner_Reverts_WhenReceivedTokensLengthMismatches() public {
+        (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) = _claimArgs(1);
+        address[] memory receivedTokens = new address[](0);
+
+        vm.expectRevert(IMerklIncentives.RewardTokensLengthsMismatch.selector);
+
+        vm.prank(owner);
+        ym.claimMerklRewardsOwner(rewardTokens, receivedTokens, cumulativeAmounts, proofs);
+    }
+
+    function test_claimMerklRewardsOwner_Reverts_WhenReceivedTokenIsZero() public {
+        (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) = _claimArgs(1);
+        address[] memory receivedTokens = new address[](1);
+        rewardTokens[0] = makeAddr("rewardToken");
+        cumulativeAmounts[0] = AMOUNT;
+
+        vm.expectRevert(Requires.ZeroAddress.selector);
+
+        vm.prank(owner);
+        ym.claimMerklRewardsOwner(rewardTokens, receivedTokens, cumulativeAmounts, proofs);
     }
 
     function test_claimMerklRewardsOwner_Reverts_WhenRewardAmountIsZero() public {
@@ -204,7 +229,7 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
         vm.expectRevert(abi.encodeWithSelector(Requires.ZeroAmount.selector));
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, rewardTokens, cumulativeAmounts, proofs);
     }
 
     function test_claimMerklRewardsOwner_Reverts_WhenDistributorRejectsProof() public {
@@ -224,6 +249,7 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
 
     function test_claimMerklRewardsOwner_Reverts_WhenRewardTokenIsDuplicated() public {
         TestERC20 rewardToken = _createRewardToken();
+        _fundMerklDistributor(address(rewardToken), AMOUNT);
 
         (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) = _claimArgs(2);
         rewardTokens[0] = address(rewardToken);
@@ -231,51 +257,9 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
         cumulativeAmounts[0] = AMOUNT;
         cumulativeAmounts[1] = AMOUNT;
 
-        vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.RewardTokensNotSorted.selector, address(rewardToken)));
+        vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.MerklClaimedNoReward.selector, address(rewardToken)));
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
-    }
-
-    function test_claimMerklRewardsOwner_Reverts_WhenRewardTokensAreNotSorted() public {
-        (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) = _claimArgs(2);
-        cumulativeAmounts[0] = AMOUNT;
-        cumulativeAmounts[1] = AMOUNT;
-
-        TestERC20[] memory tokens = _createRewardTokens(2);
-        rewardTokens[0] = address(tokens[0]);
-        rewardTokens[1] = address(tokens[1]);
-        _sortClaimArgs(rewardTokens, cumulativeAmounts, proofs);
-
-        // distinct tokens in descending order are rejected as well
-        (rewardTokens[0], rewardTokens[1]) = (rewardTokens[1], rewardTokens[0]);
-
-        vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.RewardTokensNotSorted.selector, rewardTokens[1]));
-
-        vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
-    }
-
-    function testFuzz_claimMerklRewardsOwner_Reverts_WhenRewardTokenIsDuplicated(uint numTokens, uint dupIndex) public {
-        numTokens = bound(numTokens, 2, 10);
-
-        TestERC20[] memory tokens = _createRewardTokens(numTokens);
-        (address[] memory rewardTokens, uint[] memory cumulativeAmounts, bytes32[][] memory proofs) =
-            _claimArgs(numTokens);
-        for (uint i; i < numTokens; ++i) {
-            rewardTokens[i] = address(tokens[i]);
-            cumulativeAmounts[i] = AMOUNT;
-        }
-        _sortClaimArgs(rewardTokens, cumulativeAmounts, proofs);
-
-        // an otherwise sorted batch whose last entry repeats an earlier token
-        dupIndex = dupIndex % (numTokens - 1);
-        address duplicate = rewardTokens[dupIndex];
-        rewardTokens[numTokens - 1] = duplicate;
-
-        vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.RewardTokensNotSorted.selector, duplicate));
-
-        vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, rewardTokens, cumulativeAmounts, proofs);
     }
 }

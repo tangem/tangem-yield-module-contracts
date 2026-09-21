@@ -66,8 +66,9 @@ contract RewardRouteTest is MerklIncentivesFixture {
 
         uint fee = _expectedRewardFee(AMOUNT);
 
-        vm.expectEmit(true, true, false, true, address(ym));
+        vm.expectEmit(address(ym));
         emit IMerklIncentives.MerklClaimed(
+            address(rewardToken),
             address(rewardToken),
             AMOUNT,
             fee,
@@ -93,8 +94,9 @@ contract RewardRouteTest is MerklIncentivesFixture {
         uint fee = _expectedRewardFee(received);
 
         // every field follows the credited delta, not the cumulative amount
-        vm.expectEmit(true, true, false, true, address(ym));
+        vm.expectEmit(address(ym));
         emit IMerklIncentives.MerklClaimed(
+            address(rewardToken),
             address(rewardToken),
             received,
             fee,
@@ -143,8 +145,9 @@ contract RewardRouteTest is MerklIncentivesFixture {
         uint fee = _expectedRewardFee(YIELD_AMOUNT);
 
         // supplying is an entry, so a suspended token is forwarded instead of pushed
-        vm.expectEmit(true, true, false, true, address(ym));
+        vm.expectEmit(address(ym));
         emit IMerklIncentives.MerklClaimed(
+            address(yieldToken),
             address(yieldToken),
             YIELD_AMOUNT,
             fee,
@@ -178,10 +181,9 @@ contract RewardRouteTest is MerklIncentivesFixture {
             cumulativeAmounts[i] = bound(rawAmounts[i], 1, type(uint128).max);
             _fundMerklDistributor(rewardTokens[i], cumulativeAmounts[i]);
         }
-        _sortClaimArgs(rewardTokens, cumulativeAmounts, proofs);
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, rewardTokens, cumulativeAmounts, proofs);
 
         for (uint i; i < numTokens; ++i) {
             TestERC20 token = TestERC20(rewardTokens[i]);
@@ -227,8 +229,9 @@ contract RewardRouteTest is MerklIncentivesFixture {
 
         // the reward becomes a protocol position: finalToken is the aToken, kept by the module
         // the fee is withheld in the received underlying, before the net amount is supplied
-        vm.expectEmit(true, true, false, true, address(ym));
+        vm.expectEmit(address(ym));
         emit IMerklIncentives.MerklClaimed(
+            address(yieldToken),
             address(yieldToken),
             YIELD_AMOUNT,
             fee,
@@ -288,8 +291,9 @@ contract RewardRouteTest is MerklIncentivesFixture {
 
         // the aToken reward stays as-is on the module: final fields mirror the claim
         // and the fee leaves in the aToken itself
-        vm.expectEmit(true, true, false, true, address(ym));
+        vm.expectEmit(address(ym));
         emit IMerklIncentives.MerklClaimed(
+            address(protocolToken),
             address(protocolToken),
             YIELD_AMOUNT,
             fee,
@@ -311,8 +315,9 @@ contract RewardRouteTest is MerklIncentivesFixture {
 
         uint fee = _expectedRewardFee(YIELD_AMOUNT);
 
-        vm.expectEmit(true, true, false, true, address(ym));
+        vm.expectEmit(address(ym));
         emit IMerklIncentives.MerklClaimed(
+            address(protocolToken),
             address(protocolToken),
             YIELD_AMOUNT,
             fee,
@@ -370,8 +375,9 @@ contract RewardRouteTest is MerklIncentivesFixture {
 
         // the aToken reward is unwrapped: the owner receives the underlying yieldToken,
         // while the fee stays in the aToken
-        vm.expectEmit(true, true, false, true, address(ym));
+        vm.expectEmit(address(ym));
         emit IMerklIncentives.MerklClaimed(
+            address(protocolToken),
             address(protocolToken),
             YIELD_AMOUNT,
             fee,
@@ -386,7 +392,7 @@ contract RewardRouteTest is MerklIncentivesFixture {
 
     /* Post-claim errors */
 
-    /// the received-delta check runs before any routing, so one route covers every reward class
+    /// the received-delta check runs on the entry's own claim, before that entry is routed
     function test_claim_Reverts_WhenDistributorPaysNothing() public {
         TestERC20 rewardToken = _createRewardToken();
         _fundMerklDistributor(address(rewardToken), AMOUNT);
@@ -419,14 +425,13 @@ contract RewardRouteTest is MerklIncentivesFixture {
         cumulativeAmounts[0] = sendAmount;
         cumulativeAmounts[1] = pushAmount;
         cumulativeAmounts[2] = keepAmount;
-        _sortClaimArgs(rewardTokens, cumulativeAmounts, proofs);
 
         uint sendNet = sendAmount - _expectedRewardFee(sendAmount);
         uint pushNet = pushAmount - _expectedRewardFee(pushAmount);
         uint keepNet = keepAmount - _expectedRewardFee(keepAmount);
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, rewardTokens, cumulativeAmounts, proofs);
 
         // SEND_TO_OWNER:
         assertEq(unknownToken.balanceOf(owner), sendNet);
@@ -449,8 +454,7 @@ contract RewardRouteTest is MerklIncentivesFixture {
     }
 
     /// PUSH_TO_PROTOCOL supplies the underlying, which mints the very aToken that
-    /// KEEP_IN_MODULE was measured on, so the pair must settle independently
-    /// (the batch order itself is not a variable: the module only accepts ascending tokens)
+    /// KEEP_IN_MODULE is measured on, so routing one entry must not leak into the next one's delta
     function test_claim_SettlesActivePairIndependently() public {
         _fundMerklDistributor(address(yieldToken), YIELD_AMOUNT);
         _fundMerklDistributor(address(protocolToken), YIELD_AMOUNT);
@@ -460,13 +464,12 @@ contract RewardRouteTest is MerklIncentivesFixture {
         rewardTokens[1] = address(protocolToken);
         cumulativeAmounts[0] = YIELD_AMOUNT;
         cumulativeAmounts[1] = YIELD_AMOUNT;
-        _sortClaimArgs(rewardTokens, cumulativeAmounts, proofs);
 
         uint fee = _expectedRewardFee(YIELD_AMOUNT);
         uint net = YIELD_AMOUNT - fee;
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, rewardTokens, cumulativeAmounts, proofs);
 
         // both rewards land in the position, each charged once on its own delta: the aToken
         // minted by the push is never counted as part of the aToken reward
@@ -494,13 +497,12 @@ contract RewardRouteTest is MerklIncentivesFixture {
         rewardTokens[1] = address(protocolToken);
         cumulativeAmounts[0] = YIELD_AMOUNT;
         cumulativeAmounts[1] = YIELD_AMOUNT;
-        _sortClaimArgs(rewardTokens, cumulativeAmounts, proofs);
 
         uint fee = _expectedRewardFee(YIELD_AMOUNT);
         uint net = YIELD_AMOUNT - fee;
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, rewardTokens, cumulativeAmounts, proofs);
 
         // the unwrapped reward and the forwarded one both credit the owner, and each fee
         // is withheld in the token it was received in

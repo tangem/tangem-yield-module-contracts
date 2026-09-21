@@ -3,6 +3,7 @@ pragma solidity 0.8.29;
 
 import { PRECISION } from "contracts/common/Constants.sol";
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
+import { MerklTokenWrapperMock } from "contracts/test/MerklTokenWrapperMock.sol";
 import { TestERC20 } from "contracts/test/TestERC20.sol";
 import { AaveV3YieldModuleFixture } from "test/foundry/TangemAaveV3YieldModule/AaveV3YieldModuleFixture.sol";
 import { YieldModuleHarness } from "test/foundry/harnesses/YieldModuleHarness.sol";
@@ -32,6 +33,17 @@ abstract contract MerklIncentivesFixture is AaveV3YieldModuleFixture {
         deal(token, address(merklDistributor), amount, true);
     }
 
+    /* TOKEN WRAPPERS */
+
+    function _createRewardWrapper(address underlying) internal returns (MerklTokenWrapperMock wrapper) {
+        wrapper = new MerklTokenWrapperMock(underlying, address(merklDistributor), "WrappedReward", "wRWD");
+    }
+
+    function _fundRewardWrapper(MerklTokenWrapperMock wrapper, uint amount) internal {
+        wrapper.fundDistributor(amount);
+        deal(address(wrapper.underlying()), address(wrapper), amount, true);
+    }
+
     /* CLAIM ARG BUILDERS */
 
     function _claimArgs(uint count)
@@ -44,17 +56,6 @@ abstract contract MerklIncentivesFixture is AaveV3YieldModuleFixture {
         proofs = new bytes32[][](count);
     }
 
-    /// the module requires strictly ascending reward tokens, so every multi-token claim must be sorted
-    function _sortClaimArgs(address[] memory tokens, uint[] memory amounts, bytes32[][] memory proofs) internal pure {
-        for (uint i = 1; i < tokens.length; ++i) {
-            for (uint j = i; j > 0 && tokens[j - 1] > tokens[j]; --j) {
-                (tokens[j - 1], tokens[j]) = (tokens[j], tokens[j - 1]);
-                (amounts[j - 1], amounts[j]) = (amounts[j], amounts[j - 1]);
-                (proofs[j - 1], proofs[j]) = (proofs[j], proofs[j - 1]);
-            }
-        }
-    }
-
     function _singleClaimArgs(
         address rewardToken,
         uint amount
@@ -64,29 +65,58 @@ abstract contract MerklIncentivesFixture is AaveV3YieldModuleFixture {
         amounts[0] = amount;
     }
 
+    function _singleClaimArgs(
+        address rewardToken,
+        address receivedToken,
+        uint amount
+    )
+        internal
+        pure
+        returns (
+            address[] memory tokens,
+            address[] memory receivedTokens,
+            uint[] memory amounts,
+            bytes32[][] memory proofs
+        )
+    {
+        (tokens, amounts, proofs) = _singleClaimArgs(rewardToken, amount);
+
+        receivedTokens = new address[](1);
+        receivedTokens[0] = receivedToken;
+    }
+
     /* CLAIM ACTIONS */
 
     function _claimSingleAsOwner(address rewardToken, uint amount) internal {
-        (address[] memory tokens, uint[] memory amounts, bytes32[][] memory proofs) =
-            _singleClaimArgs(rewardToken, amount);
+        _claimSingleAsOwner(rewardToken, rewardToken, amount);
+    }
+
+    function _claimSingleAsOwner(address rewardToken, address receivedToken, uint amount) internal {
+        (address[] memory tokens, address[] memory receivedTokens, uint[] memory amounts, bytes32[][] memory proofs) =
+            _singleClaimArgs(rewardToken, receivedToken, amount);
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(tokens, amounts, proofs);
+        ym.claimMerklRewardsOwner(tokens, receivedTokens, amounts, proofs);
     }
 
     function _claimSingleAsBE(address rewardToken, uint amount) internal {
-        (address[] memory tokens, uint[] memory amounts, bytes32[][] memory proofs) =
-            _singleClaimArgs(rewardToken, amount);
+        _claimSingleAsBE(rewardToken, rewardToken, amount);
+    }
+
+    function _claimSingleAsBE(address rewardToken, address receivedToken, uint amount) internal {
+        (address[] memory tokens, address[] memory receivedTokens, uint[] memory amounts, bytes32[][] memory proofs) =
+            _singleClaimArgs(rewardToken, receivedToken, amount);
 
         vm.prank(backend);
-        processor.claimMerklRewards(address(ym), tokens, amounts, proofs);
+        processor.claimMerklRewards(address(ym), tokens, receivedTokens, amounts, proofs);
     }
 
     function _claimSingleAsOwnerViaForwarder(address rewardToken, uint amount) internal {
-        (address[] memory tokens, uint[] memory amounts, bytes32[][] memory proofs) =
-            _singleClaimArgs(rewardToken, amount);
+        (address[] memory tokens, address[] memory receivedTokens, uint[] memory amounts, bytes32[][] memory proofs) =
+            _singleClaimArgs(rewardToken, rewardToken, amount);
 
-        bytes memory data = abi.encodeCall(IMerklIncentives.claimMerklRewardsOwner, (tokens, amounts, proofs));
+        bytes memory data =
+            abi.encodeCall(IMerklIncentives.claimMerklRewardsOwner, (tokens, receivedTokens, amounts, proofs));
 
         _executeViaForwarder(address(ym), data, 0);
     }
