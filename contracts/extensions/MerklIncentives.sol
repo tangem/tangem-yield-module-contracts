@@ -33,62 +33,34 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
 
     function claimMerklRewardsOwner(
         address[] calldata rewardTokens,
+        address[] calldata receivedTokens,
         uint[] calldata cumulativeAmounts,
         bytes32[][] calldata proofs
     ) external onlyOwner nonReentrant {
-        _claimMerklRewards(rewardTokens, cumulativeAmounts, proofs);
+        _claimMerklRewards(rewardTokens, receivedTokens, cumulativeAmounts, proofs);
     }
 
     function claimMerklRewardsBE(
         address[] calldata rewardTokens,
+        address[] calldata receivedTokens,
         uint[] calldata cumulativeAmounts,
         bytes32[][] calldata proofs
     ) external onlyProcessor nonReentrant {
-        _claimMerklRewards(rewardTokens, cumulativeAmounts, proofs);
+        _claimMerklRewards(rewardTokens, receivedTokens, cumulativeAmounts, proofs);
     }
 
     function _claimMerklRewards(
         address[] calldata rewardTokens,
+        address[] calldata receivedTokens,
         uint[] calldata cumulativeAmounts,
         bytes32[][] calldata proofs
     ) private {
         require(rewardTokens.length > 0, RewardTokensEmpty());
         require(
-            rewardTokens.length == cumulativeAmounts.length && cumulativeAmounts.length == proofs.length,
+            rewardTokens.length == receivedTokens.length && receivedTokens.length == cumulativeAmounts.length
+                && cumulativeAmounts.length == proofs.length,
             RewardTokensLengthsMismatch()
         );
-
-        uint[] memory balancesBefore = new uint[](rewardTokens.length);
-        address[] memory users = new address[](rewardTokens.length);
-        bytes[] memory emptyDatas = new bytes[](rewardTokens.length);
-
-        for (uint i; i < rewardTokens.length; ++i) {
-            rewardTokens[i].requireNotZero();
-            cumulativeAmounts[i].requireNotZero();
-
-            if (i > 0) {
-                require(rewardTokens[i] > rewardTokens[i - 1], RewardTokensNotSorted(rewardTokens[i]));
-            }
-
-            balancesBefore[i] = IERC20(rewardTokens[i]).balanceOf(address(this));
-            users[i] = address(this);
-        }
-
-        distributor.claimWithRecipient(users, rewardTokens, cumulativeAmounts, proofs, users, emptyDatas);
-
-        _settleClaimedRewards(rewardTokens, balancesBefore);
-    }
-
-    function _settleClaimedRewards(address[] calldata rewardTokens, uint[] memory balancesBefore) private {
-        uint[] memory receivedAmounts = new uint[](rewardTokens.length);
-
-        for (uint i; i < rewardTokens.length; ++i) {
-            uint balanceAfter = IERC20(rewardTokens[i]).balanceOf(address(this));
-
-            require(balanceAfter > balancesBefore[i], MerklClaimedNoReward(rewardTokens[i]));
-
-            receivedAmounts[i] = balanceAfter - balancesBefore[i];
-        }
 
         uint serviceFeeRate = processor.serviceFeeRate();
         address feeReceiver = processor.feeReceiver();
@@ -99,29 +71,57 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
 
         feeReceiver.requireNotZero();
 
-        for (uint i; i < rewardTokens.length; ++i) {
-            address rewardToken = rewardTokens[i];
-            uint receivedAmount = receivedAmounts[i];
+        Claim memory claim = _newClaim();
 
-            uint serviceFee = _takeServiceFee(rewardToken, receivedAmount, serviceFeeRate, feeReceiver);
-            _routeClaimedReward(rewardToken, receivedAmount, serviceFee);
+        for (uint i; i < rewardTokens.length; ++i) {
+            rewardTokens[i].requireNotZero();
+            receivedTokens[i].requireNotZero();
+            cumulativeAmounts[i].requireNotZero();
+
+            claim.tokens[0] = rewardTokens[i];
+            claim.amounts[0] = cumulativeAmounts[i];
+            claim.proofs[0] = proofs[i];
+
+            address receivedToken = receivedTokens[i];
+
+            uint receivedAmount = _claim(receivedToken, claim);
+
+            uint serviceFee = _takeServiceFee(receivedToken, receivedAmount, serviceFeeRate, feeReceiver);
+            _routeClaimedReward(claim.tokens[0], receivedToken, receivedAmount, serviceFee);
         }
     }
 
-    function _routeClaimedReward(address rewardToken, uint receivedAmount, uint serviceFee) private {
-        (address yieldToken, TokenAction tokenAction) = _classifyRewardRoute(rewardToken);
+    function _claim(address receivedToken, Claim memory claim) private returns (uint receivedAmount) {
+        uint balanceBefore = IERC20(receivedToken).balanceOf(address(this));
+
+        distributor.claimWithRecipient(claim.users, claim.tokens, claim.amounts, claim.proofs, claim.users, claim.datas);
+
+        uint balanceAfter = IERC20(receivedToken).balanceOf(address(this));
+
+        require(balanceAfter > balanceBefore, MerklClaimedNoReward(receivedToken));
+
+        receivedAmount = balanceAfter - balanceBefore;
+    }
+
+    function _routeClaimedReward(
+        address rewardToken,
+        address receivedToken,
+        uint receivedAmount,
+        uint serviceFee
+    ) private {
+        (address yieldToken, TokenAction tokenAction) = _classifyRewardRoute(receivedToken);
 
         uint netAmount = receivedAmount - serviceFee;
 
-        address finalToken = rewardToken;
+        address finalToken = receivedToken;
         uint finalAmount = netAmount;
         address finalRecipient = address(this);
 
         if (tokenAction == TokenAction.PUSH_TO_PROTOCOL) {
-            _pushToProtocol(rewardToken, netAmount);
-            finalToken = address(protocolTokens[rewardToken]);
+            _pushToProtocol(receivedToken, netAmount);
+            finalToken = address(protocolTokens[receivedToken]);
 
-            _increaseProtocolBalanceWithoutFee(rewardToken, netAmount);
+            _increaseProtocolBalanceWithoutFee(receivedToken, netAmount);
         } else if (tokenAction == TokenAction.UNWRAP_TO_OWNER) {
             finalToken = yieldToken;
             finalAmount = _pullFromProtocolToOwner(yieldToken, netAmount);
@@ -129,12 +129,13 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         } else if (tokenAction == TokenAction.KEEP_IN_MODULE) {
             _increaseProtocolBalanceWithoutFee(yieldToken, netAmount);
         } else {
-            IERC20(rewardToken).safeTransfer(owner, netAmount);
+            IERC20(receivedToken).safeTransfer(owner, netAmount);
             finalRecipient = owner;
         }
 
         emit MerklClaimed(
             rewardToken,
+            receivedToken,
             receivedAmount,
             serviceFee,
             finalRecipient,
@@ -144,12 +145,12 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         );
     }
 
-    function _classifyRewardRoute(address rewardToken) private returns (address yieldToken, TokenAction tokenAction) {
-        if (isProtocolToken[rewardToken]) {
-            yieldToken = _resolveYieldToken(rewardToken);
+    function _classifyRewardRoute(address receivedToken) private returns (address yieldToken, TokenAction tokenAction) {
+        if (isProtocolToken[receivedToken]) {
+            yieldToken = _resolveYieldToken(receivedToken);
             tokenAction = yieldTokensData[yieldToken].active ? TokenAction.KEEP_IN_MODULE : TokenAction.UNWRAP_TO_OWNER;
-        } else if (_isEntryAllowed(rewardToken)) {
-            yieldToken = rewardToken;
+        } else if (_isEntryAllowed(receivedToken)) {
+            yieldToken = receivedToken;
             tokenAction = TokenAction.PUSH_TO_PROTOCOL;
         } else {
             tokenAction = TokenAction.SEND_TO_OWNER;
@@ -157,7 +158,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
     }
 
     function _takeServiceFee(
-        address rewardToken,
+        address receivedToken,
         uint receivedAmount,
         uint serviceFeeRate,
         address feeReceiver
@@ -165,7 +166,17 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         fee = receivedAmount * serviceFeeRate / PRECISION;
 
         if (fee > 0) {
-            IERC20(rewardToken).safeTransfer(feeReceiver, fee);
+            IERC20(receivedToken).safeTransfer(feeReceiver, fee);
         }
+    }
+
+    function _newClaim() private view returns (Claim memory claim) {
+        claim.users = new address[](1);
+        claim.tokens = new address[](1);
+        claim.amounts = new uint[](1);
+        claim.proofs = new bytes32[][](1);
+        claim.datas = new bytes[](1);
+
+        claim.users[0] = address(this);
     }
 }
