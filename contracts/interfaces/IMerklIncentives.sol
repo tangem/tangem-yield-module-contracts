@@ -2,6 +2,14 @@
 pragma solidity 0.8.29;
 
 interface IMerklIncentives {
+    struct Claim {
+        address[] users;
+        address[] tokens;
+        uint[] amounts;
+        bytes32[][] proofs;
+        bytes[] datas;
+    }
+
     error MerklClaimedNoReward(address receivedToken);
     error RewardTokensEmpty();
     error RewardTokensLengthsMismatch();
@@ -16,14 +24,6 @@ interface IMerklIncentives {
         uint finalAmount,
         address indexed caller
     );
-
-    struct Claim {
-        address[] users;
-        address[] tokens;
-        uint[] amounts;
-        bytes32[][] proofs;
-        bytes[] datas;
-    }
 
     function claimMerklRewardsOwner(
         address[] calldata rewardTokens,
