@@ -17,7 +17,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
 
     uint public constant MAX_MERKL_SERVICE_FEE_RATE = 1500;
 
-    address public constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    address public constant NATIVE_TOKEN = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
     IMerklDistributor public immutable distributor;
 
@@ -85,16 +85,15 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             claim.proofs[0] = proofs[i];
 
             address receivedToken = receivedTokens[i];
-
-            uint receivedAmount = _claim(receivedToken, claim);
+            uint receivedAmount = _claimSingle(receivedToken, claim);
 
             uint serviceFee = _takeServiceFee(receivedToken, receivedAmount, serviceFeeRate, feeReceiver);
             _routeClaimedReward(claim.tokens[0], receivedToken, receivedAmount, serviceFee);
         }
     }
 
-    function _claim(address receivedToken, Claim memory claim) private returns (uint receivedAmount) {
-        bool isNative = receivedToken == NATIVE;
+    function _claimSingle(address receivedToken, Claim memory claim) private returns (uint receivedAmount) {
+        bool isNative = receivedToken == NATIVE_TOKEN;
 
         uint balanceBefore = isNative ? address(this).balance : IERC20(receivedToken).balanceOf(address(this));
 
@@ -175,7 +174,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
     }
 
     function _transferReward(address receivedToken, address to, uint amount) private {
-        if (receivedToken == NATIVE) {
+        if (receivedToken == NATIVE_TOKEN) {
             (bool success,) = to.call{ value: amount }("");
             require(success, NativeTransferFailed());
 
