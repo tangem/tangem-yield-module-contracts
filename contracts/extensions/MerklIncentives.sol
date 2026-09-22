@@ -17,6 +17,8 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
 
     uint public constant MAX_MERKL_SERVICE_FEE_RATE = 1500;
 
+    address public constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
     IMerklDistributor public immutable distributor;
 
     enum TokenAction {
@@ -92,11 +94,13 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
     }
 
     function _claim(address receivedToken, Claim memory claim) private returns (uint receivedAmount) {
-        uint balanceBefore = IERC20(receivedToken).balanceOf(address(this));
+        bool isNative = receivedToken == NATIVE;
+
+        uint balanceBefore = isNative ? address(this).balance : IERC20(receivedToken).balanceOf(address(this));
 
         distributor.claimWithRecipient(claim.users, claim.tokens, claim.amounts, claim.proofs, claim.users, claim.datas);
 
-        uint balanceAfter = IERC20(receivedToken).balanceOf(address(this));
+        uint balanceAfter = isNative ? address(this).balance : IERC20(receivedToken).balanceOf(address(this));
 
         require(balanceAfter > balanceBefore, MerklClaimedNoReward(receivedToken));
 
@@ -129,7 +133,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         } else if (tokenAction == TokenAction.KEEP_IN_MODULE) {
             _increaseProtocolBalanceWithoutFee(yieldToken, netAmount);
         } else {
-            IERC20(receivedToken).safeTransfer(owner, netAmount);
+            _transferReward(receivedToken, owner, netAmount);
             finalRecipient = owner;
         }
 
@@ -166,8 +170,19 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         fee = receivedAmount * serviceFeeRate / PRECISION;
 
         if (fee > 0) {
-            IERC20(receivedToken).safeTransfer(feeReceiver, fee);
+            _transferReward(receivedToken, feeReceiver, fee);
         }
+    }
+
+    function _transferReward(address receivedToken, address to, uint amount) private {
+        if (receivedToken == NATIVE) {
+            (bool success,) = to.call{ value: amount }("");
+            require(success, NativeTransferFailed());
+
+            return;
+        }
+
+        IERC20(receivedToken).safeTransfer(to, amount);
     }
 
     function _newClaim() private view returns (Claim memory claim) {
