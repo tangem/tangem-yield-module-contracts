@@ -4,8 +4,10 @@ pragma solidity 0.8.29;
 
 import { MerklIncentivesFixture, TestERC20 } from "./MerklIncentivesFixture.sol";
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
+import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 import { IMerklDistributor } from "contracts/interfaces/external/IMerklDistributor.sol";
 import { MerklTokenWrapperMock } from "contracts/test/MerklTokenWrapperMock.sol";
+import { NativeRejectingOwner } from "contracts/test/NativeRejectingOwner.sol";
 
 /// A Merkl campaign may distribute a token wrapper instead of the reward token itself: the claim
 /// burns the wrapper at the recipient and pays out the underlying token. The distributor must
@@ -264,7 +266,81 @@ contract TokenWrapperRewardsTest is MerklIncentivesFixture {
         assertEq(underlying.balanceOf(address(ym)), 0);
     }
 
+    /* Native */
+
+    function test_claim_SendsNativeToOwner_WhenWrapperUnwrapsToNative() public {
+        address native = ym.NATIVE_TOKEN();
+        MerklTokenWrapperMock wrapper = _createNativeRewardWrapper(AMOUNT);
+
+        uint fee = _expectedRewardFee(AMOUNT);
+        uint ownerBalanceBefore = owner.balance;
+        uint feeReceiverBalanceBefore = feeReceiver.balance;
+
+        vm.expectEmit(address(ym));
+        emit IMerklIncentives.MerklClaimed(address(wrapper), native, AMOUNT, fee, owner, native, AMOUNT - fee, owner);
+
+        _claimSingleAsOwner(address(wrapper), native, AMOUNT);
+
+        assertEq(owner.balance, ownerBalanceBefore + AMOUNT - fee);
+        assertEq(feeReceiver.balance, feeReceiverBalanceBefore + fee);
+        assertEq(address(ym).balance, 0);
+    }
+
+    function test_claim_Reverts_WhenNativeDeliversNothing() public {
+        address native = ym.NATIVE_TOKEN();
+        MerklTokenWrapperMock wrapper = _createNativeRewardWrapper(AMOUNT);
+        wrapper.setClaimFeeRate(WRAPPER_BASE);
+
+        vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.MerklClaimedNoReward.selector, native));
+
+        _claimSingleAsOwner(address(wrapper), native, AMOUNT);
+    }
+
+    function test_claim_KeepsPreexistingNativeBalance() public {
+        address native = ym.NATIVE_TOKEN();
+        uint existingBalance = 5 ether;
+        vm.deal(address(ym), existingBalance);
+
+        MerklTokenWrapperMock wrapper = _createNativeRewardWrapper(AMOUNT);
+
+        uint fee = _expectedRewardFee(AMOUNT);
+        uint ownerBalanceBefore = owner.balance;
+
+        _claimSingleAsOwner(address(wrapper), native, AMOUNT);
+
+        assertEq(address(ym).balance, existingBalance);
+        assertEq(owner.balance, ownerBalanceBefore + AMOUNT - fee);
+    }
+
+    function test_claim_Reverts_WhenOwnerRejectsNative() public {
+        address rejectingOwner = address(new NativeRejectingOwner());
+        ym = _deployYieldModule(rejectingOwner, address(yieldToken), DEFAULT_MAX_NETWORK_FEE);
+
+        address native = ym.NATIVE_TOKEN();
+        MerklTokenWrapperMock wrapper = _createNativeRewardWrapper(AMOUNT);
+
+        (
+            address[] memory rewardTokens,
+            address[] memory receivedTokens,
+            uint[] memory cumulativeAmounts,
+            bytes32[][] memory proofs
+        ) = _singleClaimArgs(address(wrapper), native, AMOUNT);
+
+        vm.expectRevert(IYieldModule.NativeTransferFailed.selector);
+
+        vm.prank(rejectingOwner);
+        ym.claimMerklRewardsOwner(rewardTokens, receivedTokens, cumulativeAmounts, proofs);
+    }
+
     /* helpers */
+
+    function _createNativeRewardWrapper(uint amount) internal returns (MerklTokenWrapperMock wrapper) {
+        wrapper = _createRewardWrapper(address(wrappedNative));
+        wrapper.setUnwrapsToNative(true);
+
+        _fundRewardWrapper(wrapper, amount);
+        vm.deal(address(wrappedNative), amount);
+    }
 
     function _claimPair(
         MerklTokenWrapperMock firstWrapper,

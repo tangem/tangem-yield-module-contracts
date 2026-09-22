@@ -5,6 +5,8 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import { IWETH } from "contracts/interfaces/external/IWETH.sol";
+
 /// Mimics a Merkl pull token wrapper (`PullTokenWrapperTransferImmutable`): the campaign
 /// distributes this wrapper token, and a claim burns it at the recipient and pays out the
 /// underlying token held by the wrapper instead. The recipient therefore never ends up with
@@ -17,8 +19,12 @@ contract MerklTokenWrapperMock is ERC20 {
     IERC20 public immutable underlying;
     address public immutable distributor;
 
+    error NativeTransferFailed();
+
     /// share of a claim the wrapper withholds, in BASE units;
     uint public claimFeeRate;
+
+    bool public unwrapsToNative;
 
     constructor(
         address underlying_,
@@ -30,12 +36,18 @@ contract MerklTokenWrapperMock is ERC20 {
         distributor = distributor_;
     }
 
+    receive() external payable { }
+
     function fundDistributor(uint amount) external {
         _mint(distributor, amount);
     }
 
     function setClaimFeeRate(uint claimFeeRate_) external {
         claimFeeRate = claimFeeRate_;
+    }
+
+    function setUnwrapsToNative(bool unwrapsToNative_) external {
+        unwrapsToNative = unwrapsToNative_;
     }
 
     function _update(address from, address to, uint value) internal override {
@@ -50,8 +62,19 @@ contract MerklTokenWrapperMock is ERC20 {
 
         uint toTransfer = value - value * claimFeeRate / BASE;
 
-        if (toTransfer > 0) {
-            underlying.safeTransfer(to, toTransfer);
+        if (toTransfer == 0) {
+            return;
         }
+
+        if (unwrapsToNative) {
+            IWETH(address(underlying)).withdraw(toTransfer);
+
+            (bool success,) = to.call{ value: toTransfer }("");
+            require(success, NativeTransferFailed());
+
+            return;
+        }
+
+        underlying.safeTransfer(to, toTransfer);
     }
 }
