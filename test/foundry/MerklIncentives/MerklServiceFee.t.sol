@@ -30,8 +30,9 @@ contract MerklServiceFeeTest is MerklIncentivesFixture {
         uint topUp = AMOUNT / 4;
         _fundMerklDistributor(address(rewardToken), topUp);
 
-        vm.expectEmit(true, true, false, true, address(ym));
+        vm.expectEmit(address(ym));
         emit IMerklIncentives.MerklClaimed(
+            address(rewardToken),
             address(rewardToken),
             topUp,
             _expectedRewardFee(topUp),
@@ -53,8 +54,17 @@ contract MerklServiceFeeTest is MerklIncentivesFixture {
         _fundMerklDistributor(address(rewardToken), 1);
 
         // the fee rounds to zero, so nothing is transferred and the event reports a zero fee amount
-        vm.expectEmit(true, true, false, true, address(ym));
-        emit IMerklIncentives.MerklClaimed(address(rewardToken), 1, 0, owner, address(rewardToken), 1, owner);
+        vm.expectEmit(address(ym));
+        emit IMerklIncentives.MerklClaimed(
+            address(rewardToken),
+            address(rewardToken),
+            1,
+            0,
+            owner,
+            address(rewardToken),
+            1,
+            owner
+        );
 
         _claimSingleAsOwner(address(rewardToken), 1);
 
@@ -103,8 +113,9 @@ contract MerklServiceFeeTest is MerklIncentivesFixture {
         uint fee = _expectedRewardFee(AMOUNT);
 
         // the receiver is read from the processor at execution time
-        vm.expectEmit(true, true, false, true, address(ym));
+        vm.expectEmit(address(ym));
         emit IMerklIncentives.MerklClaimed(
+            address(rewardToken),
             address(rewardToken),
             AMOUNT,
             fee,
@@ -205,10 +216,9 @@ contract MerklServiceFeeTest is MerklIncentivesFixture {
         cumulativeAmounts[0] = AMOUNT;
         cumulativeAmounts[1] = YIELD_AMOUNT;
         cumulativeAmounts[2] = YIELD_AMOUNT;
-        _sortClaimArgs(rewardTokens, cumulativeAmounts, proofs);
 
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, rewardTokens, cumulativeAmounts, proofs);
 
         assertEq(ym.feeDebts(address(unknownToken)), 0);
         assertEq(ym.feeDebts(address(yieldToken)), 0);
@@ -232,10 +242,8 @@ contract MerklServiceFeeTest is MerklIncentivesFixture {
         _fundMerklDistributor(rewardTokens[0], firstAmount);
         _fundMerklDistributor(rewardTokens[1], secondAmount);
 
-        _sortClaimArgs(rewardTokens, cumulativeAmounts, proofs);
-
         vm.prank(owner);
-        ym.claimMerklRewardsOwner(rewardTokens, cumulativeAmounts, proofs);
+        ym.claimMerklRewardsOwner(rewardTokens, rewardTokens, cumulativeAmounts, proofs);
 
         // rounding is applied per token, so the total can differ from a fee on the summed amount
         assertEq(tokens[0].balanceOf(feeReceiver), _expectedRewardFee(firstAmount));
@@ -256,8 +264,9 @@ contract MerklServiceFeeTest is MerklIncentivesFixture {
         uint fee = amount * rate / PRECISION;
 
         // the fee field reports exactly what leaves the module under the applied rate
-        vm.expectEmit(true, true, false, true, address(ym));
+        vm.expectEmit(address(ym));
         emit IMerklIncentives.MerklClaimed(
+            address(rewardToken),
             address(rewardToken),
             amount,
             fee,
