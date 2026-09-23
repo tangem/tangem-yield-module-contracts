@@ -4,6 +4,7 @@ require("./enterProtocol");
 require("./grantBackendRoles");
 require("./changeAdmin");
 require("./deployRegistry");
+require("./deployProcessor");
 require("./deployModuleImplementation");
 require("./upgradeModuleImplementation");
 require("./getEffectiveBalance");

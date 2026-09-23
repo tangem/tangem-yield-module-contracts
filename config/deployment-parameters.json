@@ -1,0 +1,8 @@
+{
+  "monad": {
+    "chainId": 143,
+    "pool": "0x69a5F9AD4f96ebf0a0C792dD42a01cC5C0102fef",
+    "distributor": "0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae",
+    "wrappedNative": "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A"
+  }
+}
