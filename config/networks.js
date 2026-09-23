@@ -11,6 +11,7 @@ const NETWORKS = {
   avalanche: { chainId: 43114, rpc: "https://avalanche.drpc.org" },
   sepolia: { chainId: 11155111, rpc: "https://gateway.tenderly.co/public/sepolia" },
   arbitrum_sepolia: { chainId: 421614, rpc: "https://arbitrum-sepolia.drpc.org" },
+  monad: { chainId: 143, rpc: "https://infra.originstake.com/monad/evm" },
 };
 
 /**

@@ -1,6 +1,6 @@
 require("@nomicfoundation/hardhat-toolbox");
+require("@tenderly/hardhat-tenderly");
 require("hardhat-abi-exporter");
-require("@solidstate/hardhat-bytecode-exporter");
 require("dotenv").config();
 require("./tasks");
 
@@ -45,6 +45,10 @@ module.exports = {
   },
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY
+  },
+  tenderly: {
+    username: process.env.TENDERLY_USERNAME || "",
+    project: process.env.TENDERLY_PROJECT || ""
   },
   sourcify: {
     enabled: false
