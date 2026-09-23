@@ -7,12 +7,9 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { PRECISION } from "contracts/common/Constants.sol";
 import { Requires } from "contracts/common/Requires.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
+import { NativeRejectingOwner } from "contracts/test/NativeRejectingOwner.sol";
 import { AaveV3YieldModuleFixture } from "test/foundry/TangemAaveV3YieldModule/AaveV3YieldModuleFixture.sol";
 import { TangemAaveV3YieldModuleHarness } from "test/foundry/harnesses/TangemAaveV3YieldModuleHarness.sol";
-
-/// Module owner that cannot receive the native token (no receive/fallback).
-/* solhint-disable-next-line no-empty-blocks */
-contract NativeRejectingOwner { }
 
 contract NativeSupportTest is AaveV3YieldModuleFixture {
     uint internal constant DEPOSIT = 10 ether;

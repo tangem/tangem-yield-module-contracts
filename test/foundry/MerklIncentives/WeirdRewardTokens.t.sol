@@ -50,6 +50,6 @@ contract WeirdRewardTokensTest is MerklIncentivesFixture {
         (address[] memory tokens, uint[] memory amounts, bytes32[][] memory proofs) =
             _singleClaimArgs(rewardToken, AMOUNT);
 
-        return abi.encodeCall(ym.claimMerklRewardsOwner, (tokens, amounts, proofs));
+        return abi.encodeCall(ym.claimMerklRewardsOwner, (tokens, tokens, amounts, proofs));
     }
 }
