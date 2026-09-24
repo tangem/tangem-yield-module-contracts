@@ -3,7 +3,7 @@ EVM smart contracts for Tangem Yield Module
 
 ## Current test mainnet deployment (Monad)
 
-TangemYieldProcessor - [0xfC77aa39E8ad776d4d31c4174F66b89d3363DEe4](https://monadvision.com/address/0xfC77aa39E8ad776d4d31c4174F66b89d3363DEe4)
+TangemYieldProcessor - [0x9002A6fC37B8f5916C4ddAD92001394C967011D6](https://monadvision.com/address/0x9002A6fC37B8f5916C4ddAD92001394C967011D6)
 
 TangemYieldModuleFactory - [0xd2806fF93F5776FeA2F0c4863c56669Ec972525d](https://monadvision.com/address/0xd2806fF93F5776FeA2F0c4863c56669Ec972525d)
 
