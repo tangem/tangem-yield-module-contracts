@@ -16,9 +16,9 @@ SwapExecutionRegistry - [0x833C25c0D4Cb2A36A70ea8F3dE1D20C5B2973fC3](https://mon
 | --- | --- | --- |
 | Polygon | 0x5758f0db5dc10a42ec332825ed0659231fb0ba9f | 0x8c86c76aA4eB91F6F371F38dC775B36a3509fa03 |
 
-| **Network** | **implementation**|
+| **Network** | **V3**|
 | --- | --- |
-| Monad | 0x86eF3fAF4787ea8Da6E35A45fC468D22bF4A344e |
+| Monad | 0x110E56a8F4bcE93acB0944d6d8FeE5116399A32C |
 
 ## Current production mainnet deployment
 
