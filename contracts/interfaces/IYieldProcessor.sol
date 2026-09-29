@@ -6,4 +6,6 @@ interface IYieldProcessor {
 
     // rate is specified in basis points (0.01 %)
     function serviceFeeRate() external view returns (uint);
+
+    function isMerklReceivedTokenAllowed(address token) external view returns (bool);
 }

@@ -13,6 +13,7 @@ interface IMerklIncentives {
     error MerklClaimedNoReward(address receivedToken);
     error RewardTokensEmpty();
     error RewardTokensLengthsMismatch();
+    error ReceivedTokenNotAllowed(address rewardToken, address receivedToken);
 
     event MerklClaimed(
         address indexed rewardToken,
