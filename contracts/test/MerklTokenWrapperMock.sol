@@ -16,7 +16,7 @@ contract MerklTokenWrapperMock is ERC20 {
 
     uint public constant BASE = 1e9;
 
-    IERC20 public immutable underlying;
+    IERC20 public immutable token;
     address public immutable distributor;
 
     error NativeTransferFailed();
@@ -32,7 +32,7 @@ contract MerklTokenWrapperMock is ERC20 {
         string memory name_,
         string memory symbol_
     ) ERC20(name_, symbol_) {
-        underlying = IERC20(underlying_);
+        token = IERC20(underlying_);
         distributor = distributor_;
     }
 
@@ -67,7 +67,7 @@ contract MerklTokenWrapperMock is ERC20 {
         }
 
         if (unwrapsToNative) {
-            IWETH(address(underlying)).withdraw(toTransfer);
+            IWETH(address(token)).withdraw(toTransfer);
 
             (bool success,) = to.call{ value: toTransfer }("");
             require(success, NativeTransferFailed());
@@ -75,6 +75,6 @@ contract MerklTokenWrapperMock is ERC20 {
             return;
         }
 
-        underlying.safeTransfer(to, toTransfer);
+        token.safeTransfer(to, toTransfer);
     }
 }

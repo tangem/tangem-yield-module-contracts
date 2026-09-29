@@ -226,6 +226,63 @@ contract TokenWrapperRewardsTest is MerklIncentivesFixture {
         _claimSingleAsOwner(address(wrapper), address(wrapper), AMOUNT);
     }
 
+    /* Received token validation */
+
+    function test_claim_Reverts_WhenReceivedTokenDiffersFromPlainRewardToken() public {
+        TestERC20 rewardToken = _createRewardToken();
+        TestERC20 fakeToken = _createRewardToken();
+        _fundMerklDistributor(address(rewardToken), AMOUNT);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IMerklIncentives.ReceivedTokenNotAllowed.selector, address(rewardToken), address(fakeToken)
+            )
+        );
+
+        _claimSingleAsOwner(address(rewardToken), address(fakeToken), AMOUNT);
+    }
+
+    function test_claim_Reverts_WhenReceivedTokenIsNotWrapperUnderlying() public {
+        TestERC20 underlying = _createRewardToken();
+        TestERC20 fakeToken = _createRewardToken();
+        MerklTokenWrapperMock wrapper = _createRewardWrapper(address(underlying));
+        _fundRewardWrapper(wrapper, AMOUNT);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IMerklIncentives.ReceivedTokenNotAllowed.selector, address(wrapper), address(fakeToken)
+            )
+        );
+
+        _claimSingleAsOwner(address(wrapper), address(fakeToken), AMOUNT);
+    }
+
+    function test_claimMerklRewardsBE_Reverts_WhenReceivedTokenNotAllowed() public {
+        TestERC20 rewardToken = _createRewardToken();
+        TestERC20 fakeToken = _createRewardToken();
+        _fundMerklDistributor(address(rewardToken), AMOUNT);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IMerklIncentives.ReceivedTokenNotAllowed.selector, address(rewardToken), address(fakeToken)
+            )
+        );
+
+        _claimSingleAsBE(address(rewardToken), address(fakeToken), AMOUNT);
+    }
+
+    function test_claim_PassesReceivedTokenCheck_WhenReceivedTokenAllowed() public {
+        TestERC20 rewardToken = _createRewardToken();
+        TestERC20 allowedToken = _createRewardToken();
+        _fundMerklDistributor(address(rewardToken), AMOUNT);
+        _allowMerklReceivedToken(address(allowedToken));
+
+        // the check passes, so the claim fails later on the balance measurement instead
+        vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.MerklClaimedNoReward.selector, address(allowedToken)));
+
+        _claimSingleAsOwner(address(rewardToken), address(allowedToken), AMOUNT);
+    }
+
     /* Shared underlying */
 
     /// Two campaigns can wrap the same reward token, and then a single batch credits the module
@@ -340,6 +397,11 @@ contract TokenWrapperRewardsTest is MerklIncentivesFixture {
 
         _fundRewardWrapper(wrapper, amount);
         vm.deal(address(wrappedNative), amount);
+    }
+
+    function _allowMerklReceivedToken(address token) internal {
+        vm.prank(backend);
+        processor.setMerklReceivedTokenAllowed(token, true);
     }
 
     function _claimPair(
