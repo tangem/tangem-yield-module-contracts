@@ -108,6 +108,37 @@ contract TangemYieldProcessorTest is YieldModuleFixture {
         new TangemYieldProcessor(feeReceiver, PRECISION + 1);
     }
 
+    /*  setMerklReceivedTokenAllowed  */
+
+    function test_setMerklReceivedTokenAllowed_TogglesAllowance() public {
+        address token = makeAddr("receivedToken");
+        assertFalse(processor.isMerklReceivedTokenAllowed(token));
+
+        vm.prank(backend);
+        processor.setMerklReceivedTokenAllowed(token, true);
+        assertTrue(processor.isMerklReceivedTokenAllowed(token));
+
+        vm.prank(backend);
+        processor.setMerklReceivedTokenAllowed(token, false);
+        assertFalse(processor.isMerklReceivedTokenAllowed(token));
+    }
+
+    function test_setMerklReceivedTokenAllowed_EmitsMerklReceivedTokenAllowedSet() public {
+        address token = makeAddr("receivedToken");
+
+        vm.expectEmit(address(processor));
+        emit TangemYieldProcessor.MerklReceivedTokenAllowedSet(token, true);
+
+        vm.prank(backend);
+        processor.setMerklReceivedTokenAllowed(token, true);
+    }
+
+    function test_setMerklReceivedTokenAllowed_Reverts_WhenNotPropertySetter() public {
+        vm.expectRevert(_accessControlError(otherAccount, processor.PROPERTY_SETTER_ROLE()));
+        vm.prank(otherAccount);
+        processor.setMerklReceivedTokenAllowed(makeAddr("receivedToken"), true);
+    }
+
     /*  pause  */
 
     function test_pause_PausesProcessor() public {
