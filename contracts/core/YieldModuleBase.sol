@@ -24,6 +24,7 @@ abstract contract YieldModuleBase is
 
     IYieldProcessor public immutable processor;
     IYieldFactory public immutable factory;
+    address public immutable wrappedNative;
 
     modifier onlyOwner() {
         require(_msgSender() == owner, OnlyOwner());
@@ -45,10 +46,14 @@ abstract contract YieldModuleBase is
     constructor(
         address processor_,
         address factory_,
-        address trustedForwarder_
+        address trustedForwarder_,
+        address wrappedNative_
     ) ERC2771ContextUpgradeable(trustedForwarder_) {
         processor = IYieldProcessor(processor_);
         factory = IYieldFactory(factory_);
+
+        wrappedNative_.requireNotZero();
+        wrappedNative = wrappedNative_;
     }
 
     receive() external payable { }

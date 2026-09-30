@@ -8,16 +8,6 @@ import { IWETH } from "../interfaces/external/IWETH.sol";
 
 abstract contract NativeSupport is INativeSupport, YieldModuleLiquidUpgradeable {
     using Requires for uint;
-    using Requires for address;
-
-    address public immutable wrappedNative;
-
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor(address wrappedNative_) {
-        wrappedNative_.requireNotZero();
-
-        wrappedNative = wrappedNative_;
-    }
 
     function enterProtocolByOwnerWithNative() external payable onlyOwner nonReentrant {
         _requireEntryAllowed(wrappedNative);

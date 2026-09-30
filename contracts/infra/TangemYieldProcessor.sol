@@ -23,12 +23,14 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
 
     address public feeReceiver;
     uint public serviceFeeRate; // rate is specified in basis points (0.01 %)
+    mapping(address token => bool) public isMerklReceivedTokenAllowed;
 
     event ProtocolEntered(address yieldModule);
     event ProtocolExited(address yieldModule);
     event ServiceFeeCollected(address yieldModule);
     event FeeReceiverSet(address paymentReceiver);
     event FeeRateSet(uint feeRate);
+    event MerklReceivedTokenAllowedSet(address indexed token, bool allowed);
     event MerklRewardsClaimed(address yieldModule);
     event TokenSuspended(address yieldModule);
     event ProtocolResumed(address yieldModule);
@@ -100,6 +102,12 @@ contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausa
         _setServiceFeeRate(feeRate_);
 
         emit FeeRateSet(feeRate_);
+    }
+
+    function setMerklReceivedTokenAllowed(address token, bool allowed) external onlyRole(PROPERTY_SETTER_ROLE) {
+        isMerklReceivedTokenAllowed[token] = allowed;
+
+        emit MerklReceivedTokenAllowedSet(token, allowed);
     }
 
     function softExit(address yieldModule, address yieldToken) external whenNotPaused onlyRole(RISK_SERVICE_ROLE) {
