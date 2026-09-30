@@ -9,7 +9,7 @@ import { SwapExecution } from "contracts/extensions/SwapExecution.sol";
 // Pins the frozen slots 0..7 on a module shaped like a real one: the full core chain plus an
 // extension. Adding a layer or reordering the bases must not move any of these.
 contract StorageLayoutStub is SwapExecution {
-    constructor() SwapExecution(address(4)) YieldModuleBase(address(1), address(2), address(3)) { }
+    constructor() SwapExecution(address(4)) YieldModuleBase(address(1), address(2), address(3), address(4)) { }
 
     /* solhint-disable no-empty-blocks */
     function initialize(address) external { }

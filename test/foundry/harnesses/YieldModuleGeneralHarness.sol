@@ -21,11 +21,12 @@ contract YieldModuleGeneralHarness is YieldModuleHarness {
         address yieldProcessor_,
         address factory_,
         address trustedForwarder_,
-        address swapExecutionRegistry_
+        address swapExecutionRegistry_,
+        address wrappedNative_
     )
         MerklIncentives(distributor_)
         SwapExecution(swapExecutionRegistry_)
-        YieldModuleBase(yieldProcessor_, factory_, trustedForwarder_)
+        YieldModuleBase(yieldProcessor_, factory_, trustedForwarder_, wrappedNative_)
     {
         pool = GeneralPoolMock(pool_);
 
