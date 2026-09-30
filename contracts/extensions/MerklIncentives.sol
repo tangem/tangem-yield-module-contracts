@@ -209,7 +209,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         address receivedToken,
         TokenAction tokenAction
     ) private view returns (bool) {
-        if (receivedToken == rewardToken || receivedToken == NATIVE_TOKEN) {
+        if (receivedToken == rewardToken || receivedToken == wrappedNative || receivedToken == NATIVE_TOKEN) {
             return true;
         }
 
