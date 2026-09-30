@@ -75,7 +75,8 @@ abstract contract YieldModuleFixture is BaseTest, TestHelpers {
             address(processor),
             address(factory),
             address(forwarder),
-            address(swapExecutionRegistry)
+            address(swapExecutionRegistry),
+            address(wrappedNative)
         );
 
         factory.grantRole(factory.IMPLEMENTATION_SETTER_ROLE(), backend);

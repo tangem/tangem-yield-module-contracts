@@ -28,7 +28,8 @@ contract UpgradeTest is YieldModuleFixture {
             address(processor),
             address(factory),
             NEW_FORWARDER,
-            address(swapExecutionRegistry)
+            address(swapExecutionRegistry),
+            address(wrappedNative)
         );
 
         vm.startPrank(backend);
