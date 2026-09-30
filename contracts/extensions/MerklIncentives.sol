@@ -5,6 +5,7 @@ import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/Saf
 
 import { IMerklIncentives } from "../interfaces/IMerklIncentives.sol";
 import { IMerklDistributor } from "../interfaces/external/IMerklDistributor.sol";
+import { IMerklPullTokenWrapper } from "../interfaces/external/IMerklPullTokenWrapper.sol";
 
 import { PRECISION } from "../common/Constants.sol";
 import { Requires } from "../common/Requires.sol";
@@ -76,19 +77,28 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         Claim memory claim = _newClaim();
 
         for (uint i; i < rewardTokens.length; ++i) {
-            rewardTokens[i].requireNotZero();
-            receivedTokens[i].requireNotZero();
+            address rewardToken = rewardTokens[i];
+            address receivedToken = receivedTokens[i];
+
+            rewardToken.requireNotZero();
+            receivedToken.requireNotZero();
             cumulativeAmounts[i].requireNotZero();
 
-            claim.tokens[0] = rewardTokens[i];
+            (address yieldToken, TokenAction tokenAction) = _classifyRewardRoute(receivedToken);
+
+            require(
+                _isReceivedTokenAllowed(rewardToken, receivedToken, tokenAction),
+                ReceivedTokenNotAllowed(rewardToken, receivedToken)
+            );
+
+            claim.tokens[0] = rewardToken;
             claim.amounts[0] = cumulativeAmounts[i];
             claim.proofs[0] = proofs[i];
 
-            address receivedToken = receivedTokens[i];
             uint receivedAmount = _claimSingle(receivedToken, claim);
 
             uint serviceFee = _takeServiceFee(receivedToken, receivedAmount, serviceFeeRate, feeReceiver);
-            _routeClaimedReward(claim.tokens[0], receivedToken, receivedAmount, serviceFee);
+            _routeClaimedReward(rewardToken, receivedToken, receivedAmount, serviceFee, yieldToken, tokenAction);
         }
     }
 
@@ -110,10 +120,10 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         address rewardToken,
         address receivedToken,
         uint receivedAmount,
-        uint serviceFee
+        uint serviceFee,
+        address yieldToken,
+        TokenAction tokenAction
     ) private {
-        (address yieldToken, TokenAction tokenAction) = _classifyRewardRoute(receivedToken);
-
         uint netAmount = receivedAmount - serviceFee;
 
         address finalToken = receivedToken;
@@ -192,5 +202,28 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
         claim.datas = new bytes[](1);
 
         claim.users[0] = address(this);
+    }
+
+    function _isReceivedTokenAllowed(
+        address rewardToken,
+        address receivedToken,
+        TokenAction tokenAction
+    ) private view returns (bool) {
+        if (receivedToken == rewardToken || receivedToken == wrappedNative || receivedToken == NATIVE_TOKEN) {
+            return true;
+        }
+
+        // Other routes only accept registered reserves or their aTokens, so a mirrored-balance fake cannot reach them
+        if (tokenAction != TokenAction.SEND_TO_OWNER) {
+            return true;
+        }
+
+        try IMerklPullTokenWrapper(rewardToken).token() returns (address underlying) {
+            if (underlying == receivedToken) {
+                return true;
+            }
+        } catch { } // solhint-disable-line no-empty-blocks
+
+        return processor.isMerklReceivedTokenAllowed(receivedToken);
     }
 }

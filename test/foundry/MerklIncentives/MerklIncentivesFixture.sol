@@ -41,7 +41,7 @@ abstract contract MerklIncentivesFixture is AaveV3YieldModuleFixture {
 
     function _fundRewardWrapper(MerklTokenWrapperMock wrapper, uint amount) internal {
         wrapper.fundDistributor(amount);
-        deal(address(wrapper.underlying()), address(wrapper), amount, true);
+        deal(address(wrapper.token()), address(wrapper), amount, true);
     }
 
     /* CLAIM ARG BUILDERS */

@@ -6,6 +6,7 @@ import { MerklIncentivesFixture, TestERC20 } from "./MerklIncentivesFixture.sol"
 import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 import { IMerklDistributor } from "contracts/interfaces/external/IMerklDistributor.sol";
+import { IMerklPullTokenWrapper } from "contracts/interfaces/external/IMerklPullTokenWrapper.sol";
 import { MerklTokenWrapperMock } from "contracts/test/MerklTokenWrapperMock.sol";
 import { NativeRejectingOwner } from "contracts/test/NativeRejectingOwner.sol";
 
@@ -226,6 +227,159 @@ contract TokenWrapperRewardsTest is MerklIncentivesFixture {
         _claimSingleAsOwner(address(wrapper), address(wrapper), AMOUNT);
     }
 
+    /* Received token validation */
+
+    function test_claim_Reverts_WhenReceivedTokenDiffersFromPlainRewardToken() public {
+        TestERC20 rewardToken = _createRewardToken();
+        TestERC20 fakeToken = _createRewardToken();
+        _fundMerklDistributor(address(rewardToken), AMOUNT);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IMerklIncentives.ReceivedTokenNotAllowed.selector, address(rewardToken), address(fakeToken)
+            )
+        );
+
+        _claimSingleAsOwner(address(rewardToken), address(fakeToken), AMOUNT);
+    }
+
+    function test_claim_Reverts_WhenReceivedTokenIsNotWrapperUnderlying() public {
+        TestERC20 underlying = _createRewardToken();
+        TestERC20 fakeToken = _createRewardToken();
+        MerklTokenWrapperMock wrapper = _createRewardWrapper(address(underlying));
+        _fundRewardWrapper(wrapper, AMOUNT);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IMerklIncentives.ReceivedTokenNotAllowed.selector, address(wrapper), address(fakeToken)
+            )
+        );
+
+        _claimSingleAsOwner(address(wrapper), address(fakeToken), AMOUNT);
+    }
+
+    function test_claimMerklRewardsBE_Reverts_WhenReceivedTokenNotAllowed() public {
+        TestERC20 rewardToken = _createRewardToken();
+        TestERC20 fakeToken = _createRewardToken();
+        _fundMerklDistributor(address(rewardToken), AMOUNT);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IMerklIncentives.ReceivedTokenNotAllowed.selector, address(rewardToken), address(fakeToken)
+            )
+        );
+
+        _claimSingleAsBE(address(rewardToken), address(fakeToken), AMOUNT);
+    }
+
+    function test_claim_PassesReceivedTokenCheck_WhenReceivedTokenAllowed() public {
+        TestERC20 rewardToken = _createRewardToken();
+        TestERC20 allowedToken = _createRewardToken();
+        _fundMerklDistributor(address(rewardToken), AMOUNT);
+        _allowMerklReceivedToken(address(allowedToken));
+
+        // the check passes, so the claim fails later on the balance measurement instead
+        vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.MerklClaimedNoReward.selector, address(allowedToken)));
+
+        _claimSingleAsOwner(address(rewardToken), address(allowedToken), AMOUNT);
+    }
+
+    function test_claim_PushesToProtocol_WhenRouteAllowsReceivedToken() public {
+        MerklTokenWrapperMock wrapper = _createRewardWrapper(address(yieldToken));
+        _fundRewardWrapper(wrapper, YIELD_AMOUNT);
+        _hideWrappedToken(wrapper);
+
+        uint protocolBalanceBefore = ym.protocolBalance(address(yieldToken));
+
+        uint fee = _expectedRewardFee(YIELD_AMOUNT);
+
+        _claimSingleAsOwner(address(wrapper), address(yieldToken), YIELD_AMOUNT);
+
+        assertEq(ym.protocolBalance(address(yieldToken)), protocolBalanceBefore + YIELD_AMOUNT - fee);
+        assertEq(yieldToken.balanceOf(feeReceiver), fee);
+        assertEq(yieldToken.balanceOf(address(ym)), 0);
+    }
+
+    function test_claim_KeepsInModule_WhenRouteAllowsReceivedToken() public {
+        MerklTokenWrapperMock wrapper = _createRewardWrapper(address(protocolToken));
+        _fundRewardWrapper(wrapper, YIELD_AMOUNT);
+        _hideWrappedToken(wrapper);
+
+        uint protocolBalanceBefore = ym.protocolBalance(address(yieldToken));
+
+        uint fee = _expectedRewardFee(YIELD_AMOUNT);
+
+        _claimSingleAsOwner(address(wrapper), address(protocolToken), YIELD_AMOUNT);
+
+        assertEq(ym.protocolBalance(address(yieldToken)), protocolBalanceBefore + YIELD_AMOUNT - fee);
+        assertEq(protocolToken.balanceOf(feeReceiver), fee);
+    }
+
+    function test_claim_UnwrapsToOwner_WhenRouteAllowsReceivedToken() public {
+        _withdrawAndDeactivate(ym, owner, address(yieldToken));
+
+        MerklTokenWrapperMock wrapper = _createRewardWrapper(address(protocolToken));
+        _fundRewardWrapper(wrapper, YIELD_AMOUNT);
+        _hideWrappedToken(wrapper);
+
+        uint ownerBalanceBefore = yieldToken.balanceOf(owner);
+
+        uint fee = _expectedRewardFee(YIELD_AMOUNT);
+
+        _claimSingleAsOwner(address(wrapper), address(protocolToken), YIELD_AMOUNT);
+
+        assertEq(yieldToken.balanceOf(owner), ownerBalanceBefore + YIELD_AMOUNT - fee);
+        assertEq(protocolToken.balanceOf(address(ym)), 0);
+    }
+
+    function test_claim_SendsToOwner_WhenReceivedTokenIsWrappedNative() public {
+        MerklTokenWrapperMock wrapper = _createRewardWrapper(address(wrappedNative));
+        _fundRewardWrapper(wrapper, AMOUNT);
+        _hideWrappedToken(wrapper);
+
+        uint fee = _expectedRewardFee(AMOUNT);
+
+        _claimSingleAsOwner(address(wrapper), address(wrappedNative), AMOUNT);
+
+        assertEq(wrappedNative.balanceOf(owner), AMOUNT - fee);
+        assertEq(wrappedNative.balanceOf(feeReceiver), fee);
+        assertEq(wrappedNative.balanceOf(address(ym)), 0);
+    }
+
+    function test_claim_Reverts_WhenRouteDisallowsSuspendedYieldToken() public {
+        _suspendViaProcessor(ym);
+
+        MerklTokenWrapperMock wrapper = _createRewardWrapper(address(yieldToken));
+        _fundRewardWrapper(wrapper, YIELD_AMOUNT);
+        _hideWrappedToken(wrapper);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IMerklIncentives.ReceivedTokenNotAllowed.selector, address(wrapper), address(yieldToken)
+            )
+        );
+
+        _claimSingleAsOwner(address(wrapper), address(yieldToken), YIELD_AMOUNT);
+    }
+
+    function test_claim_Reverts_WhenPlainRewardDeclaresActiveYieldToken() public {
+        TestERC20 rewardToken = _createRewardToken();
+        _fundMerklDistributor(address(rewardToken), AMOUNT);
+
+        vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.MerklClaimedNoReward.selector, address(yieldToken)));
+
+        _claimSingleAsOwner(address(rewardToken), address(yieldToken), AMOUNT);
+    }
+
+    function test_claim_Reverts_WhenPlainRewardDeclaresProtocolToken() public {
+        TestERC20 rewardToken = _createRewardToken();
+        _fundMerklDistributor(address(rewardToken), AMOUNT);
+
+        vm.expectRevert(abi.encodeWithSelector(IMerklIncentives.MerklClaimedNoReward.selector, address(protocolToken)));
+
+        _claimSingleAsOwner(address(rewardToken), address(protocolToken), AMOUNT);
+    }
+
     /* Shared underlying */
 
     /// Two campaigns can wrap the same reward token, and then a single batch credits the module
@@ -340,6 +494,15 @@ contract TokenWrapperRewardsTest is MerklIncentivesFixture {
 
         _fundRewardWrapper(wrapper, amount);
         vm.deal(address(wrappedNative), amount);
+    }
+
+    function _hideWrappedToken(MerklTokenWrapperMock wrapper) internal {
+        vm.mockCallRevert(address(wrapper), abi.encodeCall(IMerklPullTokenWrapper.token, ()), "");
+    }
+
+    function _allowMerklReceivedToken(address token) internal {
+        vm.prank(backend);
+        processor.setMerklReceivedTokenAllowed(token, true);
     }
 
     function _claimPair(
