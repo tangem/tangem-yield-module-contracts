@@ -3,6 +3,7 @@
 pragma solidity 0.8.29;
 
 import { IERC1967 } from "@openzeppelin/contracts/interfaces/IERC1967.sol";
+import { ERC1967Utils } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 
 import { YieldModuleFixture } from "../YieldModuleFixture.sol";
 import { YieldModuleGeneralHarness } from "../harnesses/YieldModuleGeneralHarness.sol";
@@ -11,8 +12,6 @@ import { YieldModuleHarness } from "../harnesses/YieldModuleHarness.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
 
 contract UpgradeTest is YieldModuleFixture {
-    address internal constant NEW_FORWARDER = address(0);
-
     YieldModuleHarness internal yieldModule;
     YieldModuleGeneralHarness internal newImplementation;
 
@@ -27,7 +26,6 @@ contract UpgradeTest is YieldModuleFixture {
             address(merklDistributor),
             address(processor),
             address(factory),
-            NEW_FORWARDER,
             address(swapExecutionRegistry),
             address(wrappedNative)
         );
@@ -39,12 +37,12 @@ contract UpgradeTest is YieldModuleFixture {
     }
 
     function test_upgradeToAndCall_UpgradesToNewImplementation() public {
-        assertEq(yieldModule.trustedForwarder(), address(forwarder));
+        assertEq(_implementationOf(address(yieldModule)), address(ymGeneralImpl));
 
         vm.prank(owner);
         yieldModule.upgradeToAndCall(address(newImplementation), "");
 
-        assertEq(yieldModule.trustedForwarder(), NEW_FORWARDER);
+        assertEq(_implementationOf(address(yieldModule)), address(newImplementation));
     }
 
     function test_upgradeToAndCall_Reverts_WhenNotOwner() public {
@@ -65,5 +63,9 @@ contract UpgradeTest is YieldModuleFixture {
 
         vm.prank(owner);
         yieldModule.upgradeToAndCall(address(newImplementation), "");
+    }
+
+    function _implementationOf(address proxy) internal view returns (address) {
+        return address(uint160(uint(vm.load(proxy, ERC1967Utils.IMPLEMENTATION_SLOT))));
     }
 }

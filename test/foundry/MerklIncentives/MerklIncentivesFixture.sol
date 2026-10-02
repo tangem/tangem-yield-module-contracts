@@ -2,7 +2,6 @@
 pragma solidity 0.8.29;
 
 import { PRECISION } from "contracts/common/Constants.sol";
-import { IMerklIncentives } from "contracts/interfaces/IMerklIncentives.sol";
 import { MerklTokenWrapperMock } from "contracts/test/MerklTokenWrapperMock.sol";
 import { TestERC20 } from "contracts/test/TestERC20.sol";
 import { AaveV3YieldModuleFixture } from "test/foundry/TangemAaveV3YieldModule/AaveV3YieldModuleFixture.sol";
@@ -109,15 +108,5 @@ abstract contract MerklIncentivesFixture is AaveV3YieldModuleFixture {
 
         vm.prank(backend);
         processor.claimMerklRewards(address(ym), tokens, receivedTokens, amounts, proofs);
-    }
-
-    function _claimSingleAsOwnerViaForwarder(address rewardToken, uint amount) internal {
-        (address[] memory tokens, address[] memory receivedTokens, uint[] memory amounts, bytes32[][] memory proofs) =
-            _singleClaimArgs(rewardToken, rewardToken, amount);
-
-        bytes memory data =
-            abi.encodeCall(IMerklIncentives.claimMerklRewardsOwner, (tokens, receivedTokens, amounts, proofs));
-
-        _executeViaForwarder(address(ym), data, 0);
     }
 }

@@ -27,7 +27,6 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
             address(0),
             address(processor),
             address(factory),
-            address(forwarder),
             address(swapExecutionRegistry),
             address(wrappedNative)
         );
@@ -93,32 +92,6 @@ contract MerklIncentivesTest is MerklIncentivesFixture {
         emit TangemYieldProcessor.MerklRewardsClaimed(address(ym));
 
         _claimSingleAsBE(address(rewardToken), AMOUNT);
-    }
-
-    function test_claimMerklRewardsOwner_Success_ViaForwarder() public {
-        TestERC20 rewardToken = _createRewardToken();
-        _fundMerklDistributor(address(rewardToken), AMOUNT);
-
-        uint fee = _expectedRewardFee(AMOUNT);
-
-        // the forwarder must not leak into the event: caller is the owner, not the relayer
-        vm.expectEmit(address(ym));
-        emit IMerklIncentives.MerklClaimed(
-            address(rewardToken),
-            address(rewardToken),
-            AMOUNT,
-            fee,
-            owner,
-            address(rewardToken),
-            AMOUNT - fee,
-            owner
-        );
-
-        _claimSingleAsOwnerViaForwarder(address(rewardToken), AMOUNT);
-
-        assertEq(rewardToken.balanceOf(owner), AMOUNT - fee);
-        assertEq(rewardToken.balanceOf(feeReceiver), fee);
-        assertEq(rewardToken.balanceOf(address(ym)), 0);
     }
 
     /* Gas */
