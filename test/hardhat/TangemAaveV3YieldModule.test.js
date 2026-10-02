@@ -12,7 +12,7 @@ describe("TangemBridgeProcessor", function () {
   const SOFT_EXIT_ZERO_AMOUNT = 3;
   // AaveV3PoolMock.WithdrawFailed(), as the module forwards it verbatim
   const POOL_WITHDRAW_FAILED_REASON = ethers.id("WithdrawFailed()").slice(0, 10);
-  let yieldToken, factory, processor, pool, forwarder, protocolToken, swapExecutionRegistry, merklDistributor, wrappedNative, backend, owner, otherAccount;
+  let yieldToken, factory, processor, pool, protocolToken, swapExecutionRegistry, merklDistributor, wrappedNative, backend, owner, otherAccount;
 
   async function deployYieldModuleFor(moduleOwnerSigner, initialYieldTokenAddress = ethers.ZeroAddress, maxNetworkFee = 0) {
     const moduleOwnerAddress = await moduleOwnerSigner.getAddress();
@@ -35,7 +35,7 @@ describe("TangemBridgeProcessor", function () {
   });
 
   beforeEach(async function () {
-    ( { yieldToken, factory, processor, pool, forwarder, swapExecutionRegistry, merklDistributor, wrappedNative } = await deployTestSetup() );
+    ( { yieldToken, factory, processor, pool, swapExecutionRegistry, merklDistributor, wrappedNative } = await deployTestSetup() );
 
     const protocolTokenAddress = await pool.aToken();
     const TestERC20 = await ethers.getContractFactory("TestERC20");
@@ -1324,8 +1324,14 @@ describe("TangemBridgeProcessor", function () {
 
   describe("Upgrade", function () {
     const maxNetworkFee = 12345;
-    const newForwarder = ethers.ZeroAddress;
+    // keccak256("eip1967.proxy.implementation") - 1
+    const implementationSlot = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
     let yieldModule, newImplementation;
+
+    async function implementationOf(proxy) {
+      const raw = await ethers.provider.getStorage(proxy, implementationSlot);
+      return ethers.getAddress(ethers.dataSlice(raw, 12));
+    }
 
     beforeEach(async function () {
       const deployTx = await factory.connect(owner).deployYieldModule(owner, yieldToken, maxNetworkFee);
@@ -1335,7 +1341,7 @@ describe("TangemBridgeProcessor", function () {
       const yieldModuleAddress = await factory.calculateYieldModuleAddress(owner);
       yieldModule = TangemAaveV3YieldModule.attach(yieldModuleAddress)
 
-      newImplementation = await TangemAaveV3YieldModule.deploy(pool, merklDistributor, processor, factory, newForwarder, swapExecutionRegistry, wrappedNative);
+      newImplementation = await TangemAaveV3YieldModule.deploy(pool, merklDistributor, processor, factory, swapExecutionRegistry, wrappedNative);
       await newImplementation.waitForDeployment();
 
       const pauseTx = await factory.pause();
@@ -1346,12 +1352,13 @@ describe("TangemBridgeProcessor", function () {
     });
 
     it("Should upgrade to new implementation", async function () {
-      expect(await yieldModule.trustedForwarder()).to.equal(forwarder);
+      const oldImplementation = await implementationOf(yieldModule);
+      expect(oldImplementation).to.not.equal(await newImplementation.getAddress());
 
       const exitTx = await yieldModule.connect(owner).upgradeToAndCall(newImplementation, "0x");
       await exitTx.wait();
 
-      expect(await yieldModule.trustedForwarder()).to.equal(newForwarder);
+      expect(await implementationOf(yieldModule)).to.equal(await newImplementation.getAddress());
     });
 
     it("Should fail with correct error if called not by owner", async function () {

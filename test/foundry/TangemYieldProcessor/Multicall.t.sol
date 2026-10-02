@@ -5,7 +5,6 @@ pragma solidity 0.8.29;
 import { Vm } from "forge-std/src/Vm.sol";
 
 import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
-import { ERC2771Forwarder } from "@openzeppelin/contracts/metatx/ERC2771Forwarder.sol";
 import { Errors } from "@openzeppelin/contracts/utils/Errors.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
@@ -102,24 +101,6 @@ contract TangemYieldProcessorMulticallTest is YieldModuleFixture {
 
         assertFalse(success);
         assertEq(returndata, _accessControlError(otherAccount, processor.RISK_SERVICE_ROLE()));
-    }
-
-    function test_multicall_Reverts_WhenRelayedThroughForwarder() public {
-        bytes32 riskRole = processor.RISK_SERVICE_ROLE();
-        vm.prank(backend);
-        processor.grantRole(riskRole, owner);
-        YieldModuleHarness[] memory modules = _deployModules(1);
-
-        ERC2771Forwarder.ForwardRequestData memory request =
-            _signForwardRequest(address(processor), abi.encodeCall(processor.multicall, (_suspendCalls(modules))));
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ERC2771Forwarder.ERC2771UntrustfulTarget.selector, address(processor), address(forwarder)
-            )
-        );
-        vm.prank(otherAccount);
-        forwarder.execute(request);
     }
 
     function test_multicall_KeepsCaller_InNestedMulticall() public {
@@ -296,50 +277,5 @@ contract TangemYieldProcessorMulticallTest is YieldModuleFixture {
                 ++count;
             }
         }
-    }
-
-    function _signForwardRequest(
-        address target,
-        bytes memory data
-    ) internal view returns (ERC2771Forwarder.ForwardRequestData memory request) {
-        uint48 deadline = uint48(block.timestamp + 1 hours);
-
-        bytes32 domainSeparator = keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes("Tangem ERC2771 Forwarder")),
-                keccak256(bytes("1")),
-                block.chainid,
-                address(forwarder)
-            )
-        );
-
-        bytes32 structHash = keccak256(
-            abi.encode(
-                keccak256(
-                    "ForwardRequest(address from,address to,uint256 value,uint256 gas,uint256 nonce,uint48 deadline,bytes data)"
-                ),
-                owner,
-                target,
-                0,
-                1_000_000,
-                forwarder.nonces(owner),
-                deadline,
-                keccak256(data)
-            )
-        );
-
-        bytes32 digest = keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, structHash));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPk, digest);
-
-        request = ERC2771Forwarder.ForwardRequestData({
-            from: owner,
-            to: target,
-            value: 0,
-            gas: 1_000_000,
-            deadline: deadline,
-            data: data,
-            signature: abi.encodePacked(r, s, v)
-        });
     }
 }

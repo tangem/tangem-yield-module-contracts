@@ -7,10 +7,6 @@ async function deployTestSetup() {
     const yieldToken = await TestERC20.deploy("TestToken", "TST", 18);
     await yieldToken.waitForDeployment();
 
-    const TangemERC2771Forwarder = await ethers.getContractFactory("TangemERC2771Forwarder");
-    const forwarder = await TangemERC2771Forwarder.deploy();
-    await forwarder.waitForDeployment();
-
     const AaveV3PoolMock = await ethers.getContractFactory("AaveV3PoolMock");
     const pool = await AaveV3PoolMock.deploy();
     await pool.waitForDeployment();
@@ -63,7 +59,7 @@ async function deployTestSetup() {
     await wrappedNative.waitForDeployment();
 
     const AaveV3YieldModule = await ethers.getContractFactory("TangemAaveV3YieldModule");
-    const moduleImplementation = await AaveV3YieldModule.deploy(pool, merklDistributor, processor, factory, forwarder, swapExecutionRegistry, wrappedNative);
+    const moduleImplementation = await AaveV3YieldModule.deploy(pool, merklDistributor, processor, factory, swapExecutionRegistry, wrappedNative);
     await moduleImplementation.waitForDeployment();
 
     const implementationSetterRole = ethers.id("IMPLEMENTATION_SETTER_ROLE")
@@ -79,7 +75,7 @@ async function deployTestSetup() {
     const unpauseTx = await factory.unpause();
     await unpauseTx.wait();
 
-    return { yieldToken, factory, processor, pool, forwarder, swapExecutionRegistry, merklDistributor, wrappedNative };
+    return { yieldToken, factory, processor, pool, swapExecutionRegistry, merklDistributor, wrappedNative };
 }
 
 module.exports = { deployTestSetup };

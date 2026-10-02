@@ -192,7 +192,6 @@ contract NativeSupportTest is AaveV3YieldModuleFixture {
             address(merklDistributor),
             address(processor),
             address(factory),
-            address(forwarder),
             address(swapExecutionRegistry),
             address(0)
         );

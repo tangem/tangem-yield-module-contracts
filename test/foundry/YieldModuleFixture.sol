@@ -6,10 +6,8 @@ import { YieldModuleGeneralHarness } from "test/foundry/harnesses/YieldModuleGen
 import { YieldModuleHarness } from "test/foundry/harnesses/YieldModuleHarness.sol";
 import { TestHelpers } from "test/foundry/utils/TestHelpers.sol";
 
-import { ERC2771Forwarder } from "@openzeppelin/contracts/metatx/ERC2771Forwarder.sol";
 import { PRECISION } from "contracts/common/Constants.sol";
 import { SwapExecutionRegistry } from "contracts/infra/SwapExecutionRegistry.sol";
-import { TangemERC2771Forwarder } from "contracts/infra/TangemERC2771Forwarder.sol";
 import { TangemYieldModuleFactory } from "contracts/infra/TangemYieldModuleFactory.sol";
 import { TangemYieldProcessor } from "contracts/infra/TangemYieldProcessor.sol";
 import { IYieldModule } from "contracts/interfaces/IYieldModule.sol";
@@ -32,7 +30,6 @@ abstract contract YieldModuleFixture is BaseTest, TestHelpers {
     uint internal constant FEE_DEBT_SCENARIO_DEPOSIT = 100_000e6;
     uint internal constant FEE_DEBT_SCENARIO_REVENUE = 10_000e6;
 
-    TangemERC2771Forwarder public forwarder;
     TangemYieldProcessor public processor;
     TangemYieldModuleFactory public factory;
     SwapExecutionRegistry public swapExecutionRegistry;
@@ -47,8 +44,6 @@ abstract contract YieldModuleFixture is BaseTest, TestHelpers {
         super.setUp();
 
         vm.startPrank(backend);
-
-        forwarder = new TangemERC2771Forwarder();
 
         processor = new TangemYieldProcessor(feeReceiver, SERVICE_FEE_RATE);
         processor.grantRole(processor.PROTOCOL_ENTERER_ROLE(), backend);
@@ -74,7 +69,6 @@ abstract contract YieldModuleFixture is BaseTest, TestHelpers {
             address(merklDistributor),
             address(processor),
             address(factory),
-            address(forwarder),
             address(swapExecutionRegistry),
             address(wrappedNative)
         );
@@ -91,7 +85,6 @@ abstract contract YieldModuleFixture is BaseTest, TestHelpers {
         vm.label(address(processor), "processor");
         vm.label(address(factory), "factory");
         vm.label(address(swapExecutionRegistry), "swapExecutionRegistry");
-        vm.label(address(forwarder), "forwarder");
         vm.label(address(merklDistributor), "merklDistributor");
         vm.label(address(swapProvider), "swapProvider");
         vm.label(address(yieldToken), "yieldToken");
@@ -195,52 +188,6 @@ abstract contract YieldModuleFixture is BaseTest, TestHelpers {
     function _collectViaProcessor(IYieldModule yieldModule, address yieldTokenAddr) internal {
         vm.prank(backend);
         processor.collectServiceFee(address(yieldModule), yieldTokenAddr);
-    }
-
-    function _executeViaForwarder(address target, bytes memory data, uint value) internal {
-        uint48 deadline = uint48(block.timestamp + 1 hours);
-        uint nonce = forwarder.nonces(owner);
-
-        bytes32 domainSeparator = keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes("Tangem ERC2771 Forwarder")),
-                keccak256(bytes("1")),
-                block.chainid,
-                address(forwarder)
-            )
-        );
-
-        bytes32 structHash = keccak256(
-            abi.encode(
-                keccak256(
-                    "ForwardRequest(address from,address to,uint256 value,uint256 gas,uint256 nonce,uint48 deadline,bytes data)"
-                ),
-                owner,
-                target,
-                value,
-                1_000_000,
-                nonce,
-                deadline,
-                keccak256(data)
-            )
-        );
-
-        bytes32 digest = keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, structHash));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPk, digest);
-
-        ERC2771Forwarder.ForwardRequestData memory request = ERC2771Forwarder.ForwardRequestData({
-            from: owner,
-            to: target,
-            value: value,
-            gas: 1_000_000,
-            deadline: deadline,
-            data: data,
-            signature: abi.encodePacked(r, s, v)
-        });
-
-        vm.prank(backend);
-        forwarder.execute{ value: value }(request);
     }
 
     /* Helpers */

@@ -29,7 +29,6 @@ abstract contract AaveV3YieldModuleFixture is YieldModuleFixture {
             address(merklDistributor),
             address(processor),
             address(factory),
-            address(forwarder),
             address(swapExecutionRegistry),
             address(wrappedNative)
         );
