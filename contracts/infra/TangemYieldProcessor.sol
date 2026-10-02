@@ -3,6 +3,7 @@ pragma solidity 0.8.29;
 
 import { AccessControlEnumerable } from "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
 import { Arrays } from "@openzeppelin/contracts/utils/Arrays.sol";
+import { Multicall } from "@openzeppelin/contracts/utils/Multicall.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
 import { PRECISION } from "../common/Constants.sol";
@@ -10,7 +11,7 @@ import { IMerklIncentives } from "../interfaces/IMerklIncentives.sol";
 import { IYieldModule } from "../interfaces/IYieldModule.sol";
 import { IYieldProcessor } from "../interfaces/IYieldProcessor.sol";
 
-contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausable {
+contract TangemYieldProcessor is IYieldProcessor, AccessControlEnumerable, Pausable, Multicall {
     using Arrays for uint[];
 
     bytes32 public constant PROTOCOL_ENTERER_ROLE = keccak256("PROTOCOL_ENTERER_ROLE");
