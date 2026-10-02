@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import { ERC2771ContextUpgradeable } from "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { ReentrancyGuardTransientUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
@@ -15,7 +14,6 @@ import { YieldModuleStorage } from "./YieldModuleStorage.sol";
 abstract contract YieldModuleBase is
     YieldModuleStorage,
     Initializable,
-    ERC2771ContextUpgradeable,
     IYieldModule,
     UUPSUpgradeable,
     ReentrancyGuardTransientUpgradeable
@@ -27,28 +25,22 @@ abstract contract YieldModuleBase is
     address public immutable wrappedNative;
 
     modifier onlyOwner() {
-        require(_msgSender() == owner, OnlyOwner());
+        require(msg.sender == owner, OnlyOwner());
         _;
     }
 
     modifier onlyOwnerOrFactory() {
-        address msgSender = _msgSender();
-        require(msgSender == owner || msgSender == address(factory), OnlyOwnerOrFactory());
+        require(msg.sender == owner || msg.sender == address(factory), OnlyOwnerOrFactory());
         _;
     }
 
     modifier onlyProcessor() {
-        require(_msgSender() == address(processor), OnlyProcessor());
+        require(msg.sender == address(processor), OnlyProcessor());
         _;
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor(
-        address processor_,
-        address factory_,
-        address trustedForwarder_,
-        address wrappedNative_
-    ) ERC2771ContextUpgradeable(trustedForwarder_) {
+    constructor(address processor_, address factory_, address wrappedNative_) {
         processor = IYieldProcessor(processor_);
         factory = IYieldFactory(factory_);
 

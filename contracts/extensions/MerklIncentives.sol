@@ -154,7 +154,7 @@ abstract contract MerklIncentives is IMerklIncentives, YieldModuleLiquidUpgradea
             finalRecipient,
             finalToken,
             finalAmount,
-            _msgSender()
+            msg.sender
         );
     }
 
