@@ -23,13 +23,12 @@ contract TangemAaveV3YieldModule is YieldModuleLiquidUpgradeable, SwapExecution,
         address distributor_,
         address yieldProcessor_,
         address factory_,
-        address trustedForwarder_,
         address swapExecutionRegistry_,
         address wrappedNative_
     )
         MerklIncentives(distributor_)
         SwapExecution(swapExecutionRegistry_)
-        YieldModuleBase(yieldProcessor_, factory_, trustedForwarder_, wrappedNative_)
+        YieldModuleBase(yieldProcessor_, factory_, wrappedNative_)
     {
         pool = IPool(pool_);
 
