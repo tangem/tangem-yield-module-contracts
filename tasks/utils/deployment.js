@@ -2,9 +2,10 @@ const deploymentParameters = require("../../config/deployment-parameters.json");
 
 const REQUIRED_PARAMETERS = ["pool", "distributor", "wrappedNative"];
 
-function resolveDeploymentParameters(hre, args = {}) {
+/** Config values of the network, overridden by the CLI arguments that were passed. */
+function resolveDeploymentParameters(hre, args = {}, required = REQUIRED_PARAMETERS) {
   const networkName = hre.network.name;
-  const { chainId, ...defaults } = deploymentParameters[networkName] ?? {};
+  const { chainId, ...configured } = deploymentParameters[networkName] ?? {};
 
   if (chainId !== undefined && chainId !== hre.network.config.chainId) {
     throw new Error(
@@ -13,8 +14,8 @@ function resolveDeploymentParameters(hre, args = {}) {
   }
 
   const overrides = Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined));
-  const parameters = { ...defaults, ...overrides };
-  const missing = REQUIRED_PARAMETERS.filter((name) => !parameters[name]);
+  const parameters = { ...configured, ...overrides };
+  const missing = required.filter((name) => !parameters[name]);
 
   if (missing.length > 0) {
     throw new Error(
