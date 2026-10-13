@@ -1,5 +1,14 @@
 const { task } = require("hardhat/config");
-const { compile, deployContract } = require("./utils");
+const { compile, deployContract, resolveDeploymentParameters, withErrorLog } = require("./utils");
+
+const MODULE_IMPLEMENTATION_PARAMETERS = [
+  "pool",
+  "distributor",
+  "processor",
+  "factory",
+  "registry",
+  "wrappedNative",
+];
 
 async function deployModuleImplementation(hre, args) {
   return deployContract(hre, "TangemAaveV3YieldModule", [
@@ -14,16 +23,17 @@ async function deployModuleImplementation(hre, args) {
 }
 
 task("deploy-module-implementation", "Deploys a new yield module implementation")
-  .addParam("pool", "The address of the Aave pool")
-  .addParam("distributor", "The address of the Merkl distributor")
-  .addParam("processor", "The address of the yield processor")
-  .addParam("factory", "The address of the yield module factory")
-  .addParam("forwarder", "The address of the Tangem forwarder")
-  .addParam("registry", "The address of the swap execution registry")
-  .addParam("wrappedNative", "The address of the wrapped native token")
-  .setAction(async (args, hre) => {
+  .addOptionalParam("pool", "Overrides the configured Aave pool address")
+  .addOptionalParam("distributor", "Overrides the configured Merkl distributor address")
+  .addOptionalParam("processor", "Overrides the configured yield processor address")
+  .addOptionalParam("factory", "Overrides the configured yield module factory address")
+  .addOptionalParam("registry", "Overrides the configured swap execution registry address")
+  .addOptionalParam("wrappedNative", "Overrides the configured wrapped native token address")
+  .setAction(withErrorLog("deployModuleImplementation", async (args, hre) => {
     await compile(hre);
-    await deployModuleImplementation(hre, args);
-  });
+    const parameters = resolveDeploymentParameters(hre, args, MODULE_IMPLEMENTATION_PARAMETERS);
+    // A zero trusted forwarder disables ERC-2771 meta-transactions.
+    await deployModuleImplementation(hre, { ...parameters, forwarder: hre.ethers.ZeroAddress });
+  }));
 
 module.exports = { deployModuleImplementation };
