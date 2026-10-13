@@ -7,6 +7,12 @@ function withErrorLog(functionName, action) {
       await action(args, hre);
     } catch (error) {
       err(error.message, functionName);
+
+      // AggregateError's own message omits the underlying causes.
+      for (const cause of error.errors ?? []) {
+        err(cause.message, functionName);
+      }
+
       process.exitCode = 1;
     }
   };
