@@ -43,4 +43,4 @@ function buildNetworks() {
   );
 }
 
-module.exports = { NETWORKS, buildNetworks };
+module.exports = { NETWORKS, buildNetworks, rpcUrl };

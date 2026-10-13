@@ -8,3 +8,4 @@ require("./deployProcessor");
 require("./deployModuleImplementation");
 require("./upgradeModuleImplementation");
 require("./getEffectiveBalance");
+require("./initNetwork");
