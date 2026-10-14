@@ -44,7 +44,17 @@ module.exports = {
     except: ["contracts/test/"]
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY
+    apiKey: process.env.ETHERSCAN_API_KEY,
+    customChains: [
+      {
+        network: "monad",
+        chainId: 143,
+        urls: {
+          apiURL: "https://api.etherscan.io/v2/api",
+          browserURL: "https://monadscan.com"
+        }
+      }
+    ]
   },
   tenderly: {
     username: process.env.TENDERLY_USERNAME || "",
