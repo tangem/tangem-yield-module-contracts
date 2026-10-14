@@ -16,7 +16,6 @@ async function deployBase(hre, args) {
   const parameters = resolveDeploymentParameters(hre, args);
   const deployer = (await getSigner(hre)).address;
 
-  const forwarder = await deployContract(hre, "TangemERC2771Forwarder", [], { verify: true });
   const processor = await deployProcessor(hre, parameters);
   const factory = await deployContract(hre, "TangemYieldModuleFactory", [], { verify: true });
   const registry = await deployRegistry(hre, { admin: deployer });
@@ -26,7 +25,7 @@ async function deployBase(hre, args) {
     distributor: parameters.distributor,
     processor: await processor.getAddress(),
     factory: await factory.getAddress(),
-    forwarder: await forwarder.getAddress(),
+    forwarder: hre.ethers.ZeroAddress,
     registry: await registry.getAddress(),
     wrappedNative: parameters.wrappedNative,
   });
@@ -38,7 +37,7 @@ async function deployBase(hre, args) {
 
   log("deployment complete", "deployBase", hre.network.name);
 
-  return { forwarder, processor, factory, registry, implementation };
+  return { processor, factory, registry, implementation };
 }
 
 task("deploy-base", "Deploys the base set of Tangem yield contracts")
