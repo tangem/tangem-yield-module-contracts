@@ -25,7 +25,7 @@ async function deployBase(hre, args) {
     distributor: parameters.distributor,
     processor: await processor.getAddress(),
     factory: await factory.getAddress(),
-    forwarder: await hre.ethers.ZeroAddress,
+    forwarder: hre.ethers.ZeroAddress,
     registry: await registry.getAddress(),
     wrappedNative: parameters.wrappedNative,
   });
